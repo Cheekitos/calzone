@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artefact Loadout Calculator</title>
+<style>
+  :root{
+    --bg: #14161a;
+    --panel: #1b1e23;
+    --panel-2: #20242a;
+    --border: #2d3138;
+    --text: #d9dadc;
+    --muted: #8a8f97;
+    --accent: #c9893f;
+    --accent-dim: #8a5f2d;
+    --good: #6f9e5c;
+    --good-bg: rgba(111,158,92,0.12);
+    --bad: #c2503f;
+    --bad-bg: rgba(194,80,63,0.12);
+    --warn: #c9a23f;
+    --mono: "SF Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    /* Quality/rarity colors, used for My Loadout pills */
+    --q-common: #9aa1ad;    --q-common-bg: rgba(154,161,173,0.16);
+    --q-uncommon: #5fb86a;  --q-uncommon-bg: rgba(95,184,106,0.16);
+    --q-special: #4f9be0;   --q-special-bg: rgba(79,155,224,0.16);
+    --q-rare: #a06fe0;      --q-rare-bg: rgba(160,111,224,0.16);
+    --q-exclusive: #e0564f; --q-exclusive-bg: rgba(224,86,79,0.16);
+    --q-legendary: #e0c23f; --q-legendary-bg: rgba(224,194,63,0.16);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.45;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  header{margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:16px;}
+  header h1{
+    font-size:20px;letter-spacing:0.08em;text-transform:uppercase;
+    margin:0 0 4px;color:#fff;font-weight:700;
+  }
+  header h1 span{color:var(--accent);}
+  header p{margin:0;color:var(--muted);font-size:13px;}
+
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:18px;}
+  @media (max-width:880px){.grid{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:16px;
+  }
+  .panel + .panel{margin-top:14px;}
+  .panel h2{
+    font-size:11px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 12px;font-weight:700;
+  }
+
+  label.field{display:block;margin-bottom:12px;}
+  label.field span.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  input[type=number],input[type=text]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--mono);font-size:14px;
+  }
+  input[type=number]:focus,input[type=text]:focus{outline:1px solid var(--accent-dim);}
+  input[type=text]::placeholder{color:var(--muted);font-size:13px;}
+
+  /* Loadout manual-add dropdown */
+  .loadout-search-dd{
+    position:absolute;top:calc(100% - 1px);left:0;right:0;
+    background:var(--panel);border:1px solid var(--border);border-top:none;
+    border-radius:0 0 4px 4px;max-height:200px;overflow-y:auto;z-index:200;display:none;
+  }
+  .loadout-search-dd.open{display:block;}
+  .loadout-search-item{padding:7px 10px;font-size:13px;cursor:pointer;}
+  .loadout-search-item:hover{background:rgba(201,137,63,0.1);color:var(--accent);}
+  select{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--mono);font-size:13px;
+    cursor:pointer;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8f97'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;
+  }
+  select:focus{outline:1px solid var(--accent-dim);}
+  select option{background:var(--panel-2);}
+
+  .row-inline{display:flex;gap:10px;}
+  .row-inline label.field{flex:1;}
+
+  .check-list{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px;background:var(--panel-2);}
+  #artifactList{max-height:600px;}
+  .check-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:3px;cursor:pointer;font-size:13px;}
+  .check-item:hover{background:rgba(255,255,255,0.03);}
+  .check-item input{accent-color:var(--accent);}
+  .check-item .dir{font-family:var(--mono);font-size:11px;width:14px;text-align:center;flex-shrink:0;}
+  .dir.good{color:var(--good);}
+  .dir.bad{color:var(--bad);}
+  .check-item .name{flex:1;}
+  .check-item .name small{color:var(--muted);}
+  .check-item.used-highlight{background:rgba(201,137,63,0.12);border:1px solid var(--accent-dim);}
+  .check-item.used-highlight:hover{background:rgba(201,137,63,0.18);}
+  .artifact-used-hdr{
+    font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);
+    font-weight:700;padding:3px 6px 7px;border-bottom:1px solid var(--border);margin-bottom:5px;
+  }
+
+  .toggle-row{display:flex;justify-content:flex-end;gap:10px;margin-bottom:8px;}
+  .toggle-row button{
+    background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;
+    text-decoration:underline;padding:0;letter-spacing:0.03em;
+  }
+
+  button.primary{
+    width:100%;margin-top:6px;background:var(--accent);color:#1a1306;border:none;
+    padding:11px;border-radius:4px;font-weight:700;font-size:13px;letter-spacing:0.06em;
+    text-transform:uppercase;cursor:pointer;
+  }
+  button.primary:hover{background:#dd9849;}
+
+  .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
+
+  /* results */
+  .empty-state{color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;}
+  .msg-error{background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;padding:10px 12px;border-radius:4px;font-size:13px;margin-bottom:14px;}
+
+  .loadout-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+  .loadout-chip{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:4px;
+    padding:6px 10px;font-size:13px;display:flex;align-items:center;gap:6px;
+  }
+  .loadout-chip b{color:var(--accent);font-family:var(--mono);}
+  button.loadout-chip{cursor:pointer;font-family:var(--sans);color:var(--text);}
+  button.loadout-chip:hover{border-color:var(--accent-dim);}
+  button.loadout-chip.owned-match{border-color:var(--good);background:var(--good-bg);}
+  button.loadout-chip.owned-match:hover{background:rgba(111,158,92,0.22);}
+
+  /* Artefact context popover (Exclude / Favorite) */
+  .artchip-popover{
+    position:fixed;z-index:1000;background:var(--panel);border:1px solid var(--border);
+    border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.5);padding:10px;min-width:230px;
+    font-size:13px;opacity:0;transform:translateY(-4px);max-height:80vh;overflow-y:auto;
+    transition:opacity 0.15s ease,transform 0.15s ease;pointer-events:none;
+  }
+  .artchip-popover.open{opacity:1;transform:translateY(0);pointer-events:auto;}
+  .popover-btn{
+    display:block;width:100%;text-align:left;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:7px 10px;border-radius:4px;font-size:12.5px;cursor:pointer;margin-bottom:6px;
+    font-family:var(--sans);
+  }
+  .popover-btn:last-child{margin-bottom:0;}
+  .popover-btn:hover{border-color:var(--accent-dim);background:rgba(201,137,63,0.08);}
+  .popover-btn.danger{color:var(--bad);}
+
+  .owned-pills{display:flex;gap:5px;flex-wrap:wrap;}
+  .quality-pill{
+    font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:999px;
+    border:1px solid;display:inline-flex;align-items:center;white-space:nowrap;
+  }
+  .quality-pill.q-100{color:var(--q-common);border-color:var(--q-common);background:var(--q-common-bg);}
+  .quality-pill.q-115{color:var(--q-uncommon);border-color:var(--q-uncommon);background:var(--q-uncommon-bg);}
+  .quality-pill.q-130{color:var(--q-special);border-color:var(--q-special);background:var(--q-special-bg);}
+  .quality-pill.q-145{color:var(--q-rare);border-color:var(--q-rare);background:var(--q-rare-bg);}
+  .quality-pill.q-160{color:var(--q-exclusive);border-color:var(--q-exclusive);background:var(--q-exclusive-bg);}
+  .quality-pill.q-175{color:var(--q-legendary);border-color:var(--q-legendary);background:var(--q-legendary-bg);}
+  button.quality-pill{cursor:pointer;}
+  button.quality-pill:hover{filter:brightness(1.35);}
+  button.quality-pill.active{box-shadow:0 0 0 1px currentColor;filter:brightness(1.25);}
+
+  .score-line{font-size:12px;color:var(--muted);margin:10px 0 0;}
+  .score-line b{color:var(--text);}
+
+  table.stat-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+  table.stat-table th{
+    text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:0.04em;padding:6px 8px;border-bottom:1px solid var(--border);
+  }
+  table.stat-table td{padding:6px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);}
+  table.stat-table td.statname{font-family:var(--sans);}
+  table.stat-table tr.target td.statname{font-weight:700;color:#fff;}
+  .val.good{color:var(--good);}
+  .val.bad{color:var(--bad);}
+
+  .gauge-wrap{margin-bottom:12px;}
+  .gauge-head{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
+  .gauge-head .gname{color:var(--text);}
+  .gauge-head .gval{font-family:var(--mono);}
+  .gauge-track{position:relative;height:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+  .gauge-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px 0 0 3px;}
+  .gauge-marker{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.5);}
+  .gauge-status{font-size:11px;margin-top:3px;letter-spacing:0.03em;}
+
+  .section-title{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;}
+  .section-title:first-child{margin-top:0;}
+
+  .result-card{border:1px solid var(--border);border-radius:5px;padding:12px 14px;margin-bottom:12px;background:var(--panel-2);}
+  .rank-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .rank-badge{
+    background:var(--accent);color:#1a1306;font-weight:700;font-size:11px;
+    border-radius:3px;padding:2px 7px;letter-spacing:0.03em;
+  }
+  .target-line{margin:8px 0 2px;display:flex;flex-wrap:wrap;gap:6px;}
+  .target-pill{font-size:11.5px;font-family:var(--mono);padding:3px 8px;border-radius:3px;border:1px solid var(--border);}
+  .target-pill.good{color:var(--good);}
+  .target-pill.bad{color:var(--bad);}
+  .target-pill.top-stat{border-color:var(--accent);}
+  .result-card details{margin-top:10px;}
+  .result-card summary{cursor:pointer;font-size:11.5px;color:var(--accent);letter-spacing:0.03em;margin-bottom:6px;}
+  .result-card details[open] summary{margin-bottom:10px;}
+
+  .flag-note{font-size:11.5px;color:var(--warn);background:rgba(201,162,63,0.1);border:1px solid var(--warn);padding:8px 10px;border-radius:4px;margin-top:14px;}
+
+  /* Level toggle (LVL 0 / LVL 15) - remove to revert to granular level input */
+  .lvl-toggle{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .lvl-btn{
+    flex:1;background:none;border:none;border-right:1px solid var(--border);
+    color:var(--muted);font-size:13px;padding:8px 6px;cursor:pointer;
+    font-family:var(--mono);letter-spacing:0.06em;
+  }
+  .lvl-btn:last-child{border-right:none;}
+  .lvl-btn.active{background:var(--accent-dim);color:var(--text);}
+  .lvl-note{font-size:11px;margin-top:6px;letter-spacing:0.02em;color:var(--muted);}
+  .lvl-note.on{color:var(--good);}
+
+  .check-group-hdr{
+    font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--accent-dim);padding:8px 6px 3px;font-weight:700;
+  }
+  .check-group-hdr:first-child{padding-top:3px;}
+
+  .check-main{display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0;}
+  .stat-controls{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+  .tier-group{display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+  .tier-btn{
+    background:none;border:none;border-right:1px solid var(--border);
+    color:var(--muted);font-size:10px;padding:2px 5px;cursor:pointer;
+    font-family:var(--mono);letter-spacing:0.04em;line-height:1.4;
+  }
+  .tier-btn:last-child{border-right:none;}
+  .tier-btn.active{background:var(--accent-dim);color:var(--text);}
+
+  button.primary:disabled{opacity:0.45;cursor:not-allowed;}
+  button.primary:disabled:hover{background:var(--accent);}
+  button.primary.danger{background:#7a1f14;color:#000;}
+  button.primary.danger:hover{background:#8f2418;}
+  button.primary.danger:disabled:hover{background:#7a1f14;}
+  .btn-row{display:flex;gap:8px;margin-bottom:14px;}
+
+  /* Progress bar */
+  .prog-tagline{font-size:12px;color:var(--muted);margin:0 0 18px;line-height:1.5;}
+  .prog-tagline b{color:var(--accent);font-family:var(--mono);}
+  .prog-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;}
+  .prog-row-label{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase;}
+  .prog-count{font-size:12px;color:var(--text);font-family:var(--mono);}
+  .prog-track{
+    position:relative;height:16px;
+    background:var(--panel-2);border:1px solid var(--border);
+    border-radius:3px;overflow:hidden;margin-bottom:9px;
+  }
+  .prog-fill{
+    position:absolute;left:0;top:0;height:100%;
+    background:linear-gradient(90deg,var(--accent-dim),var(--accent));
+    transition:width 0.25s ease-out;
+    box-shadow:0 0 14px rgba(201,137,63,0.45);
+  }
+  .prog-scan{
+    position:absolute;top:0;bottom:0;width:5px;
+    background:linear-gradient(90deg,transparent,rgba(255,210,140,0.95),transparent);
+    animation:scan-sweep 1.6s ease-in-out infinite;
+    pointer-events:none;
+  }
+  .prog-pct{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.55);
+    line-height:1;pointer-events:none;z-index:1;
+  }
+  .prog-status{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:0.02em;}
+  @keyframes scan-sweep{
+    0%  {left:-5px;opacity:0;}
+    6%  {opacity:1;}
+    94% {opacity:1;}
+    100%{left:100%;opacity:0;}
+  }
+
+  .art-heart{
+    background:none;border:none;cursor:pointer;padding:0 2px;
+    font-size:13px;line-height:1;flex-shrink:0;color:var(--muted);
+    transition:color 0.12s;
+  }
+  .art-heart:hover{color:var(--bad);}
+  .art-heart.owned{color:#fff;}
+  .art-heart.owned:hover{color:var(--bad);}
+
+  /* Results header row (title + view toggle) */
+  .results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .results-header h2{margin:0;}
+  .results-view-toggle{display:flex;gap:3px;}
+  .view-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;
+  }
+  .view-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
+
+  /* Grid view: 3 cards per row, independent heights */
+  .results-grid-view{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:start;}
+  .results-grid-view .result-card{margin-bottom:0;}
+  @media(max-width:1080px){.results-grid-view{grid-template-columns:repeat(2,1fr);}}
+  /* Keep all chip buttons single-line so they're uniform height within and across cards.
+     max-width + min-width:0 on the name span gives ellipsis if a name is very long. */
+  .results-grid-view .loadout-chip{white-space:nowrap;max-width:100%;}
+  .results-grid-view .loadout-chip>span{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  /* align-content:flex-start keeps chips packed together at the top of the equalised
+     section; without this the default 'stretch' spreads rows apart to fill minHeight. */
+  .results-grid-view .loadout-list{align-content:flex-start;}
+  /* Faint separator between chips and stats; sits at a consistent level across cards
+     because the chip section height is already equalised. */
+  .results-grid-view .target-line{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ARTEFACT <span>LOADOUT</span> CALCULATOR</h1>
+    <p>Find your best Artefact build</p>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: controls -->
+    <div>
+      <div class="btn-row">
+        <button class="primary" id="calcBtn" style="flex:1;margin:0;">Find best combination</button>
+        <button class="primary danger" id="resetAllBtn" style="margin:0;width:auto;padding-left:18px;padding-right:18px;">Reset</button>
+      </div>
+
+      <div class="panel">
+        <h2>Backpack</h2>
+        <div class="row-inline">
+          <label class="field">
+            <span class="lbl">Slots</span>
+            <input type="number" id="slotsInput" min="1" max="6" value="4">
+          </label>
+          <label class="field">
+            <span class="lbl">Protection %</span>
+            <input type="number" id="protInput" min="0" max="100" value="60">
+          </label>
+          <label class="field">
+            <span class="lbl">Effectiveness %</span>
+            <input type="number" id="effInput" min="-100" max="200" value="83.5">
+          </label>
+        </div>
+        <div id="backpackPresets" style="display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 14px;"></div>
+        <div class="row-inline">
+          <!-- GRANULAR LEVEL INPUT: hidden - set label display:block and remove lvl-toggle div below to revert -->
+          <label class="field" style="display:none;">
+            <span class="lbl">Level (0–15)</span>
+            <input type="number" id="levelInput" min="0" max="15" value="0">
+          </label>
+          <!-- LEVEL TOGGLE - remove this div to revert to granular input -->
+          <div class="field" style="flex:1;">
+            <span class="lbl" style="display:block;font-size:12px;color:var(--muted);margin-bottom:5px;">Artefact Level</span>
+            <div class="lvl-toggle">
+              <button type="button" class="lvl-btn active" data-lvl="0">LVL 0</button>
+              <button type="button" class="lvl-btn" data-lvl="15">LVL 15</button>
+            </div>
+          </div>
+          <label class="field" style="flex:2;">
+            <span class="lbl">Quality</span>
+            <select id="qualityInput">
+              <option value="100" selected>Common - 100%</option>
+              <option value="115">Uncommon - 115%</option>
+              <option value="130">Special - 130%</option>
+              <option value="145">Rare - 145%</option>
+              <option value="160">Exclusive - 160%</option>
+              <option value="175">Legendary - 175%</option>
+            </select>
+          </label>
+        </div>
+        <!-- lvlNote lives outside the row so it doesn't affect toggle/select height alignment -->
+        <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
+      </div>
+
+      <div class="panel">
+        <h2>Valuable Stats</h2>
+        <div class="toggle-row">
+          <button type="button" id="statClearBtn">clear</button>
+        </div>
+        <div class="check-list" id="statList"></div>
+        <div class="check-group-hdr" style="padding-top:12px;">Extra Options</div>
+        <!-- INCLUDE ADDITIONAL CHK: hidden - driven by level toggle; restore display:flex to revert -->
+        <label class="check-item" style="display:none;margin-bottom:4px;">
+          <input type="checkbox" id="includeAdditionalChk">
+          <span class="name">Include additional stats</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="noVitalityDebuffChk" checked>
+          <span class="name">No Vitality debuff</span>
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>My Loadout</h2>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">Favorited</span>
+          <span style="display:flex;gap:10px;">
+            <button type="button" id="exportLoadoutBtn" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">export</button>
+            <button type="button" id="importLoadoutBtn" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">import</button>
+            <input type="file" id="importLoadoutFile" accept="application/json" style="display:none;">
+            <button type="button" id="clearLoadoutBtn" style="font-size:11px;color:var(--bad);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">clear all</button>
+          </span>
+        </div>
+        <div class="check-list" id="ownedList" style="max-height:160px;"></div>
+        <div class="check-group-hdr" style="padding-top:12px;">Add Artefact</div>
+        <div style="position:relative;margin-bottom:8px;">
+          <input type="text" id="loadoutSearchInput" placeholder="Type artefact name…" autocomplete="off">
+          <div id="loadoutSearchDd" class="loadout-search-dd"></div>
+        </div>
+        <div id="loadoutAddRow" class="row-inline" style="display:none;">
+          <select id="loadoutQualitySelect" style="flex:1;">
+            <option value="100">Common - 100%</option>
+            <option value="115">Uncommon - 115%</option>
+            <option value="130">Special - 130%</option>
+            <option value="145">Rare - 145%</option>
+            <option value="160">Exclusive - 160%</option>
+            <option value="175">Legendary - 175%</option>
+          </select>
+          <button type="button" id="loadoutAddBtn" class="primary" style="width:auto;margin:0;padding:8px 16px;flex-shrink:0;">Add</button>
+        </div>
+        <label class="check-item" style="margin-top:10px;">
+          <input type="checkbox" id="useLoadoutChk">
+          <span class="name">Only use my loadout for next search</span>
+        </label>
+
+      </div>
+
+      <div class="panel">
+        <h2>Available artefacts</h2>
+        <div class="toggle-row">
+          <button type="button" id="artAllBtn">all</button>
+          <button type="button" id="artNoneBtn">none</button>
+        </div>
+        <div class="check-list" id="artifactList"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: results -->
+    <div>
+      <div class="panel" id="results">
+        <h2>Result</h2>
+        <div class="empty-state">Choose stats to optimize and hit "Find best combination".</div>
+      </div>
+      <div id="consumableZone"></div>
+      <div id="upgradeTips"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Data ---------- */
+// good:true  -> positive value is beneficial (display green when >=0)
+// good:false -> negative value is beneficial (display green when <=0)
+// threshold:true -> one of the 5 stats capped at 0.5 net (after backpack protection)
+const STAT_META = {
+  "Bioinfection protection":    {good:true},
+  "Biological infection":       {good:false, threshold:true},
+  "Bleeding":                   {good:false},
+  "Bleeding protection":        {good:true},
+  "Bullet resistance":          {good:true},
+  "Burning":                    {good:false},
+  "Carry weight":               {good:true},
+  "Explosion protection":       {good:true},
+  "Frost":                      {good:false, threshold:true},
+  "Health regeneration":        {good:true},
+  "Healing effectiveness":      {good:true},
+  "Laceration protection":      {good:true},
+  "Movement speed":             {good:true},
+  "Periodic healing":           {good:true},
+  "Psyonics":                   {good:false, threshold:true},
+  "Psy-emission protection":    {good:true},
+  "Psy-emissions":              {good:false},
+  "Radiation":                  {good:false, threshold:true},
+  "Radiation protection":       {good:true},
+  "Reaction to burns":          {good:true},
+  "Reaction to chemical burns": {good:true},
+  "Reaction to electricity":    {good:true},
+  "Reaction to laceration":     {good:true},
+  "Recoil":                     {good:false},
+  "Resistance to chemicals":    {good:true},
+  "Resistance to electricity":  {good:true},
+  "Resistance to fire":         {good:true},
+  "Running speed":              {good:true},
+  "Stability":                  {good:true},
+  "Stamina":                    {good:true},
+  "Stamina regeneration":       {good:true},
+  "Sway":                       {good:false},
+  "Temperature":                {good:false, threshold:true},
+  "Thermal protection":         {good:true},
+  "Vitality":                   {good:true}
+};
+
+// stats that use a % unit when displayed (rest are flat values)
+const PERCENT_STATS = new Set([
+  "Bioinfection protection",
+  "Bleeding protection",
+  "Burning",
+  "Health regeneration",
+  "Healing effectiveness",
+  "Movement speed",
+  "Periodic healing",
+  "Reaction to burns",
+  "Reaction to chemical burns",
+  "Reaction to electricity",
+  "Reaction to laceration",
+  "Recoil",
+  "Resistance to electricity",
+  "Running speed",
+  "Stability",
+  "Stamina",
+  "Stamina regeneration",
+  "Sway",
+  "Vitality"
+]);
+
+const STAT_NAMES = Object.keys(STAT_META).sort();
+const STAT_IDX = {}; STAT_NAMES.forEach((s,i)=>STAT_IDX[s]=i);
+const THRESHOLD_STATS = STAT_NAMES.filter(s=>STAT_META[s].threshold);
+const NS = STAT_NAMES.length;
+
+// Quality tiers, mirrored from the #qualityInput select (used by My Loadout favoriting).
+const QUALITY_LABELS = {100:"Common",115:"Uncommon",130:"Special",145:"Rare",160:"Exclusive",175:"Legendary"};
+const QUALITY_COLORS = {100:'var(--q-common)',115:'var(--q-uncommon)',130:'var(--q-special)',145:'var(--q-rare)',160:'var(--q-exclusive)',175:'var(--q-legendary)'};
+const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-160",175:"q-175"};
+
+// --- Level / Quality scaling (stalcraft-artifact-formula.md) ---
+// Group 1: positive value = DEBUFF (Formula B, no scaling); negative = BUFF (Formula A, scales).
+const GROUP1_DEBUFF = new Set(["Temperature","Frost","Psy-emissions","Biological infection","Radiation","Psyonics"]);
+// Group 2: negative value = DEBUFF (Formula B, no scaling); positive = BUFF (Formula A, scales).
+const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
+
+// Returns true if this (stat, value) pair uses Formula B (fixed debuff - no level/quality scale).
+function isFormulaB(statName, value) {
+  if (value === 0) return false;
+  if (GROUP1_DEBUFF.has(statName)) return value > 0; // positive = debuff
+  if (GROUP2_DEBUFF.has(statName)) return value < 0; // negative = debuff
+  return false; // all other stats always use Formula A
+}
+
+// Scale a stored base value by level and quality.
+// Formula A: base × (1 + 0.02 × level) × (quality / 100)
+// Formula B: fixed at stored (A-tier) value - B-tier values (quality ≥ 115%) not yet in dataset.
+function scaleStat(value, statName, level, quality) {
+  if (value === 0) return 0;
+  if (isFormulaB(statName, value)) return value;
+  return value * (1 + 0.02 * level) * (quality / 100);
+}
+
+// Main and Additional stat lines kept separate per artefact so the UI can
+// toggle Additional stats on/off. Each stat uses the beneficial extreme of
+// its roll range:
+//   good:true  -> max value of range
+//   good:false -> min value of range (most negative / least positive)
+// "Resistance to electricity" and "Electricity resistance" are merged as one stat.
+// "Resistance to fire" and "Fire resistance" are merged as one stat.
+// Duplicate entries (Wicked Hedgehog #2) and unnamed entries are omitted.
+const ARTIFACTS = [
+ {name:"Acid Crystal", main:{"Vitality":-6.8,"Health regeneration":0.9,"Bioinfection protection":20,"Biological infection":-2.16,"Reaction to chemical burns":0.9}, add:{"Resistance to chemicals":7.3,"Bioinfection protection":10,"Health regeneration":0.3}},
+ {name:"Amberite", main:{"Running speed":0.6,"Carry weight":11.2,"Stamina regeneration":2.6,"Radiation":0.53,"Temperature":-1.28}, add:{"Movement speed":0.6,"Stamina regeneration":0.9,"Carry weight":3.8}},
+ {name:"Atom", main:{"Vitality":1,"Stamina regeneration":3.4,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28,"Psyonics":-1.28}, add:{"Bleeding":-0.698,"Stamina regeneration":1.201,"Vitality":0.402}},
+ {name:"Battery", main:{"Stamina":11.4,"Movement speed":0.85,"Running speed":1.15,"Radiation":1.06,"Reaction to electricity":1.3}, add:{"Resistance to electricity":10.7,"Movement speed":0.3,"Stamina":3.8}},
+ {name:"Berry", main:{"Vitality":1.3,"Radiation":1.06,"Bleeding":-0.6}, add:{"Bleeding":-0.2,"Health regeneration":1.1,"Vitality":0.5}},
+ {name:"Bismuth", main:{"Health regeneration":2.1,"Biological infection":2.12,"Recoil":-4.4}, add:{"Health regeneration":0.7,"Recoil":-1.5,"Sway":-6.1}},
+ {name:"Black Hole", main:{"Vitality":0.7,"Stamina regeneration":5.1,"Bullet resistance":10.1,"Bleeding protection":-2.21,"Psyonics":2.12}, add:{"Bullet resistance":3.4,"Stamina regeneration":1.7,"Health regeneration":1.8}},
+ {name:"Bracelet", main:{"Vitality":0.5,"Movement speed":1.2,"Running speed":1.6,"Stamina regeneration":3.6,"Psyonics":2.12}, add:{"Stamina":16.2,"Movement speed":0.4,"Stamina regeneration":1.2}},
+ {name:"Bubblegum", main:{"Movement speed":-1.28,"Running speed":-1.28,"Bullet resistance":19.3,"Explosion protection":14.9,"Temperature":2.12,"Reaction to laceration":1.9}, add:{"Bullet resistance":6.5,"Laceration protection":20.2,"Explosion protection":5}},
+ {name:"Burr", main:{"Stamina":9.3,"Movement speed":0.35,"Running speed":0.5,"Radiation":-2.16,"Psyonics":0.42}, add:{"Stamina":3.1,"Movement speed":0.15,"Stamina regeneration":1.5}},
+ {name:"Candlelight", main:{"Health regeneration":0.9,"Stamina regeneration":2.4,"Bullet resistance":2.1,"Temperature":-2.16}, add:{"Temperature":-0.88,"Stamina regeneration":0.8,"Health regeneration":0.3}},
+ {name:"Chicken God", main:{"Vitality":1.7,"Carry weight":8.7,"Temperature":-0.19,"Frost":0.42,"Reaction to electricity":1,"Reaction to burns":1,"Reaction to chemical burns":1,"Reaction to laceration":1}, add:{"Vitality":0.6,"Carry weight":2.9,"Stamina regeneration":2.9}},
+ {name:"Chilly", main:{"Vitality":2.7,"Temperature":-0.38,"Frost":0.85,"Burning":-0.4}, add:{"Vitality":0.9,"Burning":-0.2,"Explosion protection":14.9}},
+ {name:"Coil", main:{"Movement speed":1.2,"Running speed":1.6,"Carry weight":4.7,"Resistance to fire":16.2,"Temperature":2.12}, add:{"Movement speed":0.4,"Resistance to fire":5.1,"Bleeding protection":4.3}},
+ {name:"Colophony", main:{"Carry weight":8.7,"Health regeneration":2,"Stamina regeneration":1.3,"Biological infection":1.06}, add:{"Carry weight":2.9,"Vitality":1.2,"Health regeneration":0.7}},
+ {name:"Comet", main:{"Stamina":16.2,"Movement speed":0.6,"Running speed":0.8,"Carry weight":3.3,"Temperature":1.06}, add:{"Stamina regeneration":2.5,"Stamina":5.4,"Movement speed":0.2}},
+ {name:"Cone", main:{"Stamina":15.2,"Temperature":-4.08,"Burning":-0.2}, add:{"Stamina":5.2,"Healing effectiveness":5.1,"Burning":-0.1}},
+ {name:"Crust", main:{"Health regeneration":1.5,"Bullet resistance":2.6,"Biological infection":1.06,"Bleeding":-0.8}, add:{"Bleeding":-0.3,"Bleeding protection":2.6,"Health regeneration":0.5}},
+ {name:"Cryogen", main:{"Carry weight":8.3,"Stamina regeneration":1.9,"Temperature":-3.04}, add:{"Stamina regeneration":0.9,"Bullet resistance":5.4,"Carry weight":2}},
+ {name:"Cursed Rose", main:{"Bullet resistance":11.6,"Explosion protection":8.9,"Radiation":1.06}, add:{"Bullet resistance":3.9,"Explosion protection":3,"Stamina regeneration":2.9}},
+ {name:"Cycle", main:{"Stamina":15.4,"Biological infection":-4.08,"Bleeding":-0.7}, add:{"Stamina":5.2,"Health regeneration":1.2,"Bleeding":-0.3}},
+ {name:"Dark Crystal", main:{"Vitality":1,"Health regeneration":1.6,"Stamina regeneration":1.5,"Radiation":-1.28,"Psyonics":0.53}, add:{"Health regeneration":0.8,"Vitality":1,"Stamina regeneration":0.8}},
+ {name:"Dark Viburnum", main:{"Running speed":1.15,"Health regeneration":3.3,"Stamina regeneration":4.8,"Psyonics":2.12,"Recoil":6.46}, add:{"Health regeneration":1.1,"Movement speed":1.15,"Stamina regeneration":1.6}},
+ {name:"Disintegrator", main:{"Stamina":12.4,"Running speed":0.45,"Stamina regeneration":1.9,"Psyonics":-3.04,"Reaction to electricity":1}, add:{"Movement speed":0.45,"Stamina":4.2,"Stamina regeneration":0.7}},
+ {name:"Dumbbell", main:{"Vitality":0.6,"Running speed":0.75,"Carry weight":9.8,"Healing effectiveness":9.8,"Laceration protection":13.7,"Radiation":2.12}, add:{"Healing effectiveness":3.3,"Laceration protection":4.6,"Movement speed":0.75}},
+ {name:"Egg", main:{"Stamina":19.4,"Carry weight":18.6,"Radiation":2.12}, add:{"Stamina":6.5,"Carry weight":6.2,"Bleeding protection":5.1}},
+ {name:"Embryo", main:{"Running speed":0.35,"Stamina regeneration":1.5,"Radiation":0.42,"Biological infection":-2.16,"Bleeding":-0.7,"Reaction to chemical burns":0.7}, add:{"Stamina regeneration":0.5,"Bleeding":-0.3,"Movement speed":0.35}},
+ {name:"Eye of the Storm", main:{"Vitality":-12.58,"Movement speed":0.75,"Running speed":1,"Carry weight":9.8,"Thermal protection":45,"Bioinfection protection":45,"Temperature":-2.16,"Biological infection":-2.16}, add:{"Thermal protection":10,"Bioinfection protection":10,"Movement speed":0.25}},
+ {name:"Fahrenheit", main:{"Stamina":10.4,"Bullet resistance":9.3,"Temperature":-1.28,"Frost":0.42,"Reaction to laceration":1}, add:{"Bullet resistance":3.1,"Stamina":3.5,"Health regeneration":1.2}},
+ {name:"Firebird", main:{"Health regeneration":1.4,"Healing effectiveness":8.7,"Bleeding protection":1.5,"Temperature":1.06}, add:{"Bleeding":-1,"Health regeneration":0.5,"Healing effectiveness":2.9}},
+ {name:"Flicker", main:{"Movement speed":1,"Running speed":1.3462,"Health regeneration":1.9,"Psy-emissions":0.833,"Reaction to electricity":1.4}, add:{"Movement speed":0.35,"Health regeneration":0.5,"Resistance to electricity":12.2}},
+ {name:"Fossil", main:{"Vitality":2.1,"Periodic healing":0.4,"Biological infection":2.12}, add:{"Stamina regeneration":3.6,"Periodic healing":0.2,"Vitality":0.7}},
+ {name:"Frame", main:{"Carry weight":9.3,"Stamina regeneration":2.2,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28}, add:{"Psy-emissions":-1.28,"Carry weight":3.1,"Stamina regeneration":0.8}},
+ {name:"Frost", main:{"Healing effectiveness":4.6,"Bullet resistance":2.6,"Laceration protection":13,"Temperature":-0.19,"Frost":0.42,"Reaction to laceration":0.9}, add:{"Laceration protection":4.4,"Stamina":9.7,"Healing effectiveness":1.6}},
+ {name:"Gills", main:{"Vitality":1.3,"Health regeneration":2.3,"Bleeding protection":3.7,"Radiation":2.12}, add:{"Stamina regeneration":3.2,"Health regeneration":0.8,"Vitality":0.5}},
+ {name:"Golden Prima", main:{"Movement speed":0.7,"Running speed":0.95,"Carry weight":12.4,"Radiation":1.06}, add:{"Movement speed":0.25,"Carry weight":4.2,"Stamina":13}},
+ {name:"Gum", main:{"Health regeneration":1.1,"Bullet resistance":2.6,"Radiation":-2.16,"Temperature":-1.28,"Bleeding":-1.1,"Reaction to chemical burns":1.1}, add:{"Radiation":-0.88,"Health regeneration":0.4,"Bleeding":-0.4}},
+ {name:"Heart", main:{"Health regeneration":1.8,"Stamina regeneration":2.5,"Periodic healing":0.2,"Radiation":1.06}, add:{"Healing effectiveness":6.3,"Stamina regeneration":0.8,"Health regeneration":0.9}},
+ {name:"Hedgehog", main:{"Vitality":-13.6,"Carry weight":7,"Radiation protection":45,"Radiation":-3.04,"Reaction to laceration":1}, add:{"Stamina":3.5,"Laceration protection":9.7,"Radiation protection":20}},
+ {name:"Heel", main:{"Healing effectiveness":13,"Bullet resistance":5.2,"Explosion protection":13.4,"Temperature":-0.38,"Frost":0.85,"Reaction to burns":1.5}, add:{"Explosion protection":4.5,"Laceration protection":18.2,"Healing effectiveness":4.4}},
+ {name:"Helium", main:{"Movement speed":1.1,"Running speed":1.5,"Health regeneration":1.6,"Stability":1.9,"Biological infection":2.12}, add:{"Movement speed":0.4,"Stamina regeneration":3.2,"Health regeneration":0.6}},
+ {name:"Hoop", main:{"Health regeneration":2.3,"Bullet resistance":9.1,"Psyonics":2.12}, add:{"Bullet resistance":3.1,"Stamina":14.6,"Health regeneration":0.8}},
+ {name:"Ice Hedgehog", main:{"Movement speed":1,"Running speed":1.35,"Stamina regeneration":2.9,"Biological infection":1.06}, add:{"Stamina":13,"Movement speed":0.35,"Stamina regeneration":1}},
+ {name:"Ilyich Lamp", main:{"Vitality":-13.6,"Carry weight":7,"Psy-emission protection":45,"Psyonics":-3.04,"Reaction to electricity":1.2}, add:{"Carry weight":2.4,"Psy-emission protection":20,"Resistance to electricity":9.7}},
+ {name:"Inkwell", main:{"Vitality":1.2,"Health regeneration":2,"Biological infection":1.06,"Reaction to laceration":1.2}, add:{"Laceration protection":12.2,"Health regeneration":0.7,"Vitality":0.4}},
+ {name:"Inside Out Rose", main:{"Healing effectiveness":-14.45,"Bullet resistance":12.2,"Stability":8.4,"Biological infection":2.12}, add:{"Stamina regeneration":4.3,"Bullet resistance":4.1,"Stability":2.8}},
+ {name:"Jelly", main:{"Carry weight":8.7,"Bullet resistance":11.6,"Biological infection":1.06}, add:{"Carry weight":2.9,"Bullet resistance":3.9,"Laceration protection":12.2}},
+ {name:"Kettlebell", main:{"Vitality":-13.6,"Carry weight":7,"Thermal protection":45,"Temperature":-3.04,"Reaction to burns":0.8}, add:{"Resistance to fire":9.7,"Movement speed":0.2,"Thermal protection":20}},
+ {name:"Lard", main:{"Vitality":0.4,"Health regeneration":1.5,"Healing effectiveness":4.6,"Radiation":1.06}, add:{"Stamina":9.7,"Health regeneration":0.5,"Healing effectiveness":1.6}},
+ {name:"Larva", main:{"Stamina":13,"Healing effectiveness":8.7,"Temperature":-1.28,"Biological infection":0.53}, add:{"Vitality":1.2,"Stamina":4.4,"Healing effectiveness":2.9}},
+ {name:"Leaded Glass", main:{"Health regeneration":1,"Radiation":-1.28,"Temperature":-0.19,"Psyonics":-1.28,"Frost":0.42,"Burning":-0.2,"Reaction to burns":0.5}, add:{"Burning":-0.1,"Health regeneration":0.4,"Vitality":0.6}},
+ {name:"Leech", main:{"Vitality":-6.8,"Carry weight":5.2,"Radiation protection":20,"Radiation":-2.16}, add:{"Carry weight":1.8,"Reaction to laceration":1.6,"Radiation protection":10}},
+ {name:"Lemna", main:{"Vitality":-13.6,"Carry weight":7,"Bioinfection protection":45,"Biological infection":-3.04,"Reaction to chemical burns":1.2}, add:{"Resistance to chemicals":9.7,"Health regeneration":0.5,"Bioinfection protection":20}},
+ {name:"Link", main:{"Vitality":2.1,"Carry weight":10.9,"Temperature":2.12}, add:{"Vitality":0.7,"Carry weight":3.7,"Health regeneration":1.8}},
+ {name:"Lollipop", main:{"Stamina regeneration":2.1,"Laceration protection":6.1,"Radiation":-2.16,"Biological infection":0.42,"Reaction to laceration":0.6}, add:{"Laceration protection":2.1,"Stamina regeneration":0.7,"Vitality":0.6}},
+ {name:"Loop", main:{"Movement speed":1.2,"Running speed":1.6,"Radiation":2.12,"Recoil":-2.6}, add:{"Movement speed":0.4,"Bleeding":-1,"Recoil":-0.9}},
+ {name:"Magma", main:{"Vitality":2.1,"Bullet resistance":4.4,"Stability":4.9,"Temperature":2.12}, add:{"Vitality":0.699,"Stamina":16.2,"Stability":1.7}},
+ {name:"Mirror", main:{"Vitality":-12.58,"Movement speed":0.75,"Running speed":1,"Carry weight":9.8,"Radiation protection":45,"Psy-emission protection":45,"Radiation":-2.16,"Psyonics":-2.16}, add:{"Movement speed":0.252,"Radiation protection":20,"Psy-emission protection":20}},
+ {name:"Mug", main:{"Vitality":1.2,"Carry weight":3.8,"Explosion protection":12.7,"Radiation":0.53,"Biological infection":-1.28}, add:{"Vitality":0.4,"Health regeneration":1.4,"Explosion protection":4.3}},
+ {name:"Onion", main:{"Stamina":11.1,"Bullet resistance":4.9,"Radiation":0.53,"Psyonics":-1.28}, add:{"Bullet resistance":1.7,"Stamina":3.7,"Bleeding protection":2.1}},
+ {name:"Opal", main:{"Vitality":-2.47,"Stamina":21.6,"Bullet resistance":19.3,"Temperature":-0.38,"Frost":0.85}, add:{"Stamina":7.2,"Bullet resistance":6.5,"Stability":6.5}},
+ {name:"Peg-Top", main:{"Laceration protection":14.5,"Explosion protection":7.5,"Psyonics":-4.08}, add:{"Bullet resistance":6.8,"Laceration protection":4.9,"Explosion protection":2.5}},
+ {name:"Phlegm", main:{"Movement speed":0.25,"Running speed":0.25,"Healing effectiveness":6.5,"Bleeding protection":2.6,"Biological infection":1.06}, add:{"Bleeding":-0.8,"Bleeding protection":0.9,"Healing effectiveness":2.2}},
+ {name:"Polyhedron", main:{"Stamina":20.8,"Running speed":0.75,"Stamina regeneration":3.2,"Radiation":2.12}, add:{"Stamina regeneration":1.1,"Stamina":7,"Movement speed":0.75}},
+ {name:"Prima", main:{"Carry weight":9.3,"Laceration protection":9.1,"Radiation":1.06}, add:{"Laceration protection":3.1,"Carry weight":3.1,"Bleeding":-0.8}},
+ {name:"Prism", main:{"Bullet resistance":14.5,"Explosion protection":11.2,"Stability":2.6,"Psyonics":2.12}, add:{"Bullet resistance":4.9,"Explosion protection":3.8,"Stamina regeneration":3.6}},
+ {name:"Proto-Onion", main:{"Stamina regeneration":2.7,"Healing effectiveness":4.1,"Radiation":-3.04}, add:{"Health regeneration":1,"Stamina regeneration":0.9,"Healing effectiveness":1.4}},
+ {name:"Pumpkin", main:{"Carry weight":7.3,"Stamina regeneration":3.4,"Radiation":-4.08}, add:{"Vitality":1,"Carry weight":2.5,"Stamina regeneration":1.2}},
+ {name:"Radiator", main:{"Movement speed":0.5,"Running speed":0.7,"Temperature":-2.16,"Psyonics":-1.28,"Burning":-0.3,"Reaction to burns":0.8}, add:{"Burning":-0.1,"Movement speed":0.2,"Temperature":-0.88}},
+ {name:"Raisin", main:{"Vitality":-2.3,"Stamina":21.6,"Movement speed":1.6,"Running speed":2.15,"Stability":2.6,"Temperature":2.12}, add:{"Stamina":7.2,"Movement speed":0.55,"Stamina regeneration":4.8}},
+ {name:"Rattle", main:{"Stamina":13.9,"Movement speed":0.5,"Running speed":0.7,"Temperature":1.06}, add:{"Stamina regeneration":2.2,"Stamina":4.7,"Movement speed":0.2}},
+ {name:"Red Crystal", main:{"Vitality":-6.8,"Stamina":7.8,"Thermal protection":20,"Temperature":-2.16,"Reaction to burns":0.6}, add:{"Resistance to fire":7.3,"Thermal protection":10,"Stamina":2.6}},
+ {name:"Retina", main:{"Movement speed":1,"Running speed":1.35,"Stamina regeneration":2.9,"Biological infection":-1.28,"Psyonics":1.06,"Reaction to burns":-4.16}, add:{"Movement speed":0.35,"Stamina regeneration":1,"Bleeding":-1}},
+ {name:"Rime", main:{"Bullet resistance":10.1,"Laceration protection":10.7,"Temperature":-0.19,"Frost":0.42}, add:{"Laceration protection":3.6,"Bullet resistance":3.4,"Explosion protection":7.8}},
+ {name:"Rose", main:{"Bullet resistance":8.7,"Explosion protection":6.7,"Psyonics":1.06}, add:{"Bullet resistance":2.9,"Explosion protection":2.3,"Carry weight":6.5}},
+ {name:"Scallop", main:{"Bullet resistance":10.1,"Explosion protection":7.8,"Radiation":1.06}, add:{"Bullet resistance":3.4,"Explosion protection":2.6,"Bleeding":-0.9}},
+ {name:"Scrubber", main:{"Stamina regeneration":3.1,"Healing effectiveness":4.6,"Radiation":-1.28,"Biological infection":-2.16,"Reaction to laceration":0.9}, add:{"Stamina regeneration":1.1,"Biological infection":-0.88,"Healing effectiveness":1.6}},
+ {name:"Shard", main:{"Vitality":1.9,"Health regeneration":0.7,"Healing effectiveness":6.9,"Biological infection":2.12}, add:{"Vitality":0.7,"Stamina regeneration":3.2,"Healing effectiveness":2.3}},
+ {name:"Shrimp", main:{"Vitality":-0.42,"Carry weight":10.9,"Bullet resistance":7.1,"Psyonics":1.06}, add:{"Bullet resistance":2.4,"Explosion protection":7.8,"Carry weight":3.7}},
+ {name:"Snail", main:{"Stamina":12.4,"Health regeneration":1,"Biological infection":-3.04,"Bleeding":-0.3}, add:{"Bleeding protection":2.3,"Stamina":4.2,"Health regeneration":0.4}},
+ {name:"Snake Eye", main:{"Vitality":1.9,"Movement speed":0.75,"Running speed":1,"Healing effectiveness":-3.82,"Psyonics":2.12}, add:{"Stamina":14.6,"Movement speed":0.25,"Vitality":0.7}},
+ {name:"Snares", main:{"Movement speed":0.7,"Running speed":0.95,"Laceration protection":17.4,"Biological infection":0.53,"Psyonics":-1.28}, add:{"Movement speed":0.25,"Health regeneration":1.4,"Laceration protection":5.8}},
+ {name:"Spectral Crystal", main:{"Vitality":-6.8,"Stamina regeneration":1.7,"Psy-emission protection":20,"Psyonics":-2.16,"Reaction to electricity":0.9}, add:{"Resistance to electricity":7.3,"Psy-emission protection":10,"Stamina regeneration":0.6}},
+ {name:"Spiral", main:{"Vitality":-0.42,"Movement speed":1,"Running speed":1.35,"Carry weight":8.7,"Radiation":1.06}, add:{"Carry weight":2.9,"Movement speed":0.35,"Healing effectiveness":7.2}},
+ {name:"Sponge", main:{"Carry weight":2.8,"Laceration protection":9.1,"Explosion protection":9.6,"Radiation":1.06,"Reaction to laceration":0.9}, add:{"Laceration protection":3.1,"Explosion protection":3.2,"Health regeneration":1.1}},
+ {name:"Static", main:{"Bullet resistance":10.1,"Radiation":2.12,"Recoil":-3.7}, add:{"Stamina":16.2,"Bullet resistance":3.4,"Recoil":-1.3}},
+ {name:"Steel Hedgehog", main:{"Stamina":14.6,"Healing effectiveness":3,"Bullet resistance":13,"Psyonics":2.12,"Reaction to laceration":1.3}, add:{"Bullet resistance":4.4,"Laceration protection":13.7,"Stamina":4.9}},
+ {name:"Sticky Burr", main:{"Stamina":10.8,"Movement speed":0.4,"Running speed":0.55,"Radiation":-2.16}, add:{"Radiation":-0.88,"Stamina":3.6,"Movement speed":0.15}},
+ {name:"Stress Fest", main:{"Movement speed":0.7,"Running speed":0.95,"Healing effectiveness":8.7,"Bullet resistance":-1.7,"Temperature":1.06}, add:{"Movement speed":0.25,"Healing effectiveness":2.9,"Carry weight":8.7}},
+ {name:"Sun", main:{"Vitality":1.9,"Health regeneration":1.6,"Temperature":2.12,"Reaction to burns":1.1}, add:{"Health regeneration":0.6,"Bleeding protection":3.9,"Vitality":0.7}},
+ {name:"Swamp Rot", main:{"Vitality":0.3,"Stamina regeneration":2.4,"Healing effectiveness":3.6,"Biological infection":-2.16,"Reaction to chemical burns":0.9}, add:{"Biological infection":-0.88,"Stamina regeneration":0.8,"Healing effectiveness":1.2}},
+ {name:"Tallow", main:{"Health regeneration":1.4,"Healing effectiveness":8.7,"Radiation":1.06,"Temperature":-1.28}, add:{"Health regeneration":0.5,"Healing effectiveness":2.9,"Explosion protection":7.2}},
+ {name:"Timber", main:{"Stamina regeneration":4.1,"Bullet resistance":8.1,"Radiation":-1.28,"Temperature":0.53}, add:{"Health regeneration":1.4,"Stamina regeneration":1.4,"Bullet resistance":2.7}},
+ {name:"Tiny Key", main:{"Radiation":2.12,"Recoil":-4.4,"Sway":-6.1}, add:{"Bullet resistance":12.2,"Recoil":-1.5,"Sway":-2.1}},
+ {name:"Transformer", main:{"Stamina":13.9,"Carry weight":6.5,"Biological infection":-1.28,"Psyonics":-2.16,"Reaction to electricity":1.1}, add:{"Stamina":4.7,"Carry weight":2.2,"Psy-emissions":-0.88}},
+ {name:"Veiner", main:{"Carry weight":8.7,"Bullet resistance":5.7,"Radiation":0.53,"Psyonics":-1.28}, add:{"Bullet resistance":1.9,"Stamina regeneration":2,"Carry weight":2.9}},
+ {name:"Viburnum Branch", main:{"Vitality":1.5,"Healing effectiveness":10.9,"Radiation":2.12,"Bleeding":-0.4}, add:{"Stamina":16.2,"Healing effectiveness":3.7,"Vitality":0.5}},
+ {name:"Whirlwind", main:{"Movement speed":1.1,"Running speed":1.5,"Resistance to electricity":13.7,"Temperature":-0.19,"Frost":0.42,"Reaction to burns":1.1}, add:{"Resistance to electricity":4.6,"Burning":-0.3,"Movement speed":0.4}},
+ {name:"White Rose", main:{"Stamina":7.6,"Carry weight":7.3,"Psyonics":-2.16,"Reaction to electricity":0.9}, add:{"Psy-emissions":-0.88,"Stamina":2.6,"Carry weight":2.5}},
+ {name:"Wicked Hedgehog", main:{"Stamina":13.9,"Movement speed":0.5,"Running speed":0.7,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28,"Reaction to laceration":0.9}, add:{"Stamina":4.7,"Movement speed":0.2,"Psy-emissions":-1.28}},
+ {name:"Wolf Tears", main:{"Stamina":9.3,"Carry weight":4.4,"Radiation":0.42,"Temperature":-2.16,"Reaction to burns":0.5}, add:{"Bullet resistance":4.1,"Stamina":3.1,"Carry weight":1.5}}
+];
+
+const MAIN_VECS = ARTIFACTS.map(a=>{
+  const v = new Float64Array(NS);
+  for (const k in a.main) v[STAT_IDX[k]] = a.main[k];
+  return v;
+});
+const ADD_VECS = ARTIFACTS.map(a=>{
+  const v = new Float64Array(NS);
+  for (const k in a.add) v[STAT_IDX[k]] = a.add[k];
+  return v;
+});
+// Active per-artefact vectors used by the search; rebuilt by rebuildVecs()
+// depending on whether Additional stat lines are included.
+// Effectiveness multiplies all stats EXCEPT the 5 infection/threshold stats.
+const THRESHOLD_IDX = new Set(THRESHOLD_STATS.map(s => STAT_IDX[s]));
+let VECS = MAIN_VECS;
+// Scales one artefact's Main(+Additional) stats to a given quality, independent of the
+// global Quality selector. Used by rebuildVecs (global quality) and by the My Loadout
+// pool builder (per-owned-unit quality).
+function scaleArtifactVec(artifactIdx, quality, includeAdditional, effectiveness, level){
+  const effMult = effectiveness / 100;
+  const v = MAIN_VECS[artifactIdx];
+  const c = new Float64Array(NS);
+  for (let k=0;k<NS;k++){
+    const statName = STAT_NAMES[k];
+    const scaledMain = scaleStat(v[k], statName, level, quality);
+    const scaledAdd = includeAdditional ? scaleStat(ADD_VECS[artifactIdx][k], statName, level, quality) : 0;
+    const base = scaledMain + scaledAdd;
+    c[k] = THRESHOLD_IDX.has(k) ? base : base * effMult;
+  }
+  return c;
+}
+function rebuildVecs(includeAdditional, effectiveness, level, quality){
+  VECS = MAIN_VECS.map((v,i)=> scaleArtifactVec(i, quality, includeAdditional, effectiveness, level));
+}
+rebuildVecs(false, 100, 0, 100);
+
+/* ---------- UI build ---------- */
+const statListEl = document.getElementById('statList');
+
+const STAT_CATEGORIES = [
+  { label: 'Utility', names: new Set(["Carry weight","Movement speed","Running speed","Stamina","Stamina regeneration"]) },
+  { label: 'Combat',  names: new Set(["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"]) },
+];
+const CATEGORIZED = new Set([...STAT_CATEGORIES[0].names, ...STAT_CATEGORIES[1].names]);
+STAT_CATEGORIES.push({ label: 'Misc', names: new Set(STAT_NAMES.filter(n => !CATEGORIZED.has(n))) });
+
+function addStatItem(name){
+  const good = STAT_META[name].good;
+  const id = 'stat_'+name.replace(/[^a-z0-9]/gi,'_');
+  const div = document.createElement('div');
+  div.className = 'check-item';
+  div.innerHTML = `<label class="check-main">
+      <input type="checkbox" id="${id}" data-stat="${name}">
+      <span class="dir ${good?'good':'bad'}">${good?'\u2191':'\u2193'}</span>
+      <span class="name">${name}</span>
+    </label>
+    <div class="stat-controls">
+      <div class="tier-group">
+        <button type="button" class="tier-btn" data-tier="high">H</button>
+        <button type="button" class="tier-btn active" data-tier="med">M</button>
+        <button type="button" class="tier-btn" data-tier="low">L</button>
+      </div>
+    </div>`;
+  statListEl.appendChild(div);
+}
+
+STAT_CATEGORIES.forEach((cat, ci)=>{
+  const hdr = document.createElement('div');
+  hdr.className = 'check-group-hdr';
+  if (ci === 0){
+    hdr.style.display = 'flex';
+    hdr.style.justifyContent = 'space-between';
+    hdr.innerHTML = `<span>${cat.label}</span><span>Priority</span>`;
+  } else {
+    hdr.textContent = cat.label;
+  }
+  statListEl.appendChild(hdr);
+  // preserve alphabetical order within each category
+  STAT_NAMES.filter(n => cat.names.has(n)).forEach(addStatItem);
+});
+
+// Tier button toggle - single handler on the list via delegation
+statListEl.addEventListener('click', e=>{
+  const btn = e.target.closest('.tier-btn');
+  if (!btn) return;
+  const group = btn.closest('.tier-group');
+  group.querySelectorAll('.tier-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+// Artefacts excluded from the "Available artefacts" list by default
+// (still selectable - just unticked on load).
+const DEFAULT_OFF = new Set([
+  "Chilly","Flicker","Snares","Coil","Static","Pumpkin","Wicked Hedgehog",
+  "Cycle","Link","Loop","Jelly","Gills","Cone","Fossil","Colophony",
+  "Stress Fest","Mug","Peg-Top","Timber","Rime","Hoop","Fahrenheit","Opal",
+  "Retina","Raisin","Dark Viburnum","Bubblegum","Chicken God","Tiny Key",
+  "Black Hole","Inside Out Rose","Egg"
+]);
+
+// --- Persistence (this is a standalone file with no backend, so the available-artefacts
+// exclusion list and the My Loadout favorites are saved to localStorage) ---
+const LS_EXCLUDED = 'artiCalc_excluded';
+const LS_OWNED = 'artiCalc_owned';
+
+function loadExcludedNames(){
+  try {
+    const raw = localStorage.getItem(LS_EXCLUDED);
+    if (raw === null) return null; // no saved state yet -> caller falls back to DEFAULT_OFF
+    return new Set(JSON.parse(raw));
+  } catch(e){ return null; }
+}
+function saveExcludedNames(){
+  const excluded = Array.from(artifactListEl.querySelectorAll('input'))
+    .filter(c => !c.checked)
+    .map(c => ARTIFACTS[parseInt(c.dataset.idx)].name);
+  try { localStorage.setItem(LS_EXCLUDED, JSON.stringify(excluded)); } catch(e){}
+}
+function loadOwned(){
+  try {
+    const raw = localStorage.getItem(LS_OWNED);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const out = {};
+    Object.keys(parsed).forEach(k => out[parseInt(k)] = parsed[k]);
+    return out;
+  } catch(e){ return {}; }
+}
+function saveOwned(){
+  try { localStorage.setItem(LS_OWNED, JSON.stringify(OWNED)); } catch(e){}
+}
+// { [artifactIdx]: [quality, quality, ...] } -- one entry per physically owned unit.
+let OWNED = loadOwned();
+
+const artifactListEl = document.getElementById('artifactList');
+const savedExcluded = loadExcludedNames();
+ARTIFACTS.forEach((a,i)=>{
+  const id = 'art_'+i;
+  const div = document.createElement('label');
+  div.className = 'check-item';
+  const isExcluded = savedExcluded ? savedExcluded.has(a.name) : DEFAULT_OFF.has(a.name);
+  const checkedAttr = isExcluded ? '' : 'checked';
+  const ownedAtLoad = !!(OWNED[i] && OWNED[i].length);
+  div.innerHTML = `<input type="checkbox" id="${id}" data-idx="${i}" ${checkedAttr}>
+    <span class="name">${a.name}</span>
+    <button type="button" class="art-heart${ownedAtLoad?' owned':''}" data-idx="${i}">${ownedAtLoad?'♥':'♡'}</button>`;
+  artifactListEl.appendChild(div);
+});
+// Persist any manual tick/untick of an individual artefact checkbox.
+artifactListEl.addEventListener('change', e=>{
+  if (e.target.matches('input[type=checkbox]')) saveExcludedNames();
+});
+// Heart button: open a quick "add to favorites" popover for this artefact.
+artifactListEl.addEventListener('click', e=>{
+  const heart = e.target.closest('.art-heart');
+  if (!heart) return;
+  e.stopPropagation(); // prevent the document outside-click listener from closing the popover we're about to open
+  const idx = parseInt(heart.dataset.idx);
+  if (chipPopoverEl.classList.contains('open') && popoverOpenIdx === idx){
+    closeChipPopover();
+    return;
+  }
+  popoverOpenIdx = idx;
+  popoverAnchorEl = heart;
+  renderPopoverHeartAdd(idx);
+  positionPopover(heart);
+  chipPopoverEl.classList.add('open');
+});
+
+// Pins the artefacts used in the last search results to the top of the
+// "Available artefacts" list, highlighted, so the user can quickly untick
+// ones they don't have and re-run the search.
+function usedArtifactIndices(results){
+  const set = new Set();
+  (results || []).forEach(r => r.chosen.forEach(c => set.add(c.idx)));
+  return Array.from(set);
+}
+function restoreArtifactOrder(){
+  Array.from(artifactListEl.querySelectorAll('.check-item'))
+    .sort((a,b) => parseInt(a.querySelector('input').dataset.idx) - parseInt(b.querySelector('input').dataset.idx))
+    .forEach(item => artifactListEl.appendChild(item));
+}
+function highlightUsedArtifacts(indices){
+  const oldHdr = artifactListEl.querySelector('.artifact-used-hdr');
+  if (oldHdr) oldHdr.remove();
+  artifactListEl.querySelectorAll('.check-item.used-highlight').forEach(el => el.classList.remove('used-highlight'));
+  restoreArtifactOrder();
+  if (!indices || indices.length === 0) return;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'artifact-used-hdr';
+  hdr.textContent = 'Used in last results';
+  artifactListEl.insertBefore(hdr, artifactListEl.firstChild);
+
+  indices.slice().sort((a,b) => b-a).forEach(idx => {
+    const input = artifactListEl.querySelector(`input[data-idx="${idx}"]`);
+    if (!input) return;
+    const item = input.closest('.check-item');
+    item.classList.add('used-highlight');
+    artifactListEl.insertBefore(item, hdr.nextSibling);
+  });
+}
+
+/* ---------- My Loadout: owned-artefacts list + chip popover ---------- */
+const ownedListEl = document.getElementById('ownedList');
+
+function renderOwnedList(){
+  const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
+  if (indices.length === 0){
+    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts favorited yet - click an artefact chip on a result card and choose "Favorite".</div>';
+    return;
+  }
+  indices.sort((a,b) => ARTIFACTS[a].name.localeCompare(ARTIFACTS[b].name));
+  let html = '';
+  indices.forEach(idx=>{
+    // Sort by quality for display but preserve original array index so splice targets the right unit.
+    const sorted = OWNED[idx].map((q,origQi)=>({q,origQi})).sort((a,b)=>a.q-b.q);
+    const pills = sorted.map(({q,origQi})=>
+      `<span class="quality-pill ${QUALITY_CLASS[q]}" data-idx="${idx}" data-qi="${origQi}" style="cursor:pointer;">${ARTIFACTS[idx].name}</span>`
+    ).join('');
+    html += `<div class="check-item owned-row" data-idx="${idx}" style="cursor:pointer;">
+      <span class="owned-pills">${pills}</span>
+    </div>`;
+  });
+  ownedListEl.innerHTML = html;
+}
+renderOwnedList();
+ownedListEl.addEventListener('click', e=>{
+  // Pill click → unit-specific "remove this unit" popover
+  const pill = e.target.closest('.quality-pill[data-qi]');
+  if (pill){
+    const idx = parseInt(pill.dataset.idx);
+    const qi  = parseInt(pill.dataset.qi);
+    if (chipPopoverEl.classList.contains('open') && popoverOpenIdx === idx && popoverOpenQi === qi){
+      closeChipPopover(); return;
+    }
+    popoverOpenIdx = idx; popoverOpenQi = qi; popoverAnchorEl = pill;
+    renderPopoverRemoveUnit(idx, qi);
+    positionPopover(pill);
+    chipPopoverEl.classList.add('open');
+    return;
+  }
+  // Row click (outside pills) → general popover (edit all / exclude / etc.)
+  const row = e.target.closest('.owned-row');
+  if (!row) return;
+  popoverOpenQi = null;
+  openChipPopover(row, parseInt(row.dataset.idx));
+});
+
+const chipPopoverEl = document.createElement('div');
+chipPopoverEl.className = 'artchip-popover';
+document.body.appendChild(chipPopoverEl);
+let popoverOpenIdx = null;
+let popoverAnchorEl = null;
+let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
+
+function closeChipPopover(){
+  chipPopoverEl.classList.remove('open');
+  popoverOpenIdx = null;
+  popoverAnchorEl = null;
+  popoverOpenQi = null;
+}
+// Positions against the popover's *actual* current size (it stays in the layout tree even
+// while closed/transparent, so this is accurate), clamped fully inside the viewport. Re-call
+// this any time the popover's content/height changes (e.g. switching to the Favorite form,
+// or adding more quality rows) since it doesn't auto-reposition on its own.
+function positionPopover(anchorEl){
+  const r = anchorEl.getBoundingClientRect();
+  const popRect = chipPopoverEl.getBoundingClientRect();
+  const popW = Math.max(popRect.width, 230);
+  const popH = popRect.height;
+  let left = Math.min(r.left, window.innerWidth - popW - 10);
+  left = Math.max(8, left);
+  let top = r.bottom + 6;
+  if (top + popH > window.innerHeight - 8) top = r.top - popH - 6;
+  top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+  chipPopoverEl.style.left = left + 'px';
+  chipPopoverEl.style.top = top + 'px';
+}
+function qualitySelectHtml(q, i){
+  return `<select class="fav-quality" data-i="${i}">
+    ${Object.keys(QUALITY_LABELS).map(val=>`<option value="${val}" ${parseInt(val)===q?'selected':''}>${QUALITY_LABELS[val]}</option>`).join('')}
+  </select>`;
+}
+function renderPopoverMain(idx){
+  const isOwned = !!(OWNED[idx] && OWNED[idx].length);
+  chipPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name}</div>
+    <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
+    <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Favorite' : 'Favorite'}</button>
+    ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Favorites</button>' : ''}
+  `;
+}
+function renderPopoverFavorite(idx){
+  const existing = (OWNED[idx] || []).slice();
+  const count = Math.max(1, existing.length || 1);
+  while (existing.length < count) existing.push(100);
+  chipPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name} - Favorite</div>
+    <label class="field" style="margin-bottom:8px;">
+      <span class="lbl">How many do you own?</span>
+      <input type="number" min="1" max="20" id="favCount" value="${count}">
+    </label>
+    <div id="favQualityRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+      ${existing.map((q,i)=>qualitySelectHtml(q,i)).join('')}
+    </div>
+    <button type="button" class="popover-btn" data-act="save-favorite">Save</button>
+    <button type="button" class="popover-btn" data-act="back">Back</button>
+  `;
+  document.getElementById('favCount').addEventListener('input', e=>{
+    const n = Math.max(1, Math.min(20, parseInt(e.target.value) || 1));
+    const rows = document.getElementById('favQualityRows');
+    const current = rows.querySelectorAll('select.fav-quality').length;
+    if (n > current){
+      for (let i = current; i < n; i++) rows.insertAdjacentHTML('beforeend', qualitySelectHtml(100, i));
+    } else if (n < current){
+      Array.from(rows.querySelectorAll('select.fav-quality')).slice(n).forEach(el => el.remove());
+    }
+    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
+  });
+}
+function renderPopoverHeartAdd(idx){
+  chipPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name}</div>
+    <label class="field" style="margin-bottom:10px;">
+      <span class="lbl">Quality</span>
+      <select id="heartQualitySelect">
+        ${Object.entries(QUALITY_LABELS).map(([val,label])=>`<option value="${val}">${label} - ${val}%</option>`).join('')}
+      </select>
+    </label>
+    <button type="button" class="popover-btn" data-act="heart-add">Add to Favorites</button>
+  `;
+}
+function renderPopoverRemoveUnit(idx, qi){
+  const q = OWNED[idx][qi];
+  chipPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name} - ${QUALITY_LABELS[q]}</div>
+    <button type="button" class="popover-btn danger" data-act="remove-unit">Remove</button>
+  `;
+}
+function updateHeartState(idx){
+  artifactListEl.querySelectorAll(`.art-heart[data-idx="${idx}"]`).forEach(h=>{
+    const owned = !!(OWNED[idx] && OWNED[idx].length);
+    h.textContent = owned ? '♥' : '♡';
+    h.classList.toggle('owned', owned);
+  });
+}
+function updateAllHeartStates(){
+  artifactListEl.querySelectorAll('.art-heart').forEach(h=>{
+    const idx = parseInt(h.dataset.idx);
+    const owned = !!(OWNED[idx] && OWNED[idx].length);
+    h.textContent = owned ? '♥' : '♡';
+    h.classList.toggle('owned', owned);
+  });
+}
+chipPopoverEl.addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  e.stopPropagation(); // innerHTML swaps below detach e.target from the DOM mid-bubble;
+                        // without this the document-level outside-click listener's
+                        // contains() check would fail and incorrectly close the popover.
+  const idx = popoverOpenIdx;
+  if (idx == null) return;
+  const act = btn.dataset.act;
+  if (act === 'exclude'){
+    const input = artifactListEl.querySelector(`input[data-idx="${idx}"]`);
+    if (input) input.checked = false;
+    saveExcludedNames();
+    closeChipPopover();
+  } else if (act === 'favorite'){
+    renderPopoverFavorite(idx);
+    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
+  } else if (act === 'back'){
+    renderPopoverMain(idx);
+    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
+  } else if (act === 'unfavorite'){
+    delete OWNED[idx];
+    saveOwned();
+    renderOwnedList();
+    updateHeartState(idx);
+    closeChipPopover();
+  } else if (act === 'save-favorite'){
+    const selects = Array.from(chipPopoverEl.querySelectorAll('select.fav-quality'));
+    OWNED[idx] = selects.map(s => parseInt(s.value));
+    saveOwned();
+    renderOwnedList();
+    updateHeartState(idx);
+    closeChipPopover();
+  } else if (act === 'heart-add'){
+    const q = parseInt(chipPopoverEl.querySelector('#heartQualitySelect').value);
+    if (!OWNED[idx]) OWNED[idx] = [];
+    OWNED[idx].push(q);
+    saveOwned();
+    renderOwnedList();
+    updateHeartState(idx);
+    closeChipPopover();
+  } else if (act === 'remove-unit'){
+    const qi = popoverOpenQi;
+    if (qi != null && OWNED[idx]){
+      OWNED[idx].splice(qi, 1);
+      if (OWNED[idx].length === 0) delete OWNED[idx];
+      saveOwned();
+      renderOwnedList();
+      updateHeartState(idx);
+    }
+    closeChipPopover();
+  }
+});
+function openChipPopover(anchorEl, idx){
+  popoverOpenIdx = idx;
+  popoverAnchorEl = anchorEl;
+  renderPopoverMain(idx);
+  positionPopover(anchorEl);
+  chipPopoverEl.classList.add('open');
+}
+// Close on outside click / Escape; clicks on chips/owned-rows are handled by their own listeners.
+document.addEventListener('click', e=>{
+  if (!chipPopoverEl.classList.contains('open')) return;
+  if (chipPopoverEl.contains(e.target)) return;
+  if (e.target.closest('.loadout-chip') || e.target.closest('.owned-row')) return;
+  closeChipPopover();
+});
+document.addEventListener('keydown', e=>{ if (e.key === 'Escape') closeChipPopover(); });
+// Delegate clicks on every loadout chip across all result sections (Top 10 / Consumable zone / Upgrade tips).
+document.addEventListener('click', e=>{
+  const chip = e.target.closest('.loadout-chip[data-idx]');
+  if (!chip) return;
+  const idx = parseInt(chip.dataset.idx);
+  if (popoverOpenIdx === idx && chipPopoverEl.classList.contains('open')) closeChipPopover();
+  else openChipPopover(chip, idx);
+});
+
+
+document.getElementById('statClearBtn').onclick = ()=>{
+  statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
+};
+document.getElementById('artAllBtn').onclick = ()=>{
+  artifactListEl.querySelectorAll('input').forEach(c=>c.checked=true);
+  saveExcludedNames();
+};
+document.getElementById('artNoneBtn').onclick = ()=>{
+  artifactListEl.querySelectorAll('input').forEach(c=>c.checked=false);
+  saveExcludedNames();
+};
+document.getElementById('clearLoadoutBtn').onclick = ()=>{
+  OWNED = {};
+  saveOwned();
+  renderOwnedList();
+  updateAllHeartStates();
+};
+
+/* ---------- My Loadout: export / import (JSON, keyed by artefact name so it
+   survives ARTIFACTS being reordered/edited between versions of this file) ---------- */
+document.getElementById('exportLoadoutBtn').onclick = ()=>{
+  const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
+  const data = {
+    type: 'artiCalc-loadout',
+    version: 1,
+    artifacts: indices.map(i => ({ name: ARTIFACTS[i].name, qualities: OWNED[i].slice() }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'artifact-loadout.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+document.getElementById('importLoadoutBtn').onclick = ()=>{
+  document.getElementById('importLoadoutFile').click();
+};
+document.getElementById('importLoadoutFile').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  e.target.value = ''; // reset so picking the same file again still fires 'change'
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch(err){ alert('Import failed: not valid JSON.'); return; }
+    if (!data || !Array.isArray(data.artifacts)){
+      alert('Import failed: file is not a recognized loadout export.');
+      return;
+    }
+    if (Object.keys(OWNED).length > 0 && !confirm('This will replace your current loadout. Continue?')) return;
+    const nameToIdx = {};
+    ARTIFACTS.forEach((a,i)=>{ nameToIdx[a.name] = i; });
+    const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
+    const newOwned = {};
+    let skipped = 0;
+    data.artifacts.forEach(entry=>{
+      const idx = nameToIdx[entry && entry.name];
+      const qualities = (entry && Array.isArray(entry.qualities)) ? entry.qualities.filter(q=>validQ.has(q)) : [];
+      if (idx === undefined || qualities.length === 0){ skipped++; return; }
+      newOwned[idx] = qualities;
+    });
+    OWNED = newOwned;
+    saveOwned();
+    renderOwnedList();
+    updateAllHeartStates();
+    alert('Loadout imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (unrecognized artefact or quality).' : ''));
+  };
+  reader.onerror = ()=>{ alert('Import failed: could not read file.'); };
+  reader.readAsText(file);
+});
+
+/* ---------- My Loadout: manual add ---------- */
+(function(){
+  const searchInput = document.getElementById('loadoutSearchInput');
+  const searchDd    = document.getElementById('loadoutSearchDd');
+  const addRow      = document.getElementById('loadoutAddRow');
+  let selectedIdx   = null;
+
+  function showDd(matches){
+    searchDd.innerHTML = matches.map(m =>
+      `<div class="loadout-search-item" data-idx="${m.idx}">${m.name}</div>`
+    ).join('');
+    searchDd.classList.add('open');
+  }
+  function hideDd(){ searchDd.classList.remove('open'); }
+
+  searchInput.addEventListener('input', ()=>{
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q){ hideDd(); addRow.style.display = 'none'; selectedIdx = null; return; }
+    const matches = ARTIFACTS
+      .map((a, i) => ({name: a.name, idx: i}))
+      .filter(a => a.name.toLowerCase().includes(q))
+      .slice(0, 12);
+    if (matches.length) showDd(matches); else hideDd();
+  });
+
+  searchDd.addEventListener('click', e=>{
+    const item = e.target.closest('.loadout-search-item');
+    if (!item) return;
+    selectedIdx = parseInt(item.dataset.idx);
+    searchInput.value = ARTIFACTS[selectedIdx].name;
+    hideDd();
+    addRow.style.display = ''; // row-inline class provides display:flex
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener('click', e=>{
+    if (!searchDd.classList.contains('open')) return;
+    if (searchInput.contains(e.target) || searchDd.contains(e.target)) return;
+    hideDd();
+  });
+
+  document.getElementById('loadoutAddBtn').addEventListener('click', ()=>{
+    if (selectedIdx === null) return;
+    const q = parseInt(document.getElementById('loadoutQualitySelect').value) || 100;
+    if (!OWNED[selectedIdx]) OWNED[selectedIdx] = [];
+    OWNED[selectedIdx].push(q);
+    saveOwned();
+    renderOwnedList();
+    // reset form
+    searchInput.value = '';
+    addRow.style.display = 'none';
+    selectedIdx = null;
+  });
+})();
+document.getElementById('resetAllBtn').onclick = ()=>{
+  // Cancel any running search
+  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  // Backpack inputs → defaults
+  document.getElementById('slotsInput').value = 4;
+  document.getElementById('protInput').value = 60;
+  document.getElementById('effInput').value = 83.5;
+  clearBackpackSelection();
+  document.getElementById('levelInput').value = 0;
+  document.getElementById('qualityInput').value = 100;
+  // Include additional stats → default off (driven by level toggle)
+  document.getElementById('includeAdditionalChk').checked = false;
+  // Level toggle → reset to LVL 0
+  document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.lvl==='0'));
+  const lvlNote = document.getElementById('lvlNote');
+  lvlNote.textContent = 'Additional stats excluded';
+  lvlNote.className = 'lvl-note';
+  // No Vitality debuff → default on
+  document.getElementById('noVitalityDebuffChk').checked = true;
+  // Stats: uncheck all, reset tiers to M
+  statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
+  statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
+  // Artifacts → restore DEFAULT_OFF state (and persist it, overwriting any saved customization)
+  artifactListEl.querySelectorAll('input').forEach(c=>{
+    c.checked = !DEFAULT_OFF.has(ARTIFACTS[parseInt(c.dataset.idx)].name);
+  });
+  saveExcludedNames();
+  highlightUsedArtifacts([]);
+  // My Loadout search-mode controls → off (favorited artefacts themselves are NOT cleared;
+  // they represent the player's actual inventory, not a search parameter)
+  document.getElementById('useLoadoutChk').checked = false;
+  // Reset the manual-add form
+  document.getElementById('loadoutSearchInput').value = '';
+  document.getElementById('loadoutAddRow').style.display = 'none';
+  // Restore button label if it was stuck on "Searching…"
+  const btn = document.getElementById('calcBtn');
+  btn.disabled = false;
+  btn.textContent = 'Find best combination';
+  // Clear results panel
+  document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit \u201cFind best combination\u201d.</div>';
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+};
+
+
+/* ---------- Level toggle (LVL 0 / LVL 15) - remove handler to revert ---------- */
+document.querySelectorAll('.lvl-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const lvl = parseInt(btn.dataset.lvl);
+    document.getElementById('levelInput').value = lvl;
+    document.getElementById('includeAdditionalChk').checked = (lvl === 15);
+    const note = document.getElementById('lvlNote');
+    if (lvl === 15){
+      note.textContent = 'All additional stats included';
+      note.className = 'lvl-note on';
+    } else {
+      note.textContent = 'Additional stats excluded';
+      note.className = 'lvl-note';
+    }
+  });
+});
+
+/* ---------- Backpack presets: click a pill to autofill slots/protection/effectiveness ---------- */
+const BACKPACK_PRESETS = [
+  { name: "MBSS Backpack",              qClass: "q-130", slots: 4, protection: 60,   effectiveness: 83.5 },
+  { name: "Tri-Zip Assault Backpack",   qClass: "q-130", slots: 5, protection: 60,   effectiveness: 78.5 },
+  { name: "Soviet Travel Backpack",     qClass: "q-145", slots: 5, protection: 60,   effectiveness: 90 },
+  { name: "Berloga-6 Container",        qClass: "q-160", slots: 6, protection: 78.5, effectiveness: 100 },
+  { name: "Hive Container",             qClass: "q-160", slots: 5, protection: 89.5, effectiveness: 105 },
+];
+const backpackPresetsEl = document.getElementById('backpackPresets');
+BACKPACK_PRESETS.forEach((p, i)=>{
+  backpackPresetsEl.insertAdjacentHTML('beforeend',
+    `<button type="button" class="quality-pill ${p.qClass}" data-i="${i}">${p.name}</button>`);
+});
+backpackPresetsEl.addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-i]');
+  if (!btn) return;
+  const p = BACKPACK_PRESETS[parseInt(btn.dataset.i)];
+  document.getElementById('slotsInput').value = p.slots;
+  document.getElementById('protInput').value = p.protection;
+  document.getElementById('effInput').value = p.effectiveness;
+  backpackPresetsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('active', b===btn));
+});
+// Manually editing a field after picking a preset means the values no longer
+// necessarily match that container, so drop the highlight.
+function clearBackpackSelection(){
+  backpackPresetsEl.querySelectorAll('button.active').forEach(b=>b.classList.remove('active'));
+}
+['slotsInput','protInput','effInput'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', clearBackpackSelection);
+});
+
+/* ---------- Combination count: C(n+k-1, k) multiset formula ---------- */
+function combinationCount(n, k){
+  if (n === 0 || k === 0) return 0;
+  let r = 1;
+  for (let i = 0; i < k; i++) r = r * (n + k - 1 - i) / (i + 1);
+  return Math.round(r);
+}
+// Exact count of size-`slots` multisets from entries with per-entry max repeat counts
+// (Infinity allowed). Used for the My Loadout search, where most/all entries are bounded.
+function boundedCombinationCount(maxCounts, slots){
+  const n = maxCounts.length;
+  if (n === 0) return slots === 0 ? 1 : 0;
+  const memo = new Map();
+  function rec(idx, remaining){
+    if (remaining === 0) return 1;
+    if (idx === n) return 0;
+    const key = idx + ',' + remaining;
+    if (memo.has(key)) return memo.get(key);
+    let total = 0;
+    const cap = Math.min(maxCounts[idx], remaining);
+    for (let c = 0; c <= cap; c++) total += rec(idx + 1, remaining - c);
+    memo.set(key, total);
+    return total;
+  }
+  return rec(0, slots);
+}
+
+/* ---------- Search pool builders ----------
+   A "pool" is the flat list the worker actually searches: poolVecs (scaled stat vectors),
+   poolMax (per-entry repeat cap, Infinity = unbounded), poolMeta (artifactIdx + the quality
+   used for that entry, or null when it's the global Quality selector). */
+function buildPoolModeA(includedIdx){
+  const poolVecs = includedIdx.map(i => VECS[i]);
+  const poolMax = includedIdx.map(() => Infinity);
+  const poolMeta = includedIdx.map(i => ({artifactIdx: i, quality: null}));
+  return {poolVecs, poolMax, poolMeta};
+}
+// My Loadout pool: bounded entries grouped by (artifactIdx, quality) from OWNED.
+function buildPoolModeB(includeAdditional, effectiveness, level){
+  const poolVecs = [], poolMax = [], poolMeta = [];
+  const ownedIdxSet = new Set(Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length));
+
+  ownedIdxSet.forEach(idx=>{
+    const counts = {};
+    OWNED[idx].forEach(q => counts[q] = (counts[q]||0) + 1);
+    Object.keys(counts).forEach(qStr=>{
+      const q = parseInt(qStr);
+      poolVecs.push(scaleArtifactVec(idx, q, includeAdditional, effectiveness, level));
+      poolMax.push(counts[q]);
+      poolMeta.push({artifactIdx: idx, quality: q});
+    });
+  });
+
+  return {poolVecs, poolMax, poolMeta};
+}
+
+/* ---------- Worker source (runs search off the main thread) ---------- */
+const WORKER_SRC = `
+const TOP_N = 10;
+self.onmessage = function(e){
+  var d = e.data;
+  var VECS = d.vecs.map(function(v){ return new Float64Array(v); });
+  var n = VECS.length;
+  var maxCounts = d.maxCounts; // per-pool-entry repeat cap (Infinity = unbounded)
+  var sum = new Float64Array(d.ns);
+  var counts = new Array(n).fill(0);
+  var top = [];
+  var checked = 0;
+  var REPORT_EVERY = 500000;
+  var nextReport = REPORT_EVERY;
+  var thresholds = d.thresholds;
+  var targetStats = d.targetStats;
+  var ns = d.ns;
+  var protection = d.protection;
+  var total = d.total;
+
+  function passesThreshold(){
+    for(var i=0;i<thresholds.length;i++){
+      var t=thresholds[i];
+      var raw=sum[t.idx];
+      var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
+      if(eff>t.cap+1e-9) return false;
+    }
+    return true;
+  }
+  function passesExtended(){
+    for(var i=0;i<thresholds.length;i++){
+      var t=thresholds[i];
+      var raw=sum[t.idx];
+      var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
+      if(eff>t.extCap+1e-9) return false;
+    }
+    return true;
+  }
+  function tierScores(){
+    var h=0,m=0,l=0;
+    for(var i=0;i<targetStats.length;i++){
+      var t=targetStats[i];
+      var normed=t.statMax>1e-12?sum[t.idx]*t.dir/t.statMax:0;
+      if(t.tier==='high') h+=normed;
+      else if(t.tier==='low') l+=normed;
+      else m+=normed;
+    }
+    return {h:h,m:m,l:l};
+  }
+  function rawScore(){
+    var s=0;
+    for(var i=0;i<targetStats.length;i++){var t=targetStats[i];s+=sum[t.idx]*t.dir*t.weight;}
+    return s;
+  }
+  function coverage(){
+    var c=0;
+    for(var i=0;i<targetStats.length;i++){
+      var t=targetStats[i];
+      if(sum[t.idx]*t.dir>1e-9) c++;
+    }
+    return c;
+  }
+  function beats(a,b){
+    if(a.cov!==b.cov) return a.cov>b.cov;
+    if(Math.abs(a.ts.h-b.ts.h)>1e-9) return a.ts.h>b.ts.h;
+    if(Math.abs(a.ts.m-b.ts.m)>1e-9) return a.ts.m>b.ts.m;
+    return a.ts.l>b.ts.l;
+  }
+  var TOP_MISS = 30;
+  var top_miss = [];
+  var TOP_EXT = 10;
+  var top_ext = [];
+  function considerLeaf(){
+    checked++;
+    if(checked>=nextReport){
+      self.postMessage({type:'progress',done:checked,total:total});
+      nextReport+=REPORT_EVERY;
+    }
+    var vitalityOk=!(d.noVitalityDebuff && sum[d.vitalityIdx] < -1e-9);
+    if(!vitalityOk) return;
+    var passes=passesThreshold();
+    var sc=rawScore();
+    if(passes){
+      var ts=tierScores(),cv=coverage();
+      var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
+      if(top.length===TOP_N&&!beats(entry,top[top.length-1])) return;
+      var i=top.length;
+      top.push(entry);
+      while(i>0&&beats(entry,top[i-1])){top[i]=top[i-1];top[i-1]=entry;i--;}
+      if(top.length>TOP_N) top.length=TOP_N;
+    } else if(passesExtended()){
+      // Extended zone: over hard cap but within consumable range
+      var ts2=tierScores(),cv2=coverage();
+      var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:Array.from(sum)};
+      if(top_ext.length===TOP_EXT&&!beats(entry_e,top_ext[top_ext.length-1])) {
+        // still track for upgrade analysis
+      } else {
+        var ie=top_ext.length;
+        top_ext.push(entry_e);
+        while(ie>0&&beats(entry_e,top_ext[ie-1])){top_ext[ie]=top_ext[ie-1];top_ext[ie-1]=entry_e;ie--;}
+        if(top_ext.length>TOP_EXT) top_ext.length=TOP_EXT;
+      }
+      // Also track as near-miss for upgrade analysis
+      if(top_miss.length<TOP_MISS || sc>top_miss[top_miss.length-1].score){
+        var entry2={counts:counts.slice(),score:sc,ts:{h:0,m:0,l:0},cov:0,sum:Array.from(sum)};
+        var j=top_miss.length;
+        top_miss.push(entry2);
+        while(j>0&&sc>top_miss[j-1].score){top_miss[j]=top_miss[j-1];top_miss[j-1]=entry2;j--;}
+        if(top_miss.length>TOP_MISS) top_miss.length=TOP_MISS;
+      }
+    } else {
+      // Hard fail: track only for upgrade analysis
+      if(top_miss.length===TOP_MISS && sc<=top_miss[top_miss.length-1].score) return;
+      var entry3={counts:counts.slice(),score:sc,ts:{h:0,m:0,l:0},cov:0,sum:Array.from(sum)};
+      var j2=top_miss.length;
+      top_miss.push(entry3);
+      while(j2>0&&sc>top_miss[j2-1].score){top_miss[j2]=top_miss[j2-1];top_miss[j2-1]=entry3;j2--;}
+      if(top_miss.length>TOP_MISS) top_miss.length=TOP_MISS;
+    }
+  }
+  function recurse(start,remaining){
+    if(remaining===0){considerLeaf();return;}
+    for(var i=start;i<n;i++){
+      if(counts[i]>=maxCounts[i]) continue;
+      var vec=VECS[i];
+      counts[i]++;
+      for(var k=0;k<ns;k++) sum[k]+=vec[k];
+      recurse(i,remaining-1);
+      for(var k=0;k<ns;k++) sum[k]-=vec[k];
+      counts[i]--;
+    }
+  }
+  recurse(0,d.slots);
+  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext});
+};
+`;
+
+/* ---------- Search ---------- */
+// Hard caps: effective value must stay at or below these to avoid damage.
+// Frost ignores backpack protection and has a different cap (0.99 instead of 0.49).
+const THRESH_CAP     = 0.49;  // non-Frost hard cap
+const THRESH_CAP_FROST = 0.99; // Frost hard cap
+const THRESH_EXT     = 0.54;  // non-Frost extended zone (consumable range)
+const THRESH_EXT_FROST = 0.99; // Frost has no consumables - extended zone disabled (same as hard cap)
+
+function thresholdCap(statName){ return statName === 'Frost' ? THRESH_CAP_FROST : THRESH_CAP; }
+function thresholdExtCap(statName){ return statName === 'Frost' ? THRESH_EXT_FROST : THRESH_EXT; }
+
+function passesThreshold(sum, protection){
+  for (const s of THRESHOLD_STATS){
+    const raw = sum[STAT_IDX[s]];
+    const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
+    if (eff > thresholdCap(s) + 1e-9) return false;
+  }
+  return true;
+}
+
+const TOP_N = 10;
+
+function findBest(includedIdx, slots, protection, targetStats){
+  const n = includedIdx.length;
+  const sum = new Float64Array(NS);
+  const counts = new Array(n).fill(0);
+  const top = []; // sorted descending by tier scores, max length TOP_N
+
+  // Best single-artefact beneficial value per target stat for normalization.
+  const statMaxMap = {};
+  for (const t of targetStats) {
+    const si = STAT_IDX[t.name];
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    let mx = 0;
+    for (const ai of includedIdx) { const v = VECS[ai][si] * dir; if (v > mx) mx = v; }
+    statMaxMap[t.name] = mx;
+  }
+
+  function tierScores(){
+    let h=0, m=0, l=0;
+    for (const t of targetStats){
+      const si = STAT_IDX[t.name];
+      const dir = STAT_META[t.name].good ? 1 : -1;
+      const sm = statMaxMap[t.name];
+      const normed = sm > 1e-12 ? sum[si] * dir / sm : 0;
+      if (t.tier === 'high') h += normed;
+      else if (t.tier === 'low') l += normed;
+      else m += normed;
+    }
+    return {h, m, l};
+  }
+
+  function rawScore(){
+    let s = 0;
+    for (const t of targetStats){
+      const dir = STAT_META[t.name].good ? 1 : -1;
+      s += sum[STAT_IDX[t.name]] * dir * t.weight;
+    }
+    return s;
+  }
+
+  // Count how many target stats have a beneficial non-zero contribution.
+  // Primary sort key: coverage first, tier scores break ties within same coverage.
+  function coverage(){
+    let c = 0;
+    for (const t of targetStats){
+      const dir = STAT_META[t.name].good ? 1 : -1;
+      if (sum[STAT_IDX[t.name]] * dir > 1e-9) c++;
+    }
+    return c;
+  }
+
+  function beats(a, b){
+    if (a.cov !== b.cov) return a.cov > b.cov;
+    if (Math.abs(a.ts.h - b.ts.h) > 1e-9) return a.ts.h > b.ts.h;
+    if (Math.abs(a.ts.m - b.ts.m) > 1e-9) return a.ts.m > b.ts.m;
+    return a.ts.l > b.ts.l;
+  }
+
+  function considerLeaf(){
+    if (!passesThreshold(sum, protection)) return;
+    const ts = tierScores();
+    const sc = rawScore();
+    const cv = coverage();
+    const entry = {counts: counts.slice(), score: sc, ts, cov: cv, sum: sum.slice()};
+    if (top.length === TOP_N && !beats(entry, top[top.length-1])) return;
+    let i = top.length;
+    top.push(entry);
+    while (i > 0 && beats(entry, top[i-1])){
+      top[i] = top[i-1]; top[i-1] = entry; i--;
+    }
+    if (top.length > TOP_N) top.length = TOP_N;
+  }
+
+  function recurse(start, remaining){
+    if (remaining === 0){
+      considerLeaf();
+      return;
+    }
+    for (let i=start; i<n; i++){
+      const vec = VECS[includedIdx[i]];
+      counts[i]++;
+      for (let k=0;k<NS;k++) sum[k]+=vec[k];
+      recurse(i, remaining-1);
+      for (let k=0;k<NS;k++) sum[k]-=vec[k];
+      counts[i]--;
+    }
+  }
+  recurse(0, slots);
+
+  return top.map(best=>{
+    const chosen = [];
+    best.counts.forEach((c, localI)=>{
+      if (c>0) chosen.push({idx: includedIdx[localI], count: c});
+    });
+    return {chosen, sum: best.sum, score: best.score, ts: best.ts};
+  });
+}
+
+/* ---------- Render results ---------- */
+// Returns true if OWNED contains at least one unit of this artefact at >= the given quality.
+function isOwnedAtOrAboveQuality(artifactIdx, quality){
+  const units = OWNED[artifactIdx];
+  if (!units || units.length === 0) return false;
+  return units.some(q => q >= quality);
+}
+
+function fmt(name, val){
+  const pct = PERCENT_STATS.has(name) ? '%' : '';
+  const sign = val >= 0 ? '+' : '';
+  return `${sign}${val.toFixed(2)}${pct}`;
+}
+function isGoodValue(name, val){
+  return STAT_META[name].good ? val >= 0 : val <= 0;
+}
+// For each target stat, finds which results are in the top 3 by that stat's
+// beneficial direction (so for "lower is better" stats, lowest/most negative
+// wins). Ties at the 3rd-place cutoff are all included.
+function computeTopStatSets(results, targetStats){
+  const topSets = {};
+  targetStats.forEach(t=>{
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    const idx = STAT_IDX[t.name];
+    const scored = results.map((r,i)=>({i, val: r.sum[idx]*dir}));
+    scored.sort((a,b)=>b.val-a.val);
+    const set = new Set();
+    if (scored.length){
+      const cutoff = scored[Math.min(2, scored.length-1)].val;
+      scored.forEach(s=>{ if (s.val >= cutoff - 1e-9) set.add(s.i); });
+    }
+    topSets[t.name] = set;
+  });
+  return topSets;
+}
+
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank){
+  const {chosen, sum, score, ts} = result;
+  const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
+  let html = `<div class="result-card" style="${borderStyle}">`;
+  const tierParts = [];
+  if (targetStats.some(t=>t.tier==='high')) tierParts.push(`H: ${ts.h.toFixed(2)}`);
+  if (targetStats.some(t=>t.tier==='med'))  tierParts.push(`M: ${ts.m.toFixed(2)}`);
+  if (targetStats.some(t=>t.tier==='low'))  tierParts.push(`L: ${ts.l.toFixed(2)}`);
+  const scoreText = tierParts.length ? tierParts.join(' · ') : `score ${score.toFixed(3)}`;
+
+  // For consumable-zone cards, build small over-threshold badges for the header
+  let overBadges = '';
+  if (isExtended){
+    THRESHOLD_STATS.forEach(s=>{
+      const raw = sum[STAT_IDX[s]];
+      const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
+      if (eff > thresholdCap(s) + 1e-9){
+        overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;margin-left:4px;">${s} ${eff.toFixed(2)}</span>`;
+      }
+    });
+  }
+
+  const wouldBeNote = wouldBeRank != null
+    ? `<span style="font-size:10px;color:var(--muted);margin-left:8px;">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
+    : '';
+
+  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span><span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}</div>`;
+
+  html += '<div class="loadout-list">';
+  chosen.forEach(c=>{
+    const effectiveQuality = c.quality != null ? c.quality : (parseInt(document.getElementById('qualityInput').value) || 100);
+    const ownedCls = showOwnedHighlight && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
+    html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}"><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span></button>`;
+  });
+  html += '</div>';
+
+  html += '<div class="target-line">';
+  targetStats.forEach(t=>{
+    const name = t.name;
+    const valStr = fmt(name, sum[STAT_IDX[name]]);
+    const isTopStat = topSets && topSets[name] && topSets[name].has(resultIndex);
+    html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${name}: ${valStr}</span>`;
+  });
+  html += '</div>';
+
+  html += '<details' + (isTop ? ' open' : '') + '><summary>Damage thresholds &amp; full stat breakdown</summary>';
+
+  // Build gauge and stat cells as two independent column stacks (see below).
+  const gaugeCells = [];
+  THRESHOLD_STATS.forEach(s=>{
+    const raw = sum[STAT_IDX[s]];
+    const eff = (raw > 0 && s !== 'Frost') ? raw * (1-protection/100) : raw;
+    const cap = thresholdCap(s);
+    const extCap = thresholdExtCap(s);
+    const ratio = Math.max(0, eff) / cap;
+    let color = 'var(--good)', statusColor='var(--good)', statusText='safe';
+    if (eff > extCap + 1e-9){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
+    else if (eff > cap + 1e-9){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
+    else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
+    const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
+    const markerPct = (cap / extCap) * (100/1.15);
+    gaugeCells.push(`<div style="padding:3px 0 5px;">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
+        <span>${s}</span>
+        <span style="font-family:var(--mono);color:${statusColor};">${eff.toFixed(2)} <span style="font-size:10px;">${statusText}</span></span>
+      </div>
+      <div class="gauge-track"><div class="gauge-fill" style="width:${widthPct}%;background:${color};"></div>
+        <div class="gauge-marker" style="left:${markerPct}%;"></div></div>
+    </div>`);
+  });
+
+  const statCells = [];
+  STAT_NAMES.forEach(s=>{
+    const val = sum[STAT_IDX[s]];
+    if (Math.abs(val) < 1e-9) return;
+    const good = isGoodValue(s, val);
+    const isTarget = targetStats.some(t => t.name === s);
+    statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
+      <span style="font-family:var(--sans);">${s}</span>
+      <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmt(s,val)}</span>
+    </div>`);
+  });
+
+  // Gauges and stats are independent lists of different lengths - stacking them in
+  // their own column (rather than pairing into shared grid rows) keeps each column's
+  // internal spacing/border-rhythm consistent instead of rows stretching to fit
+  // whichever column happens to be taller at that index.
+  let gridHtml = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
+  gridHtml += '<div style="flex:1;display:flex;flex-direction:column;">' + gaugeCells.join('') + '</div>';
+  gridHtml += '<div style="flex:1;display:flex;flex-direction:column;">' + statCells.join('') + '</div>';
+  gridHtml += '</div>';
+  html += gridHtml;
+
+  html += '</details></div>';
+
+  return html;
+}
+
+function renderConsumableZone(results, extResults, targetStats, protection){
+  const el = document.getElementById('consumableZone');
+  const hasValid = results && results.length > 0;
+  // With no valid builds, show every collected extended-zone build (no top-3 filter).
+  // With valid builds, only show ones that would rank in the top 3 if they were valid.
+  const shown = hasValid
+    ? (extResults || []).filter(r => results.filter(v => v.score > r.score + 1e-9).length + 1 <= 3)
+    : (extResults || []);
+  if (shown.length === 0){ el.innerHTML = ''; return; }
+
+  let html = `<div class="section-title" style="margin-top:20px;">⚠ Consumable zone (0.49–0.54)</div>
+  <div class="flag-note" style="margin-bottom:12px;">These builds exceed the 0.49 damage threshold but stay within 0.54${hasValid ? ', and would rank top 3 if valid' : ''}. A suitable consumable or drug can cover the gap - use at your own risk.</div>`;
+  shown.forEach((r,i)=>{
+    const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-9).length + 1 : undefined;
+    html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank);
+  });
+  el.innerHTML = html;
+}
+
+// In grid view, artifact chip rows (.loadout-list) can be different heights across cards,
+// pushing the stat pills out of alignment. This measures the tallest chip section per
+// group-of-N (matching the CSS column count) and gives the shorter ones a matching min-height.
+function equalizeGridCardChips(resultsEl){
+  const gridEl = resultsEl.querySelector('.results-grid-view');
+  if (!gridEl) return;
+  const cards = Array.from(gridEl.querySelectorAll('.result-card'));
+  if (cards.length < 2) return;
+  const cols = getComputedStyle(gridEl).gridTemplateColumns.trim().split(/\s+/).length || 3;
+  // Step 1: pin every chip to the same height.
+  // getBoundingClientRect forces a reflow so we read accurate natural heights first.
+  const allChips = Array.from(gridEl.querySelectorAll('.loadout-chip'));
+  const chipH = Math.max(...allChips.map(c => c.getBoundingClientRect().height));
+  allChips.forEach(c => { c.style.height = chipH + 'px'; });
+  // Step 2: now that chips are uniform, re-measure section heights and equalize per row.
+  // (Sections still vary because cards have different chip counts.)
+  for (let i = 0; i < cards.length; i += cols){
+    const group = cards.slice(i, i + cols);
+    const chipDivs = group.map(c => c.querySelector('.loadout-list'));
+    const maxH = Math.max(...chipDivs.map(d => d ? d.getBoundingClientRect().height : 0));
+    chipDivs.forEach(d => { if (d) d.style.minHeight = maxH + 'px'; });
+  }
+}
+
+function renderResults(results, extResults, targetStats, protection){
+  lastRenderArgs = {results, extResults, targetStats, protection};
+  highlightUsedArtifacts(usedArtifactIndices(results));
+  const el = document.getElementById('results');
+  if (!results || results.length === 0){
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
+    renderConsumableZone(results, extResults, targetStats, protection);
+    return;
+  }
+  const topSets = computeTopStatSets(results, targetStats);
+
+  const toggleHtml = results.length > 1
+    ? `<div class="results-view-toggle">
+        <button type="button" class="view-btn${!gridView ? ' active' : ''}" data-view="list">List</button>
+        <button type="button" class="view-btn${gridView ? ' active' : ''}" data-view="grid">Grid</button>
+      </div>`
+    : '';
+
+  let html = `<div class="results-header"><h2>Top ${results.length} combination${results.length>1?'s':''}</h2>${toggleHtml}</div>`;
+
+  if (gridView && results.length > 1) {
+    html += '<div class="results-grid-view">';
+    results.forEach((r,i)=>{ html += renderResultCard(r, targetStats, protection, i+1, false, topSets, i); });
+    html += '</div>';
+  } else {
+    results.forEach((r,i)=>{ html += renderResultCard(r, targetStats, protection, i+1, false, topSets, i); });
+  }
+  el.innerHTML = html;
+  if (gridView && results.length > 1) equalizeGridCardChips(el);
+
+  // Attach toggle handlers after innerHTML is set
+  el.querySelectorAll('.view-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      gridView = btn.dataset.view === 'grid';
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection);
+    });
+  });
+
+  renderConsumableZone(results, extResults, targetStats, protection);
+}
+
+/* ---------- Upgrade analysis ---------- */
+// For each near-miss combination, try upgrading one artifact at a time
+// (levels 1–15) and find the minimum level that makes the build valid.
+// Returns tip objects only if the upgraded build would beat any of the top-3
+// valid results by score.
+function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults){
+  if (!misses || misses.length === 0) return [];
+  const tips = [];
+  const seen = new Set(); // deduplicate by (build-key, enabler-idx, min-level)
+
+  // Score threshold: must be at least as good as the 3rd valid result
+  const minValidScore = validResults.length > 0
+    ? validResults[Math.min(2, validResults.length - 1)].score
+    : -Infinity;
+
+  // Pre-compute per-stat index+direction for scoring
+  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight }));
+
+  function scoreSum(sumArr){
+    let s = 0;
+    for (const t of tsDirs) s += sumArr[t.idx] * t.dir * t.weight;
+    return s;
+  }
+
+  // Rebuild sum vector for a combination with one artifact upgraded to overrideLvl.
+  // Non-enabler artifacts use the current VECS (already baked with current level/quality).
+  // The enabler is recomputed at overrideLvl with quality=100 (common), since we assume
+  // the user upgrades a base-quality copy. If includeAdditional is on at overrideLvl 15,
+  // the enabler's add stats are included too.
+  function buildSum(counts, localIndices, overrideIdx, overrideLvl){
+    const effMult = effectiveness / 100;
+    const s = new Float64Array(NS);
+    localIndices.forEach((globalIdx, localI)=>{
+      const cnt = counts[localI];
+      if (cnt === 0) return;
+      if (globalIdx !== overrideIdx){
+        // Use the already-computed VECS value (current level/quality setting)
+        for (let k = 0; k < NS; k++) s[k] += cnt * VECS[globalIdx][k];
+      } else {
+        // Re-compute the enabler at overrideLvl (Common 100% quality)
+        for (let k = 0; k < NS; k++){
+          const statName = STAT_NAMES[k];
+          let val = scaleStat(MAIN_VECS[globalIdx][k], statName, overrideLvl, 100);
+          if (overrideLvl === 15){
+            val += scaleStat(ADD_VECS[globalIdx][k], statName, overrideLvl, 100);
+          }
+          s[k] += cnt * (THRESHOLD_IDX.has(k) ? val : val * effMult);
+        }
+      }
+    });
+    return s;
+  }
+
+  misses.forEach(miss=>{
+    // Resolve which global artifact indices (with counts) are in this combination
+    const localIndices = []; // parallel to miss.counts
+    const chosen = [];
+    miss.counts.forEach((cnt, localI)=>{
+      localIndices.push(includedIdx[localI]);
+      if (cnt > 0) chosen.push({idx: includedIdx[localI], count: cnt});
+    });
+    if (chosen.length === 0) return;
+
+    // Get the unique artifact indices in this build (we try each as the enabler)
+    const uniqueGlobal = [...new Set(chosen.map(c=>c.idx))];
+
+    uniqueGlobal.forEach(enablerGlobalIdx=>{
+      // Binary-ish search: try levels 1..15 for this enabler artifact only
+      let minLevel = null;
+      for (let lvl = 1; lvl <= 15; lvl++){
+        const sum = buildSum(miss.counts, localIndices, enablerGlobalIdx, lvl);
+        if (passesThreshold(sum, protection)){
+          minLevel = lvl;
+          break;
+        }
+      }
+      if (minLevel === null) return; // no level makes this build valid
+
+      // Score this upgraded build
+      const upgradedSum = buildSum(miss.counts, localIndices, enablerGlobalIdx, minLevel);
+      const upgradedScore = scoreSum(upgradedSum);
+
+      // Only surface if it beats the 3rd-best valid result
+      if (upgradedScore <= minValidScore + 1e-9) return;
+
+      // Dedup key: sorted artifact indices + counts + enabler + level
+      const buildKey = chosen.map(c=>`${c.idx}x${c.count}`).sort().join(',') + `|${enablerGlobalIdx}@${minLevel}`;
+      if (seen.has(buildKey)) return;
+      seen.add(buildKey);
+
+      tips.push({
+        chosen,
+        enablerIdx: enablerGlobalIdx,
+        minLevel,
+        upgradedSum,
+        upgradedScore
+      });
+    });
+  });
+
+  // Sort by upgraded score descending, limit to 5 tips
+  tips.sort((a,b)=>b.upgradedScore - a.upgradedScore);
+  return tips.slice(0, 5);
+}
+
+function renderUpgradeTips(tips, targetStats, protection, validResults){
+  const el = document.getElementById('upgradeTips');
+  if (!tips || tips.length === 0){ el.innerHTML = ''; return; }
+
+  // Quality % multiplier strings for display
+  const LVL_QUALITY = [100,102,104,106,108,110,112,114,116,118,120,122,124,126,128,130];
+
+  let html = `<div class="section-title" style="margin-top:20px;">💡 Upgrade-Unlocked Builds</div>
+<div class="flag-note" style="margin-bottom:12px;">These builds fail the damage threshold at LVL&nbsp;0 but become valid if you upgrade one specific artifact. They score as well as the top 3 above.</div>`;
+
+  tips.forEach((tip, i)=>{
+    const enablerName = ARTIFACTS[tip.enablerIdx].name;
+    const qualityPct = LVL_QUALITY[tip.minLevel];
+    const sum = tip.upgradedSum;
+
+    html += `<div class="result-card" style="border-color:var(--accent-dim);">`;
+    html += `<div class="rank-row">
+      <span class="rank-badge" style="background:var(--accent-dim);color:var(--text);">TIP ${i+1}</span>
+      <span class="score-line" style="margin:0;">score ${tip.upgradedScore.toFixed(3)}</span>
+    </div>`;
+
+    // Loadout chips
+    html += '<div class="loadout-list">';
+    tip.chosen.forEach(c=>{
+      const isEnabler = c.idx === tip.enablerIdx;
+      const tipQuality = parseInt(document.getElementById('qualityInput').value) || 100;
+      const ownedCls = showOwnedHighlight && isOwnedAtOrAboveQuality(c.idx, tipQuality) ? ' owned-match' : '';
+      html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}" style="${isEnabler?'border-color:var(--accent);':''}">${isEnabler?'<b style="color:var(--accent)">★</b> ':''}${c.count > 1 ? `<b>${c.count}&times;</b> ` : ''}${ARTIFACTS[c.idx].name}</button>`;
+    });
+    html += '</div>';
+
+    // Enabler upgrade note
+    html += `<div style="font-size:12px;margin:8px 0 4px;color:var(--warn);">
+      ★ Upgrade <b>${enablerName}</b> to LVL ${tip.minLevel} (${qualityPct}% quality) to unlock this build
+    </div>`;
+
+    // Target stat pills
+    html += '<div class="target-line">';
+    targetStats.forEach(t=>{
+      const name = t.name;
+      const valStr = fmt(name, sum[STAT_IDX[name]]);
+      html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}">${name}: ${valStr}</span>`;
+    });
+    html += '</div>';
+
+    // Threshold gauges in details
+    html += '<details><summary>Damage thresholds &amp; full stat breakdown</summary>';
+    const tipGaugeCells = [];
+    THRESHOLD_STATS.forEach(s=>{
+      const raw = sum[STAT_IDX[s]];
+      const eff = (raw > 0 && s !== 'Frost') ? raw * (1-protection/100) : raw;
+      const cap = thresholdCap(s);
+      const extCap = thresholdExtCap(s);
+      const ratio = Math.max(0, eff) / cap;
+      let color = 'var(--good)', statusColor='var(--good)', statusText='safe';
+      if (eff > extCap + 1e-9){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
+      else if (eff > cap + 1e-9){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
+      else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
+      const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
+      const markerPct = (cap / extCap) * (100/1.15);
+      tipGaugeCells.push(`<div style="padding:3px 0 5px;">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
+          <span>${s}</span>
+          <span style="font-family:var(--mono);color:${statusColor};">${eff.toFixed(2)} <span style="font-size:10px;">${statusText}</span></span>
+        </div>
+        <div class="gauge-track"><div class="gauge-fill" style="width:${widthPct}%;background:${color};"></div>
+          <div class="gauge-marker" style="left:${markerPct}%;"></div></div>
+      </div>`);
+    });
+    const tipStatCells = [];
+    STAT_NAMES.forEach(s=>{
+      const val = sum[STAT_IDX[s]];
+      if (Math.abs(val) < 1e-9) return;
+      const good = isGoodValue(s, val);
+      const isTarget = targetStats.some(t => t.name === s);
+      tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
+        <span style="font-family:var(--sans);">${s}</span>
+        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmt(s,val)}</span>
+      </div>`);
+    });
+    let tipGrid = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
+    tipGrid += '<div style="flex:1;display:flex;flex-direction:column;">' + tipGaugeCells.join('') + '</div>';
+    tipGrid += '<div style="flex:1;display:flex;flex-direction:column;">' + tipStatCells.join('') + '</div>';
+    tipGrid += '</div>';
+    html += tipGrid;
+    html += '</details></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+
+let activeWorker = null;
+let showOwnedHighlight = false; // false in Mode B: every chip is from the loadout already
+let gridView = false;           // true = 3-column grid layout for results
+let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
+
+document.getElementById('calcBtn').onclick = ()=>{
+  const slots = Math.max(1, Math.min(6, parseInt(document.getElementById('slotsInput').value) || 1));
+  const protection = Math.max(0, Math.min(100, parseFloat(document.getElementById('protInput').value) || 0));
+  const effectiveness = Math.max(-100, Math.min(200, parseFloat(document.getElementById('effInput').value) || 0));
+  const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
+  const quality = parseInt(document.getElementById('qualityInput').value) || 100;
+
+  const targetStats = Array.from(statListEl.querySelectorAll('input[data-stat]:checked')).map(chk=>{
+    const item = chk.closest('.check-item');
+    const activeBtn = item.querySelector('.tier-btn.active');
+    const tier = activeBtn ? activeBtn.dataset.tier : 'med';
+    const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
+    return {name: chk.dataset.stat, weight, tier};
+  });
+  const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
+  const includeAdditional = document.getElementById('includeAdditionalChk').checked;
+  const noVitalityDebuff = document.getElementById('noVitalityDebuffChk').checked;
+  const useLoadout = document.getElementById('useLoadoutChk').checked;
+  showOwnedHighlight = !useLoadout;
+
+  const el = document.getElementById('results');
+  const btn = document.getElementById('calcBtn');
+
+  if (targetStats.length === 0){
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to optimize.</div>';
+    return;
+  }
+  if (!useLoadout && includedIdx.length === 0){
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
+    return;
+  }
+
+  // Cancel any previous search
+  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+
+  rebuildVecs(includeAdditional, effectiveness, level, quality);
+
+  // Build the search pool: Mode A is the regular ticked list (unbounded, global quality);
+  // Mode B (My Loadout) is bounded by owned count and scaled per-unit quality.
+  let poolVecs, poolMax, poolMeta;
+  if (useLoadout){
+    const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
+    if (totalOwnedUnits === 0){
+      el.innerHTML = '<h2>Result</h2><div class="msg-error">Favorite at least one artefact first (click a chip on a result card \u2192 Favorite), or untick "Use My Loadout".</div>';
+      return;
+    }
+    const built = buildPoolModeB(includeAdditional, effectiveness, level);
+    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
+    const totalUnits = poolMax.reduce((s,m)=>s+m, 0);
+    if (totalUnits < slots){
+      el.innerHTML = `<h2>Result</h2><div class="msg-error">You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.</div>`;
+      return;
+    }
+  } else {
+    const built = buildPoolModeA(includedIdx);
+    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
+  }
+
+  // Best single-artefact beneficial value per target stat, used to normalize tier scores.
+  const statMaxMap = {};
+  for (const t of targetStats) {
+    const si = STAT_IDX[t.name];
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    let mx = 0;
+    for (const v of poolVecs) { const val = v[si] * dir; if (val > mx) mx = val; }
+    statMaxMap[t.name] = mx;
+  }
+
+  const total = useLoadout ? boundedCombinationCount(poolMax, slots) : combinationCount(poolVecs.length, slots);
+  const totalFmt = total.toLocaleString();
+
+  // Show progress UI
+  btn.disabled = true;
+  btn.textContent = 'Searching\u2026';
+  el.innerHTML = `
+    <h2>Scanning</h2>
+    <p class="prog-tagline">checking <b>${totalFmt}</b> possible combinations</p>
+    <div class="prog-row">
+      <span class="prog-row-label">Progress</span>
+      <span class="prog-count" id="progCount">0 / ${totalFmt}</span>
+    </div>
+    <div class="prog-track">
+      <div class="prog-fill" id="progFill" style="width:0%"></div>
+      <div class="prog-scan"></div>
+      <span class="prog-pct" id="progPct">0%</span>
+    </div>
+    <div class="prog-status" id="progStatus">Initializing\u2026</div>
+  `;
+
+  // Pre-compute per-stat index+direction for the worker (avoids string lookups inside tight loop)
+  const workerTargetStats = targetStats.map(t=>({
+    idx: STAT_IDX[t.name],
+    dir: STAT_META[t.name].good ? 1 : -1,
+    weight: t.weight,
+    tier: t.tier,
+    statMax: statMaxMap[t.name]
+  }));
+  const workerThresholds = THRESHOLD_STATS.map(s=>({
+    idx: STAT_IDX[s],
+    isFrost: s === 'Frost',
+    cap: thresholdCap(s),
+    extCap: thresholdExtCap(s)
+  }));
+
+  const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+  const workerUrl = URL.createObjectURL(blob);
+  activeWorker = new Worker(workerUrl);
+
+  const startTime = Date.now();
+
+  activeWorker.onmessage = e=>{
+    if (e.data.type === 'progress'){
+      const done = e.data.done;
+      const pct = Math.min(99, Math.round(done / total * 100)); // hold at 99% until truly done
+      const elapsed = (Date.now() - startTime) / 1000;
+      const rate = elapsed > 0 ? done / elapsed : 0;
+      const remaining = rate > 0 ? (total - done) / rate : 0;
+      const etaStr = remaining > 60
+        ? Math.round(remaining / 60) + ' min remaining'
+        : Math.round(remaining) + 's remaining';
+      const rateStr = rate > 0
+        ? (rate >= 1e6 ? (rate/1e6).toFixed(1)+'M' : Math.round(rate/1e3)+'K') + ' combinations/sec'
+        : '';
+
+      document.getElementById('progFill').style.width = pct + '%';
+      document.getElementById('progPct').textContent = pct + '%';
+      document.getElementById('progCount').textContent = done.toLocaleString() + ' / ' + totalFmt;
+      document.getElementById('progStatus').textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
+
+    } else if (e.data.type === 'done'){
+      URL.revokeObjectURL(workerUrl);
+      activeWorker = null;
+      btn.disabled = false;
+      btn.textContent = 'Find best combination';
+
+      // Reconstruct results in the shape renderResults expects (quality comes from poolMeta,
+      // null for Mode A entries since those use the global Quality selector instead).
+      const results = e.data.top.map(best=>{
+        const chosen = [];
+        best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: poolMeta[localI].artifactIdx, count: c, quality: poolMeta[localI].quality}); });
+        return {chosen, sum: new Float64Array(best.sum), score: best.score, ts: best.ts};
+      });
+      const extResults = (e.data.top_ext || []).map(best=>{
+        const chosen = [];
+        best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: poolMeta[localI].artifactIdx, count: c, quality: poolMeta[localI].quality}); });
+        return {chosen, sum: new Float64Array(best.sum), score: best.score, ts: best.ts};
+      });
+      renderResults(results, extResults, targetStats, protection);
+
+      // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
+      // build while sweeping one enabler's level -- that doesn't hold for a bounded,
+      // per-unit-quality My Loadout pool, so it's skipped in that mode.
+      document.getElementById('upgradeTips').innerHTML = '';
+      if (!useLoadout){
+        const misses = e.data.top_miss || [];
+        if (misses.length > 0 && results.length > 0){
+          const tips = analyzeUpgrades(
+            misses, includedIdx, targetStats, protection,
+            includeAdditional, effectiveness, results
+          );
+          renderUpgradeTips(tips, targetStats, protection, results);
+        }
+      }
+    }
+  };
+
+  activeWorker.onerror = err=>{
+    URL.revokeObjectURL(workerUrl);
+    activeWorker = null;
+    btn.disabled = false;
+    btn.textContent = 'Find best combination';
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Search error: ' + (err.message || 'unknown error') + '</div>';
+  };
+
+  // Serialize pool vecs as plain arrays (structured-clone safe)
+  activeWorker.postMessage({
+    vecs: poolVecs.map(v=>Array.from(v)),
+    maxCounts: poolMax,
+    slots,
+    protection,
+    targetStats: workerTargetStats,
+    thresholds: workerThresholds,
+    ns: NS,
+    total,
+    noVitalityDebuff,
+    vitalityIdx: STAT_IDX['Vitality']
+  });
+};
+</script>
+</body>
+</html>
