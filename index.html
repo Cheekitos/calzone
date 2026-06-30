@@ -1000,12 +1000,24 @@ function qualitySelectHtml(q, i){
 function renderPopoverMain(idx){
   const isOwned = !!(OWNED[idx] && OWNED[idx].length);
   const isPinned = PINNED.has(idx);
+  const vec = VECS[idx];
+  const statRows = STAT_NAMES
+    .map((s, i) => ({ name: s, val: vec[i] }))
+    .filter(r => Math.abs(r.val) > 1e-9)
+    .map(r => {
+      const good = isGoodValue(r.name, r.val);
+      return `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;font-size:11.5px;">
+        <span style="color:var(--muted);">${r.name}</span>
+        <span style="font-family:var(--mono);color:${good ? 'var(--good)' : 'var(--bad)'};">${fmt(r.name, r.val)}</span>
+      </div>`;
+    }).join('');
   chipPopoverEl.innerHTML = `
-    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name}</div>
-    <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
-    <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:6px;">${ARTIFACTS[idx].name}</div>
+    <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);">${statRows}</div>
     <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Favorite' : 'Favorite'}</button>
     ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Favorites</button>' : ''}
+    <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
+    <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
   `;
 }
 function renderPopoverFavorite(idx){
