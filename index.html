@@ -296,9 +296,19 @@
   .art-heart.owned{color:#fff;}
   .art-heart.owned:hover{color:var(--bad);}
 
+  .art-lock{
+    background:none;border:none;cursor:pointer;padding:0 2px;
+    font-size:13px;line-height:1;flex-shrink:0;color:var(--muted);
+    transition:color 0.12s;
+  }
+  .art-lock:hover{color:var(--accent);}
+  .art-lock.pinned{color:var(--accent);}
+  .art-lock.pinned:hover{color:var(--accent-dim);}
+
   /* Results header row (title + view toggle) */
   .results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
   .results-header h2{margin:0;}
+  .results-toggles{display:flex;align-items:center;gap:8px;}
   .results-view-toggle{display:flex;gap:3px;}
   .view-btn{
     background:none;border:1px solid var(--border);color:var(--muted);
@@ -306,6 +316,27 @@
     font-family:var(--mono);letter-spacing:0.05em;
   }
   .view-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
+  .copy-result-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font-size:10px;cursor:pointer;padding:2px 7px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;margin-left:auto;flex-shrink:0;
+    transition:color 0.12s,border-color 0.12s;
+  }
+  .copy-result-btn:hover{color:var(--accent);border-color:var(--accent-dim);}
+  .copy-result-btn.copied{color:var(--good);border-color:var(--good);}
+
+  /* Owned / Top-stat highlight toggles - same shape as view-btn, but each is an
+     independent on/off rather than a mutually-exclusive pair, and its "on" color
+     matches the highlight it controls so the button doubles as a swatch/legend. */
+  .hl-toggle-group{display:flex;gap:3px;}
+  .hl-toggle-group:not(:last-child){padding-right:8px;border-right:1px solid var(--border);}
+  .hl-toggle-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;
+  }
+  .hl-toggle-btn.active.toggle-owned{border-color:var(--good);background:var(--good-bg);color:var(--good);}
+  .hl-toggle-btn.active.toggle-topstat{border-color:var(--accent);background:rgba(201,137,63,0.12);color:var(--accent);}
 
   /* Grid view: 3 cards per row, independent heights */
   .results-grid-view{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:start;}
@@ -712,11 +743,11 @@ rebuildVecs(false, 100, 0, 100);
 const statListEl = document.getElementById('statList');
 
 const STAT_CATEGORIES = [
-  { label: 'Utility', names: new Set(["Carry weight","Movement speed","Running speed","Stamina","Stamina regeneration"]) },
-  { label: 'Combat',  names: new Set(["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"]) },
+  { label: 'Utility', names: ["Carry weight","Movement speed","Running speed","Stamina","Stamina regeneration"] },
+  { label: 'Combat',  names: ["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"] },
+  { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emissions","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
 ];
-const CATEGORIZED = new Set([...STAT_CATEGORIES[0].names, ...STAT_CATEGORIES[1].names]);
-STAT_CATEGORIES.push({ label: 'Misc', names: new Set(STAT_NAMES.filter(n => !CATEGORIZED.has(n))) });
+const CATEGORIZED = new Set(STAT_CATEGORIES.flatMap(c => c.names));
 
 function addStatItem(name){
   const good = STAT_META[name].good;
@@ -749,8 +780,8 @@ STAT_CATEGORIES.forEach((cat, ci)=>{
     hdr.textContent = cat.label;
   }
   statListEl.appendChild(hdr);
-  // preserve alphabetical order within each category
-  STAT_NAMES.filter(n => cat.names.has(n)).forEach(addStatItem);
+  // preserve explicit order defined in STAT_CATEGORIES
+  cat.names.forEach(addStatItem);
 });
 
 // Tier button toggle - single handler on the list via delegation
@@ -765,11 +796,10 @@ statListEl.addEventListener('click', e=>{
 // Artefacts excluded from the "Available artefacts" list by default
 // (still selectable - just unticked on load).
 const DEFAULT_OFF = new Set([
-  "Chilly","Flicker","Snares","Coil","Static","Pumpkin","Wicked Hedgehog",
-  "Cycle","Link","Loop","Jelly","Gills","Cone","Fossil","Colophony",
-  "Stress Fest","Mug","Peg-Top","Timber","Rime","Hoop","Fahrenheit","Opal",
-  "Retina","Raisin","Dark Viburnum","Bubblegum","Chicken God","Tiny Key",
-  "Black Hole","Inside Out Rose","Egg"
+  "Snares","Coil","Static","Pumpkin","Wicked Hedgehog",
+  "Cycle","Link","Loop","Jelly","Gills","Cone","Colophony",
+  "Stress Fest","Mug","Peg-Top","Timber","Rime","Opal",
+  "Retina","Chicken God","Inside Out Rose"
 ]);
 
 // --- Persistence (this is a standalone file with no backend, so the available-artefacts
@@ -805,6 +835,7 @@ function saveOwned(){
 }
 // { [artifactIdx]: [quality, quality, ...] } -- one entry per physically owned unit.
 let OWNED = loadOwned();
+let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
 
 const artifactListEl = document.getElementById('artifactList');
 const savedExcluded = loadExcludedNames();
@@ -817,7 +848,8 @@ ARTIFACTS.forEach((a,i)=>{
   const ownedAtLoad = !!(OWNED[i] && OWNED[i].length);
   div.innerHTML = `<input type="checkbox" id="${id}" data-idx="${i}" ${checkedAttr}>
     <span class="name">${a.name}</span>
-    <button type="button" class="art-heart${ownedAtLoad?' owned':''}" data-idx="${i}">${ownedAtLoad?'♥':'♡'}</button>`;
+    <button type="button" class="art-heart${ownedAtLoad?' owned':''}" data-idx="${i}">${ownedAtLoad?'♥':'♡'}</button>
+    <button type="button" class="art-lock" data-idx="${i}" title="Pin: must include in results">🔓</button>`;
   artifactListEl.appendChild(div);
 });
 // Persist any manual tick/untick of an individual artefact checkbox.
@@ -825,7 +857,16 @@ artifactListEl.addEventListener('change', e=>{
   if (e.target.matches('input[type=checkbox]')) saveExcludedNames();
 });
 // Heart button: open a quick "add to favorites" popover for this artefact.
+// Lock button: toggle this artefact as a must-include pin for the next search.
 artifactListEl.addEventListener('click', e=>{
+  const lock = e.target.closest('.art-lock');
+  if (lock){
+    e.stopPropagation();
+    const idx = parseInt(lock.dataset.idx);
+    if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
+    updateLockState(idx);
+    return;
+  }
   const heart = e.target.closest('.art-heart');
   if (!heart) return;
   e.stopPropagation(); // prevent the document outside-click listener from closing the popover we're about to open
@@ -958,8 +999,10 @@ function qualitySelectHtml(q, i){
 }
 function renderPopoverMain(idx){
   const isOwned = !!(OWNED[idx] && OWNED[idx].length);
+  const isPinned = PINNED.has(idx);
   chipPopoverEl.innerHTML = `
     <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name}</div>
+    <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
     <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
     <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Favorite' : 'Favorite'}</button>
     ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Favorites</button>' : ''}
@@ -1007,8 +1050,10 @@ function renderPopoverHeartAdd(idx){
 }
 function renderPopoverRemoveUnit(idx, qi){
   const q = OWNED[idx][qi];
+  const isPinned = PINNED.has(idx);
   chipPopoverEl.innerHTML = `
     <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name} - ${QUALITY_LABELS[q]}</div>
+    <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
     <button type="button" class="popover-btn danger" data-act="remove-unit">Remove</button>
   `;
 }
@@ -1027,6 +1072,21 @@ function updateAllHeartStates(){
     h.classList.toggle('owned', owned);
   });
 }
+function updateLockState(idx){
+  artifactListEl.querySelectorAll(`.art-lock[data-idx="${idx}"]`).forEach(l=>{
+    const pinned = PINNED.has(idx);
+    l.textContent = pinned ? '🔒' : '🔓';
+    l.classList.toggle('pinned', pinned);
+  });
+}
+function updateAllLockStates(){
+  artifactListEl.querySelectorAll('.art-lock').forEach(l=>{
+    const idx = parseInt(l.dataset.idx);
+    const pinned = PINNED.has(idx);
+    l.textContent = pinned ? '🔒' : '🔓';
+    l.classList.toggle('pinned', pinned);
+  });
+}
 chipPopoverEl.addEventListener('click', e=>{
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
@@ -1036,7 +1096,11 @@ chipPopoverEl.addEventListener('click', e=>{
   const idx = popoverOpenIdx;
   if (idx == null) return;
   const act = btn.dataset.act;
-  if (act === 'exclude'){
+  if (act === 'toggle-pin'){
+    if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
+    updateLockState(idx);
+    closeChipPopover();
+  } else if (act === 'exclude'){
     const input = artifactListEl.querySelector(`input[data-idx="${idx}"]`);
     if (input) input.checked = false;
     saveExcludedNames();
@@ -1226,6 +1290,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
     OWNED[selectedIdx].push(q);
     saveOwned();
     renderOwnedList();
+    updateHeartState(selectedIdx);
     // reset form
     searchInput.value = '';
     addRow.style.display = 'none';
@@ -1260,6 +1325,9 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   });
   saveExcludedNames();
   highlightUsedArtifacts([]);
+  // Clear all pins
+  PINNED.clear();
+  updateAllLockStates();
   // My Loadout search-mode controls → off (favorited artefacts themselves are NOT cleared;
   // they represent the player's actual inventory, not a search parameter)
   document.getElementById('useLoadoutChk').checked = false;
@@ -1392,6 +1460,7 @@ self.onmessage = function(e){
   var n = VECS.length;
   var maxCounts = d.maxCounts; // per-pool-entry repeat cap (Infinity = unbounded)
   var sum = new Float64Array(d.ns);
+  if(d.lockedSum){for(var k=0;k<d.ns;k++) sum[k]=d.lockedSum[k];}
   var counts = new Array(n).fill(0);
   var top = [];
   var checked = 0;
@@ -1515,7 +1584,7 @@ self.onmessage = function(e){
       counts[i]--;
     }
   }
-  recurse(0,d.slots);
+  recurse(0,d.slots-(d.lockedSlots||0));
   self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext});
 };
 `;
@@ -1655,9 +1724,9 @@ function fmt(name, val){
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
 }
-// For each target stat, finds which results are in the top 3 by that stat's
+// For each target stat, finds which results are in the top 2 by that stat's
 // beneficial direction (so for "lower is better" stats, lowest/most negative
-// wins). Ties at the 3rd-place cutoff are all included.
+// wins). Ties at the 2nd-place cutoff are all included.
 function computeTopStatSets(results, targetStats){
   const topSets = {};
   targetStats.forEach(t=>{
@@ -1667,7 +1736,7 @@ function computeTopStatSets(results, targetStats){
     scored.sort((a,b)=>b.val-a.val);
     const set = new Set();
     if (scored.length){
-      const cutoff = scored[Math.min(2, scored.length-1)].val;
+      const cutoff = scored[Math.min(1, scored.length-1)].val;
       scored.forEach(s=>{ if (s.val >= cutoff - 1e-9) set.add(s.i); });
     }
     topSets[t.name] = set;
@@ -1701,12 +1770,15 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     ? `<span style="font-size:10px;color:var(--muted);margin-left:8px;">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
     : '';
 
-  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span><span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}</div>`;
+  const copyBtn = (!isExtended && resultIndex >= 0)
+    ? `<button type="button" class="copy-result-btn" data-result-idx="${resultIndex}" title="Copy to clipboard for Discord">📋 copy</button>`
+    : '';
+  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span><span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}${copyBtn}</div>`;
 
   html += '<div class="loadout-list">';
   chosen.forEach(c=>{
     const effectiveQuality = c.quality != null ? c.quality : (parseInt(document.getElementById('qualityInput').value) || 100);
-    const ownedCls = showOwnedHighlight && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
+    const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
     html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}"><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span></button>`;
   });
   html += '</div>';
@@ -1825,14 +1897,19 @@ function renderResults(results, extResults, targetStats, protection){
     renderConsumableZone(results, extResults, targetStats, protection);
     return;
   }
-  const topSets = computeTopStatSets(results, targetStats);
+  const topSets = topStatHighlightOn ? computeTopStatSets(results, targetStats) : null;
 
-  const toggleHtml = results.length > 1
+  const viewToggleHtml = results.length > 1
     ? `<div class="results-view-toggle">
         <button type="button" class="view-btn${!gridView ? ' active' : ''}" data-view="list">List</button>
         <button type="button" class="view-btn${gridView ? ' active' : ''}" data-view="grid">Grid</button>
       </div>`
     : '';
+  const hlToggleHtml = `<div class="hl-toggle-group">
+        <button type="button" class="hl-toggle-btn toggle-owned${ownedHighlightOn ? ' active' : ''}" data-hl="owned" title="Highlight chips you already own">Owned</button>
+        <button type="button" class="hl-toggle-btn toggle-topstat${topStatHighlightOn ? ' active' : ''}" data-hl="topstat" title="Highlight the top-2 result for each target stat">Top stats</button>
+      </div>`;
+  const toggleHtml = `<div class="results-toggles">${hlToggleHtml}${viewToggleHtml}</div>`;
 
   let html = `<div class="results-header"><h2>Top ${results.length} combination${results.length>1?'s':''}</h2>${toggleHtml}</div>`;
 
@@ -1850,6 +1927,13 @@ function renderResults(results, extResults, targetStats, protection){
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection);
+    });
+  });
+  el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
+      else topStatHighlightOn = !topStatHighlightOn;
       renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection);
     });
   });
@@ -1988,7 +2072,7 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
     tip.chosen.forEach(c=>{
       const isEnabler = c.idx === tip.enablerIdx;
       const tipQuality = parseInt(document.getElementById('qualityInput').value) || 100;
-      const ownedCls = showOwnedHighlight && isOwnedAtOrAboveQuality(c.idx, tipQuality) ? ' owned-match' : '';
+      const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, tipQuality) ? ' owned-match' : '';
       html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}" style="${isEnabler?'border-color:var(--accent);':''}">${isEnabler?'<b style="color:var(--accent)">★</b> ':''}${c.count > 1 ? `<b>${c.count}&times;</b> ` : ''}${ARTIFACTS[c.idx].name}</button>`;
     });
     html += '</div>';
@@ -2057,7 +2141,34 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
 let activeWorker = null;
 let showOwnedHighlight = false; // false in Mode B: every chip is from the loadout already
 let gridView = false;           // true = 3-column grid layout for results
+let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (still gated by showOwnedHighlight/Mode B above)
+let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
 let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
+
+function formatResultForDiscord(result, rank, targetStats){
+  const {chosen, sum} = result;
+  // Line 1: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
+  const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
+  const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
+  // Line 2: artefact list (count always shown for clarity)
+  const artParts = chosen.map(c => `${c.count}\u00d7 ${ARTIFACTS[c.idx].name}`);
+  // Line 3: stat totals, pipe-separated
+  const statParts = targetStats.map(t => `${t.name}: ${fmt(t.name, sum[STAT_IDX[t.name]])}`);
+  return `${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
+}
+document.getElementById('results').addEventListener('click', e=>{
+  const btn = e.target.closest('.copy-result-btn');
+  if (!btn || !lastRenderArgs) return;
+  const idx = parseInt(btn.dataset.resultIdx);
+  const result = lastRenderArgs.results[idx];
+  if (!result) return;
+  const text = formatResultForDiscord(result, idx + 1, lastRenderArgs.targetStats);
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent = '\u2713 copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = '\ud83d\udccb copy'; btn.classList.remove('copied'); }, 1500);
+  }).catch(()=>{});
+});
 
 document.getElementById('calcBtn').onclick = ()=>{
   const slots = Math.max(1, Math.min(6, parseInt(document.getElementById('slotsInput').value) || 1));
@@ -2079,6 +2190,13 @@ document.getElementById('calcBtn').onclick = ()=>{
   const useLoadout = document.getElementById('useLoadoutChk').checked;
   showOwnedHighlight = !useLoadout;
 
+  // Pinned artefacts: must appear in every result in both Mode A and Mode B.
+  const pinnedIdx = Array.from(PINNED);
+  if (!useLoadout) {
+    // Mode A: ensure pinned artefacts are in the search pool even if unticked.
+    pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
+  }
+
   const el = document.getElementById('results');
   const btn = document.getElementById('calcBtn');
 
@@ -2090,6 +2208,10 @@ document.getElementById('calcBtn').onclick = ()=>{
     el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
     return;
   }
+  if (pinnedIdx.length >= slots){
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} available. Unpin some or increase the slot count.</div>`;
+    return;
+  }
 
   // Cancel any previous search
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
@@ -2098,8 +2220,16 @@ document.getElementById('calcBtn').onclick = ()=>{
 
   rebuildVecs(includeAdditional, effectiveness, level, quality);
 
+  // Pre-compute the stat sum for locked artefacts; the worker starts from this non-zero
+  // base and only searches the remaining (slots − lockedSlots) free slots.
+  const lockedSum = new Float64Array(NS);
+  if (!useLoadout) {
+    pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
+  }
+
   // Build the search pool: Mode A is the regular ticked list (unbounded, global quality);
   // Mode B (My Loadout) is bounded by owned count and scaled per-unit quality.
+  const pinnedQuality = {}; // Mode B: records which quality unit was consumed for each pin
   let poolVecs, poolMax, poolMeta;
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
@@ -2113,6 +2243,32 @@ document.getElementById('calcBtn').onclick = ()=>{
     if (totalUnits < slots){
       el.innerHTML = `<h2>Result</h2><div class="msg-error">You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.</div>`;
       return;
+    }
+    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum.
+    if (pinnedIdx.length > 0) {
+      // First pass: validate every pin is actually favourited.
+      for (const pi of pinnedIdx) {
+        if (!OWNED[pi] || OWNED[pi].length === 0) {
+          el.innerHTML = `<h2>Result</h2><div class="msg-error">Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Favorite it first, or unpin it.</div>`;
+          return;
+        }
+      }
+      // Second pass: consume the highest-quality available unit of each pin.
+      for (const pi of pinnedIdx) {
+        let bestLocalIdx = -1, bestQ = -1;
+        for (let i = 0; i < poolMeta.length; i++) {
+          if (poolMeta[i].artifactIdx === pi && poolMax[i] > 0 && poolMeta[i].quality > bestQ) {
+            bestQ = poolMeta[i].quality; bestLocalIdx = i;
+          }
+        }
+        if (bestLocalIdx === -1) {
+          el.innerHTML = `<h2>Result</h2><div class="msg-error">Not enough owned units of \u201c${ARTIFACTS[pi].name}\u201d to satisfy the pin. Favorite another copy, or unpin.</div>`;
+          return;
+        }
+        for (let k = 0; k < NS; k++) lockedSum[k] += poolVecs[bestLocalIdx][k];
+        poolMax[bestLocalIdx]--;
+        pinnedQuality[pi] = bestQ;
+      }
     }
   } else {
     const built = buildPoolModeA(includedIdx);
@@ -2129,7 +2285,8 @@ document.getElementById('calcBtn').onclick = ()=>{
     statMaxMap[t.name] = mx;
   }
 
-  const total = useLoadout ? boundedCombinationCount(poolMax, slots) : combinationCount(poolVecs.length, slots);
+  const freeSlots = slots - pinnedIdx.length;
+  const total = useLoadout ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
   const totalFmt = total.toLocaleString();
 
   // Show progress UI
@@ -2196,18 +2353,24 @@ document.getElementById('calcBtn').onclick = ()=>{
       btn.disabled = false;
       btn.textContent = 'Find best combination';
 
-      // Reconstruct results in the shape renderResults expects (quality comes from poolMeta,
-      // null for Mode A entries since those use the global Quality selector instead).
-      const results = e.data.top.map(best=>{
+      // Build the pinned-artefact base once and merge it into every worker result.
+      const pinnedMerge = [];
+      {
+        const pc = {};
+        pinnedIdx.forEach(pi => { pc[pi] = (pc[pi]||0) + 1; });
+        Object.entries(pc).forEach(([pi,cnt]) => pinnedMerge.push({idx:+pi, count:cnt, quality: useLoadout ? (pinnedQuality[+pi] ?? null) : null}));
+      }
+      function mergeChosen(best){
         const chosen = [];
         best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: poolMeta[localI].artifactIdx, count: c, quality: poolMeta[localI].quality}); });
-        return {chosen, sum: new Float64Array(best.sum), score: best.score, ts: best.ts};
-      });
-      const extResults = (e.data.top_ext || []).map(best=>{
-        const chosen = [];
-        best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: poolMeta[localI].artifactIdx, count: c, quality: poolMeta[localI].quality}); });
-        return {chosen, sum: new Float64Array(best.sum), score: best.score, ts: best.ts};
-      });
+        pinnedMerge.forEach(pc => {
+          const ex = chosen.find(c => c.idx === pc.idx);
+          if (ex) ex.count += pc.count; else chosen.push({idx:pc.idx, count:pc.count, quality:pc.quality});
+        });
+        return chosen;
+      }
+      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       renderResults(results, extResults, targetStats, protection);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
@@ -2246,7 +2409,9 @@ document.getElementById('calcBtn').onclick = ()=>{
     ns: NS,
     total,
     noVitalityDebuff,
-    vitalityIdx: STAT_IDX['Vitality']
+    vitalityIdx: STAT_IDX['Vitality'],
+    lockedSum: Array.from(lockedSum),
+    lockedSlots: pinnedIdx.length
   });
 };
 </script>
