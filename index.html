@@ -95,6 +95,7 @@
 
   .check-list{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px;background:var(--panel-2);}
   #artifactList{max-height:600px;}
+  #statList{max-height:375px;}
   .check-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:3px;cursor:pointer;font-size:13px;}
   .check-item:hover{background:rgba(255,255,255,0.03);}
   .check-item input{accent-color:var(--accent);}
@@ -122,6 +123,8 @@
     text-transform:uppercase;cursor:pointer;
   }
   button.primary:hover{background:#dd9849;}
+  button.primary.stop-mode{background:var(--bad);color:#fff;}
+  button.primary.stop-mode:hover{background:#d96a5a;}
 
   .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
 
@@ -316,6 +319,17 @@
     font-family:var(--mono);letter-spacing:0.05em;
   }
   .view-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
+  #artAllBtn,#artNoneBtn,#artUnpinBtn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;text-decoration:none;
+  }
+  #artAllBtn:hover,#artNoneBtn:hover,#artUnpinBtn:hover{color:var(--accent);border-color:var(--accent-dim);}
+  .loadout-action-btn{
+    background:none;border:1px solid currentColor;font-size:10px;cursor:pointer;
+    padding:3px 8px;border-radius:3px;font-family:var(--mono);letter-spacing:0.05em;
+  }
+  .loadout-action-btn:hover{filter:brightness(1.35);}
   .copy-result-btn{
     background:none;border:1px solid var(--border);color:var(--muted);
     font-size:10px;cursor:pointer;padding:2px 7px;border-radius:3px;
@@ -439,10 +453,10 @@
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">Favorited</span>
           <span style="display:flex;gap:10px;">
-            <button type="button" id="exportLoadoutBtn" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">export</button>
-            <button type="button" id="importLoadoutBtn" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">import</button>
+            <button type="button" id="exportLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">export</button>
+            <button type="button" id="importLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">import</button>
             <input type="file" id="importLoadoutFile" accept="application/json" style="display:none;">
-            <button type="button" id="clearLoadoutBtn" style="font-size:11px;color:var(--bad);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;letter-spacing:0.03em;">clear all</button>
+            <button type="button" id="clearLoadoutBtn" class="loadout-action-btn" style="color:var(--bad);">clear all</button>
           </span>
         </div>
         <div class="check-list" id="ownedList" style="max-height:160px;"></div>
@@ -472,8 +486,9 @@
       <div class="panel">
         <h2>Available artefacts</h2>
         <div class="toggle-row">
-          <button type="button" id="artAllBtn">all</button>
-          <button type="button" id="artNoneBtn">none</button>
+          <button type="button" id="artAllBtn">select all</button>
+          <button type="button" id="artNoneBtn">unselect all</button>
+          <button type="button" id="artUnpinBtn">unpin all</button>
         </div>
         <div class="check-list" id="artifactList"></div>
       </div>
@@ -514,7 +529,7 @@ const STAT_META = {
   "Periodic healing":           {good:true},
   "Psyonics":                   {good:false, threshold:true},
   "Psy-emission protection":    {good:true},
-  "Psy-emissions":              {good:false},
+  "Psy-emissions":              {good:false, threshold:true},
   "Radiation":                  {good:false, threshold:true},
   "Radiation protection":       {good:true},
   "Reaction to burns":          {good:true},
@@ -591,126 +606,131 @@ function scaleStat(value, statName, level, quality) {
   return value * (1 + 0.02 * level) * (quality / 100);
 }
 
-// Main and Additional stat lines kept separate per artefact so the UI can
-// toggle Additional stats on/off. Each stat uses the beneficial extreme of
-// its roll range:
-//   good:true  -> max value of range
-//   good:false -> min value of range (most negative / least positive)
+// Single source of truth: `tooltip` stores the full [min,max] roll range straight
+// from the in-game tooltip, per stat, split into Main and Additional stat lines (so
+// the UI can toggle Additional stats on/off). MAIN_VECS/ADD_VECS (below) are derived
+// from this at load time by taking the max of each [min,max] pair -- the higher of
+// the two bracketed numbers, regardless of whether that stat is a buff or a debuff --
+// which is the single value the search actually uses. Anything needing the full roll
+// range (future features) should read `tooltip` directly instead of re-deriving it.
 // "Resistance to electricity" and "Electricity resistance" are merged as one stat.
 // "Resistance to fire" and "Fire resistance" are merged as one stat.
 // Duplicate entries (Wicked Hedgehog #2) and unnamed entries are omitted.
 const ARTIFACTS = [
- {name:"Acid Crystal", main:{"Vitality":-6.8,"Health regeneration":0.9,"Bioinfection protection":20,"Biological infection":-2.16,"Reaction to chemical burns":0.9}, add:{"Resistance to chemicals":7.3,"Bioinfection protection":10,"Health regeneration":0.3}},
- {name:"Amberite", main:{"Running speed":0.6,"Carry weight":11.2,"Stamina regeneration":2.6,"Radiation":0.53,"Temperature":-1.28}, add:{"Movement speed":0.6,"Stamina regeneration":0.9,"Carry weight":3.8}},
- {name:"Atom", main:{"Vitality":1,"Stamina regeneration":3.4,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28,"Psyonics":-1.28}, add:{"Bleeding":-0.698,"Stamina regeneration":1.201,"Vitality":0.402}},
- {name:"Battery", main:{"Stamina":11.4,"Movement speed":0.85,"Running speed":1.15,"Radiation":1.06,"Reaction to electricity":1.3}, add:{"Resistance to electricity":10.7,"Movement speed":0.3,"Stamina":3.8}},
- {name:"Berry", main:{"Vitality":1.3,"Radiation":1.06,"Bleeding":-0.6}, add:{"Bleeding":-0.2,"Health regeneration":1.1,"Vitality":0.5}},
- {name:"Bismuth", main:{"Health regeneration":2.1,"Biological infection":2.12,"Recoil":-4.4}, add:{"Health regeneration":0.7,"Recoil":-1.5,"Sway":-6.1}},
- {name:"Black Hole", main:{"Vitality":0.7,"Stamina regeneration":5.1,"Bullet resistance":10.1,"Bleeding protection":-2.21,"Psyonics":2.12}, add:{"Bullet resistance":3.4,"Stamina regeneration":1.7,"Health regeneration":1.8}},
- {name:"Bracelet", main:{"Vitality":0.5,"Movement speed":1.2,"Running speed":1.6,"Stamina regeneration":3.6,"Psyonics":2.12}, add:{"Stamina":16.2,"Movement speed":0.4,"Stamina regeneration":1.2}},
- {name:"Bubblegum", main:{"Movement speed":-1.28,"Running speed":-1.28,"Bullet resistance":19.3,"Explosion protection":14.9,"Temperature":2.12,"Reaction to laceration":1.9}, add:{"Bullet resistance":6.5,"Laceration protection":20.2,"Explosion protection":5}},
- {name:"Burr", main:{"Stamina":9.3,"Movement speed":0.35,"Running speed":0.5,"Radiation":-2.16,"Psyonics":0.42}, add:{"Stamina":3.1,"Movement speed":0.15,"Stamina regeneration":1.5}},
- {name:"Candlelight", main:{"Health regeneration":0.9,"Stamina regeneration":2.4,"Bullet resistance":2.1,"Temperature":-2.16}, add:{"Temperature":-0.88,"Stamina regeneration":0.8,"Health regeneration":0.3}},
- {name:"Chicken God", main:{"Vitality":1.7,"Carry weight":8.7,"Temperature":-0.19,"Frost":0.42,"Reaction to electricity":1,"Reaction to burns":1,"Reaction to chemical burns":1,"Reaction to laceration":1}, add:{"Vitality":0.6,"Carry weight":2.9,"Stamina regeneration":2.9}},
- {name:"Chilly", main:{"Vitality":2.7,"Temperature":-0.38,"Frost":0.85,"Burning":-0.4}, add:{"Vitality":0.9,"Burning":-0.2,"Explosion protection":14.9}},
- {name:"Coil", main:{"Movement speed":1.2,"Running speed":1.6,"Carry weight":4.7,"Resistance to fire":16.2,"Temperature":2.12}, add:{"Movement speed":0.4,"Resistance to fire":5.1,"Bleeding protection":4.3}},
- {name:"Colophony", main:{"Carry weight":8.7,"Health regeneration":2,"Stamina regeneration":1.3,"Biological infection":1.06}, add:{"Carry weight":2.9,"Vitality":1.2,"Health regeneration":0.7}},
- {name:"Comet", main:{"Stamina":16.2,"Movement speed":0.6,"Running speed":0.8,"Carry weight":3.3,"Temperature":1.06}, add:{"Stamina regeneration":2.5,"Stamina":5.4,"Movement speed":0.2}},
- {name:"Cone", main:{"Stamina":15.2,"Temperature":-4.08,"Burning":-0.2}, add:{"Stamina":5.2,"Healing effectiveness":5.1,"Burning":-0.1}},
- {name:"Crust", main:{"Health regeneration":1.5,"Bullet resistance":2.6,"Biological infection":1.06,"Bleeding":-0.8}, add:{"Bleeding":-0.3,"Bleeding protection":2.6,"Health regeneration":0.5}},
- {name:"Cryogen", main:{"Carry weight":8.3,"Stamina regeneration":1.9,"Temperature":-3.04}, add:{"Stamina regeneration":0.9,"Bullet resistance":5.4,"Carry weight":2}},
- {name:"Cursed Rose", main:{"Bullet resistance":11.6,"Explosion protection":8.9,"Radiation":1.06}, add:{"Bullet resistance":3.9,"Explosion protection":3,"Stamina regeneration":2.9}},
- {name:"Cycle", main:{"Stamina":15.4,"Biological infection":-4.08,"Bleeding":-0.7}, add:{"Stamina":5.2,"Health regeneration":1.2,"Bleeding":-0.3}},
- {name:"Dark Crystal", main:{"Vitality":1,"Health regeneration":1.6,"Stamina regeneration":1.5,"Radiation":-1.28,"Psyonics":0.53}, add:{"Health regeneration":0.8,"Vitality":1,"Stamina regeneration":0.8}},
- {name:"Dark Viburnum", main:{"Running speed":1.15,"Health regeneration":3.3,"Stamina regeneration":4.8,"Psyonics":2.12,"Recoil":6.46}, add:{"Health regeneration":1.1,"Movement speed":1.15,"Stamina regeneration":1.6}},
- {name:"Disintegrator", main:{"Stamina":12.4,"Running speed":0.45,"Stamina regeneration":1.9,"Psyonics":-3.04,"Reaction to electricity":1}, add:{"Movement speed":0.45,"Stamina":4.2,"Stamina regeneration":0.7}},
- {name:"Dumbbell", main:{"Vitality":0.6,"Running speed":0.75,"Carry weight":9.8,"Healing effectiveness":9.8,"Laceration protection":13.7,"Radiation":2.12}, add:{"Healing effectiveness":3.3,"Laceration protection":4.6,"Movement speed":0.75}},
- {name:"Egg", main:{"Stamina":19.4,"Carry weight":18.6,"Radiation":2.12}, add:{"Stamina":6.5,"Carry weight":6.2,"Bleeding protection":5.1}},
- {name:"Embryo", main:{"Running speed":0.35,"Stamina regeneration":1.5,"Radiation":0.42,"Biological infection":-2.16,"Bleeding":-0.7,"Reaction to chemical burns":0.7}, add:{"Stamina regeneration":0.5,"Bleeding":-0.3,"Movement speed":0.35}},
- {name:"Eye of the Storm", main:{"Vitality":-12.58,"Movement speed":0.75,"Running speed":1,"Carry weight":9.8,"Thermal protection":45,"Bioinfection protection":45,"Temperature":-2.16,"Biological infection":-2.16}, add:{"Thermal protection":10,"Bioinfection protection":10,"Movement speed":0.25}},
- {name:"Fahrenheit", main:{"Stamina":10.4,"Bullet resistance":9.3,"Temperature":-1.28,"Frost":0.42,"Reaction to laceration":1}, add:{"Bullet resistance":3.1,"Stamina":3.5,"Health regeneration":1.2}},
- {name:"Firebird", main:{"Health regeneration":1.4,"Healing effectiveness":8.7,"Bleeding protection":1.5,"Temperature":1.06}, add:{"Bleeding":-1,"Health regeneration":0.5,"Healing effectiveness":2.9}},
- {name:"Flicker", main:{"Movement speed":1,"Running speed":1.3462,"Health regeneration":1.9,"Psy-emissions":0.833,"Reaction to electricity":1.4}, add:{"Movement speed":0.35,"Health regeneration":0.5,"Resistance to electricity":12.2}},
- {name:"Fossil", main:{"Vitality":2.1,"Periodic healing":0.4,"Biological infection":2.12}, add:{"Stamina regeneration":3.6,"Periodic healing":0.2,"Vitality":0.7}},
- {name:"Frame", main:{"Carry weight":9.3,"Stamina regeneration":2.2,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28}, add:{"Psy-emissions":-1.28,"Carry weight":3.1,"Stamina regeneration":0.8}},
- {name:"Frost", main:{"Healing effectiveness":4.6,"Bullet resistance":2.6,"Laceration protection":13,"Temperature":-0.19,"Frost":0.42,"Reaction to laceration":0.9}, add:{"Laceration protection":4.4,"Stamina":9.7,"Healing effectiveness":1.6}},
- {name:"Gills", main:{"Vitality":1.3,"Health regeneration":2.3,"Bleeding protection":3.7,"Radiation":2.12}, add:{"Stamina regeneration":3.2,"Health regeneration":0.8,"Vitality":0.5}},
- {name:"Golden Prima", main:{"Movement speed":0.7,"Running speed":0.95,"Carry weight":12.4,"Radiation":1.06}, add:{"Movement speed":0.25,"Carry weight":4.2,"Stamina":13}},
- {name:"Gum", main:{"Health regeneration":1.1,"Bullet resistance":2.6,"Radiation":-2.16,"Temperature":-1.28,"Bleeding":-1.1,"Reaction to chemical burns":1.1}, add:{"Radiation":-0.88,"Health regeneration":0.4,"Bleeding":-0.4}},
- {name:"Heart", main:{"Health regeneration":1.8,"Stamina regeneration":2.5,"Periodic healing":0.2,"Radiation":1.06}, add:{"Healing effectiveness":6.3,"Stamina regeneration":0.8,"Health regeneration":0.9}},
- {name:"Hedgehog", main:{"Vitality":-13.6,"Carry weight":7,"Radiation protection":45,"Radiation":-3.04,"Reaction to laceration":1}, add:{"Stamina":3.5,"Laceration protection":9.7,"Radiation protection":20}},
- {name:"Heel", main:{"Healing effectiveness":13,"Bullet resistance":5.2,"Explosion protection":13.4,"Temperature":-0.38,"Frost":0.85,"Reaction to burns":1.5}, add:{"Explosion protection":4.5,"Laceration protection":18.2,"Healing effectiveness":4.4}},
- {name:"Helium", main:{"Movement speed":1.1,"Running speed":1.5,"Health regeneration":1.6,"Stability":1.9,"Biological infection":2.12}, add:{"Movement speed":0.4,"Stamina regeneration":3.2,"Health regeneration":0.6}},
- {name:"Hoop", main:{"Health regeneration":2.3,"Bullet resistance":9.1,"Psyonics":2.12}, add:{"Bullet resistance":3.1,"Stamina":14.6,"Health regeneration":0.8}},
- {name:"Ice Hedgehog", main:{"Movement speed":1,"Running speed":1.35,"Stamina regeneration":2.9,"Biological infection":1.06}, add:{"Stamina":13,"Movement speed":0.35,"Stamina regeneration":1}},
- {name:"Ilyich Lamp", main:{"Vitality":-13.6,"Carry weight":7,"Psy-emission protection":45,"Psyonics":-3.04,"Reaction to electricity":1.2}, add:{"Carry weight":2.4,"Psy-emission protection":20,"Resistance to electricity":9.7}},
- {name:"Inkwell", main:{"Vitality":1.2,"Health regeneration":2,"Biological infection":1.06,"Reaction to laceration":1.2}, add:{"Laceration protection":12.2,"Health regeneration":0.7,"Vitality":0.4}},
- {name:"Inside Out Rose", main:{"Healing effectiveness":-14.45,"Bullet resistance":12.2,"Stability":8.4,"Biological infection":2.12}, add:{"Stamina regeneration":4.3,"Bullet resistance":4.1,"Stability":2.8}},
- {name:"Jelly", main:{"Carry weight":8.7,"Bullet resistance":11.6,"Biological infection":1.06}, add:{"Carry weight":2.9,"Bullet resistance":3.9,"Laceration protection":12.2}},
- {name:"Kettlebell", main:{"Vitality":-13.6,"Carry weight":7,"Thermal protection":45,"Temperature":-3.04,"Reaction to burns":0.8}, add:{"Resistance to fire":9.7,"Movement speed":0.2,"Thermal protection":20}},
- {name:"Lard", main:{"Vitality":0.4,"Health regeneration":1.5,"Healing effectiveness":4.6,"Radiation":1.06}, add:{"Stamina":9.7,"Health regeneration":0.5,"Healing effectiveness":1.6}},
- {name:"Larva", main:{"Stamina":13,"Healing effectiveness":8.7,"Temperature":-1.28,"Biological infection":0.53}, add:{"Vitality":1.2,"Stamina":4.4,"Healing effectiveness":2.9}},
- {name:"Leaded Glass", main:{"Health regeneration":1,"Radiation":-1.28,"Temperature":-0.19,"Psyonics":-1.28,"Frost":0.42,"Burning":-0.2,"Reaction to burns":0.5}, add:{"Burning":-0.1,"Health regeneration":0.4,"Vitality":0.6}},
- {name:"Leech", main:{"Vitality":-6.8,"Carry weight":5.2,"Radiation protection":20,"Radiation":-2.16}, add:{"Carry weight":1.8,"Reaction to laceration":1.6,"Radiation protection":10}},
- {name:"Lemna", main:{"Vitality":-13.6,"Carry weight":7,"Bioinfection protection":45,"Biological infection":-3.04,"Reaction to chemical burns":1.2}, add:{"Resistance to chemicals":9.7,"Health regeneration":0.5,"Bioinfection protection":20}},
- {name:"Link", main:{"Vitality":2.1,"Carry weight":10.9,"Temperature":2.12}, add:{"Vitality":0.7,"Carry weight":3.7,"Health regeneration":1.8}},
- {name:"Lollipop", main:{"Stamina regeneration":2.1,"Laceration protection":6.1,"Radiation":-2.16,"Biological infection":0.42,"Reaction to laceration":0.6}, add:{"Laceration protection":2.1,"Stamina regeneration":0.7,"Vitality":0.6}},
- {name:"Loop", main:{"Movement speed":1.2,"Running speed":1.6,"Radiation":2.12,"Recoil":-2.6}, add:{"Movement speed":0.4,"Bleeding":-1,"Recoil":-0.9}},
- {name:"Magma", main:{"Vitality":2.1,"Bullet resistance":4.4,"Stability":4.9,"Temperature":2.12}, add:{"Vitality":0.699,"Stamina":16.2,"Stability":1.7}},
- {name:"Mirror", main:{"Vitality":-12.58,"Movement speed":0.75,"Running speed":1,"Carry weight":9.8,"Radiation protection":45,"Psy-emission protection":45,"Radiation":-2.16,"Psyonics":-2.16}, add:{"Movement speed":0.252,"Radiation protection":20,"Psy-emission protection":20}},
- {name:"Mug", main:{"Vitality":1.2,"Carry weight":3.8,"Explosion protection":12.7,"Radiation":0.53,"Biological infection":-1.28}, add:{"Vitality":0.4,"Health regeneration":1.4,"Explosion protection":4.3}},
- {name:"Onion", main:{"Stamina":11.1,"Bullet resistance":4.9,"Radiation":0.53,"Psyonics":-1.28}, add:{"Bullet resistance":1.7,"Stamina":3.7,"Bleeding protection":2.1}},
- {name:"Opal", main:{"Vitality":-2.47,"Stamina":21.6,"Bullet resistance":19.3,"Temperature":-0.38,"Frost":0.85}, add:{"Stamina":7.2,"Bullet resistance":6.5,"Stability":6.5}},
- {name:"Peg-Top", main:{"Laceration protection":14.5,"Explosion protection":7.5,"Psyonics":-4.08}, add:{"Bullet resistance":6.8,"Laceration protection":4.9,"Explosion protection":2.5}},
- {name:"Phlegm", main:{"Movement speed":0.25,"Running speed":0.25,"Healing effectiveness":6.5,"Bleeding protection":2.6,"Biological infection":1.06}, add:{"Bleeding":-0.8,"Bleeding protection":0.9,"Healing effectiveness":2.2}},
- {name:"Polyhedron", main:{"Stamina":20.8,"Running speed":0.75,"Stamina regeneration":3.2,"Radiation":2.12}, add:{"Stamina regeneration":1.1,"Stamina":7,"Movement speed":0.75}},
- {name:"Prima", main:{"Carry weight":9.3,"Laceration protection":9.1,"Radiation":1.06}, add:{"Laceration protection":3.1,"Carry weight":3.1,"Bleeding":-0.8}},
- {name:"Prism", main:{"Bullet resistance":14.5,"Explosion protection":11.2,"Stability":2.6,"Psyonics":2.12}, add:{"Bullet resistance":4.9,"Explosion protection":3.8,"Stamina regeneration":3.6}},
- {name:"Proto-Onion", main:{"Stamina regeneration":2.7,"Healing effectiveness":4.1,"Radiation":-3.04}, add:{"Health regeneration":1,"Stamina regeneration":0.9,"Healing effectiveness":1.4}},
- {name:"Pumpkin", main:{"Carry weight":7.3,"Stamina regeneration":3.4,"Radiation":-4.08}, add:{"Vitality":1,"Carry weight":2.5,"Stamina regeneration":1.2}},
- {name:"Radiator", main:{"Movement speed":0.5,"Running speed":0.7,"Temperature":-2.16,"Psyonics":-1.28,"Burning":-0.3,"Reaction to burns":0.8}, add:{"Burning":-0.1,"Movement speed":0.2,"Temperature":-0.88}},
- {name:"Raisin", main:{"Vitality":-2.3,"Stamina":21.6,"Movement speed":1.6,"Running speed":2.15,"Stability":2.6,"Temperature":2.12}, add:{"Stamina":7.2,"Movement speed":0.55,"Stamina regeneration":4.8}},
- {name:"Rattle", main:{"Stamina":13.9,"Movement speed":0.5,"Running speed":0.7,"Temperature":1.06}, add:{"Stamina regeneration":2.2,"Stamina":4.7,"Movement speed":0.2}},
- {name:"Red Crystal", main:{"Vitality":-6.8,"Stamina":7.8,"Thermal protection":20,"Temperature":-2.16,"Reaction to burns":0.6}, add:{"Resistance to fire":7.3,"Thermal protection":10,"Stamina":2.6}},
- {name:"Retina", main:{"Movement speed":1,"Running speed":1.35,"Stamina regeneration":2.9,"Biological infection":-1.28,"Psyonics":1.06,"Reaction to burns":-4.16}, add:{"Movement speed":0.35,"Stamina regeneration":1,"Bleeding":-1}},
- {name:"Rime", main:{"Bullet resistance":10.1,"Laceration protection":10.7,"Temperature":-0.19,"Frost":0.42}, add:{"Laceration protection":3.6,"Bullet resistance":3.4,"Explosion protection":7.8}},
- {name:"Rose", main:{"Bullet resistance":8.7,"Explosion protection":6.7,"Psyonics":1.06}, add:{"Bullet resistance":2.9,"Explosion protection":2.3,"Carry weight":6.5}},
- {name:"Scallop", main:{"Bullet resistance":10.1,"Explosion protection":7.8,"Radiation":1.06}, add:{"Bullet resistance":3.4,"Explosion protection":2.6,"Bleeding":-0.9}},
- {name:"Scrubber", main:{"Stamina regeneration":3.1,"Healing effectiveness":4.6,"Radiation":-1.28,"Biological infection":-2.16,"Reaction to laceration":0.9}, add:{"Stamina regeneration":1.1,"Biological infection":-0.88,"Healing effectiveness":1.6}},
- {name:"Shard", main:{"Vitality":1.9,"Health regeneration":0.7,"Healing effectiveness":6.9,"Biological infection":2.12}, add:{"Vitality":0.7,"Stamina regeneration":3.2,"Healing effectiveness":2.3}},
- {name:"Shrimp", main:{"Vitality":-0.42,"Carry weight":10.9,"Bullet resistance":7.1,"Psyonics":1.06}, add:{"Bullet resistance":2.4,"Explosion protection":7.8,"Carry weight":3.7}},
- {name:"Snail", main:{"Stamina":12.4,"Health regeneration":1,"Biological infection":-3.04,"Bleeding":-0.3}, add:{"Bleeding protection":2.3,"Stamina":4.2,"Health regeneration":0.4}},
- {name:"Snake Eye", main:{"Vitality":1.9,"Movement speed":0.75,"Running speed":1,"Healing effectiveness":-3.82,"Psyonics":2.12}, add:{"Stamina":14.6,"Movement speed":0.25,"Vitality":0.7}},
- {name:"Snares", main:{"Movement speed":0.7,"Running speed":0.95,"Laceration protection":17.4,"Biological infection":0.53,"Psyonics":-1.28}, add:{"Movement speed":0.25,"Health regeneration":1.4,"Laceration protection":5.8}},
- {name:"Spectral Crystal", main:{"Vitality":-6.8,"Stamina regeneration":1.7,"Psy-emission protection":20,"Psyonics":-2.16,"Reaction to electricity":0.9}, add:{"Resistance to electricity":7.3,"Psy-emission protection":10,"Stamina regeneration":0.6}},
- {name:"Spiral", main:{"Vitality":-0.42,"Movement speed":1,"Running speed":1.35,"Carry weight":8.7,"Radiation":1.06}, add:{"Carry weight":2.9,"Movement speed":0.35,"Healing effectiveness":7.2}},
- {name:"Sponge", main:{"Carry weight":2.8,"Laceration protection":9.1,"Explosion protection":9.6,"Radiation":1.06,"Reaction to laceration":0.9}, add:{"Laceration protection":3.1,"Explosion protection":3.2,"Health regeneration":1.1}},
- {name:"Static", main:{"Bullet resistance":10.1,"Radiation":2.12,"Recoil":-3.7}, add:{"Stamina":16.2,"Bullet resistance":3.4,"Recoil":-1.3}},
- {name:"Steel Hedgehog", main:{"Stamina":14.6,"Healing effectiveness":3,"Bullet resistance":13,"Psyonics":2.12,"Reaction to laceration":1.3}, add:{"Bullet resistance":4.4,"Laceration protection":13.7,"Stamina":4.9}},
- {name:"Sticky Burr", main:{"Stamina":10.8,"Movement speed":0.4,"Running speed":0.55,"Radiation":-2.16}, add:{"Radiation":-0.88,"Stamina":3.6,"Movement speed":0.15}},
- {name:"Stress Fest", main:{"Movement speed":0.7,"Running speed":0.95,"Healing effectiveness":8.7,"Bullet resistance":-1.7,"Temperature":1.06}, add:{"Movement speed":0.25,"Healing effectiveness":2.9,"Carry weight":8.7}},
- {name:"Sun", main:{"Vitality":1.9,"Health regeneration":1.6,"Temperature":2.12,"Reaction to burns":1.1}, add:{"Health regeneration":0.6,"Bleeding protection":3.9,"Vitality":0.7}},
- {name:"Swamp Rot", main:{"Vitality":0.3,"Stamina regeneration":2.4,"Healing effectiveness":3.6,"Biological infection":-2.16,"Reaction to chemical burns":0.9}, add:{"Biological infection":-0.88,"Stamina regeneration":0.8,"Healing effectiveness":1.2}},
- {name:"Tallow", main:{"Health regeneration":1.4,"Healing effectiveness":8.7,"Radiation":1.06,"Temperature":-1.28}, add:{"Health regeneration":0.5,"Healing effectiveness":2.9,"Explosion protection":7.2}},
- {name:"Timber", main:{"Stamina regeneration":4.1,"Bullet resistance":8.1,"Radiation":-1.28,"Temperature":0.53}, add:{"Health regeneration":1.4,"Stamina regeneration":1.4,"Bullet resistance":2.7}},
- {name:"Tiny Key", main:{"Radiation":2.12,"Recoil":-4.4,"Sway":-6.1}, add:{"Bullet resistance":12.2,"Recoil":-1.5,"Sway":-2.1}},
- {name:"Transformer", main:{"Stamina":13.9,"Carry weight":6.5,"Biological infection":-1.28,"Psyonics":-2.16,"Reaction to electricity":1.1}, add:{"Stamina":4.7,"Carry weight":2.2,"Psy-emissions":-0.88}},
- {name:"Veiner", main:{"Carry weight":8.7,"Bullet resistance":5.7,"Radiation":0.53,"Psyonics":-1.28}, add:{"Bullet resistance":1.9,"Stamina regeneration":2,"Carry weight":2.9}},
- {name:"Viburnum Branch", main:{"Vitality":1.5,"Healing effectiveness":10.9,"Radiation":2.12,"Bleeding":-0.4}, add:{"Stamina":16.2,"Healing effectiveness":3.7,"Vitality":0.5}},
- {name:"Whirlwind", main:{"Movement speed":1.1,"Running speed":1.5,"Resistance to electricity":13.7,"Temperature":-0.19,"Frost":0.42,"Reaction to burns":1.1}, add:{"Resistance to electricity":4.6,"Burning":-0.3,"Movement speed":0.4}},
- {name:"White Rose", main:{"Stamina":7.6,"Carry weight":7.3,"Psyonics":-2.16,"Reaction to electricity":0.9}, add:{"Psy-emissions":-0.88,"Stamina":2.6,"Carry weight":2.5}},
- {name:"Wicked Hedgehog", main:{"Stamina":13.9,"Movement speed":0.5,"Running speed":0.7,"Radiation":-1.28,"Temperature":-1.28,"Biological infection":-1.28,"Reaction to laceration":0.9}, add:{"Stamina":4.7,"Movement speed":0.2,"Psy-emissions":-1.28}},
- {name:"Wolf Tears", main:{"Stamina":9.3,"Carry weight":4.4,"Radiation":0.42,"Temperature":-2.16,"Reaction to burns":0.5}, add:{"Bullet resistance":4.1,"Stamina":3.1,"Carry weight":1.5}}
+ {name:"Acid Crystal", tooltip:{main:{"Vitality":[-8,-6.8],"Health regeneration":[0.76,0.9],"Bioinfection protection":[17,20],"Biological infection":[-2.16,-1.84],"Reaction to chemical burns":[0.76,0.9]}, add:{"Resistance to chemicals":[6.01,7.3],"Bioinfection protection":[8.5,10],"Health regeneration":[0.24,0.3]}}},
+ {name:"Amberite", tooltip:{main:{"Running speed":[0.51,0.6],"Carry weight":[9.52,11.2],"Stamina regeneration":[2.21,2.6],"Radiation":[0.53,0.62],"Temperature":[-1.28,-1.09]}, add:{"Movement speed":[0.49,0.6],"Stamina regeneration":[0.765,0.9],"Carry weight":[3.23,3.8]}}},
+ {name:"Atom", tooltip:{main:{"Vitality":[0.85,1],"Stamina regeneration":[2.89,3.4],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09],"Psyonics":[-1.28,-1.09]}, add:{"Bleeding":[-0.698,-0.575],"Stamina regeneration":[0.989,1.201],"Vitality":[0.331,0.402]}}},
+ {name:"Battery", tooltip:{main:{"Stamina":[9.69,11.4],"Movement speed":[0.72,0.85],"Running speed":[0.98,1.15],"Radiation":[1.06,1.25],"Reaction to electricity":[1.1,1.3]}, add:{"Resistance to electricity":[8.81,10.7],"Movement speed":[0.24,0.3],"Stamina":[3.12,3.8]}}},
+ {name:"Berry", tooltip:{main:{"Vitality":[1.1,1.3],"Radiation":[1.06,1.25],"Bleeding":[-0.6,-0.51]}, add:{"Bleeding":[-0.2,-0.17],"Health regeneration":[0.91,1.1],"Vitality":[0.425,0.5]}}},
+ {name:"Bismuth", tooltip:{main:{"Health regeneration":[1.78,2.1],"Biological infection":[2.12,2.5],"Recoil":[-4.4,-3.74]}, add:{"Health regeneration":[0.595,0.7],"Recoil":[-1.5,-1.275],"Sway":[-6.1,-5.185]}}},
+ {name:"Black Hole", tooltip:{main:{"Vitality":[0.6,0.7],"Stamina regeneration":[4.34,5.1],"Bullet resistance":[8.59,10.1],"Bleeding protection":[-2.6,-2.21],"Psyonics":[2.12,2.5]}, add:{"Bullet resistance":[2.8,3.4],"Stamina regeneration":[1.4,1.7],"Health regeneration":[1.48,1.8]}}},
+ {name:"Bracelet", tooltip:{main:{"Vitality":[0.42,0.5],"Movement speed":[1.02,1.2],"Running speed":[1.36,1.6],"Stamina regeneration":[3.06,3.6],"Psyonics":[2.12,2.5]}, add:{"Stamina":[13.77,16.2],"Movement speed":[0.32,0.4],"Stamina regeneration":[1.02,1.2]}}},
+ {name:"Bubblegum", tooltip:{main:{"Movement speed":[-1.5,-1.28],"Running speed":[-1.5,-1.28],"Bullet resistance":[16.4,19.3],"Explosion protection":[12.66,14.9],"Temperature":[2.12,2.5],"Reaction to laceration":[1.62,1.9]}, add:{"Bullet resistance":[5.525,6.5],"Laceration protection":[17.17,20.2],"Explosion protection":[4.25,5]}}},
+ {name:"Burr", tooltip:{main:{"Stamina":[7.9,9.3],"Movement speed":[0.3,0.35],"Running speed":[0.42,0.5],"Radiation":[-2.16,-1.84],"Psyonics":[0.42,0.5]}, add:{"Stamina":[2.635,3.1],"Movement speed":[0.12,0.15],"Stamina regeneration":[1.275,1.5]}}},
+ {name:"Candlelight", tooltip:{main:{"Health regeneration":[0.76,0.9],"Stamina regeneration":[2.04,2.4],"Bullet resistance":[1.78,2.1],"Temperature":[-2.16,-1.84]}, add:{"Temperature":[-0.88,-0.35],"Stamina regeneration":[0.68,0.8],"Health regeneration":[0.24,0.3]}}},
+ {name:"Chicken God", tooltip:{main:{"Vitality":[1.44,1.7],"Carry weight":[7.4,8.7],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to electricity":[0.85,1],"Reaction to burns":[0.85,1],"Reaction to chemical burns":[0.85,1],"Reaction to laceration":[0.85,1]}, add:{"Vitality":[0.49,0.6],"Carry weight":[2.465,2.9],"Stamina regeneration":[2.465,2.9]}}},
+ {name:"Chilly", tooltip:{main:{"Vitality":[2.3,2.7],"Temperature":[-0.38,-0.33],"Frost":[0.85,1],"Burning":[-0.4,-0.34]}, add:{"Vitality":[0.765,0.9],"Burning":[-0.2,-0.17],"Explosion protection":[12.665,14.9]}}},
+ {name:"Coil", tooltip:{main:{"Movement speed":[1.02,1.2],"Running speed":[1.36,1.6],"Carry weight":[4,4.7],"Resistance to fire":[13.77,16.2],"Temperature":[2.12,2.5]}, add:{"Movement speed":[0.33,0.4],"Resistance to fire":[4.2,5.1],"Bleeding protection":[3.54,4.3]}}},
+ {name:"Colophony", tooltip:{main:{"Carry weight":[7.4,8.7],"Health regeneration":[1.7,2],"Stamina regeneration":[1.1,1.3],"Biological infection":[1.06,1.25]}, add:{"Carry weight":[2.38,2.9],"Vitality":[0.98,1.2],"Health regeneration":[0.58,0.7]}}},
+ {name:"Comet", tooltip:{main:{"Stamina":[13.77,16.2],"Movement speed":[0.51,0.6],"Running speed":[0.68,0.8],"Carry weight":[2.8,3.3],"Temperature":[1.06,1.25]}, add:{"Stamina regeneration":[2.125,2.5],"Stamina":[4.59,5.4],"Movement speed":[0.16,0.2]}}},
+ {name:"Cone", tooltip:{main:{"Stamina":[12.92,15.2],"Temperature":[-4.08,-3.47],"Burning":[-0.2,-0.17]}, add:{"Stamina":[4.28,5.2],"Healing effectiveness":[4.2,5.1],"Burning":[-0.1,-0.082]}}},
+ {name:"Crust", tooltip:{main:{"Health regeneration":[1.28,1.5],"Bullet resistance":[2.21,2.6],"Biological infection":[1.06,1.25],"Bleeding":[-0.8,-0.68]}, add:{"Bleeding":[-0.3,-0.255],"Bleeding protection":[2.14,2.6],"Health regeneration":[0.425,0.5]}}},
+ {name:"Cryogen", tooltip:{main:{"Carry weight":[7.06,8.3],"Stamina regeneration":[1.62,1.9],"Temperature":[-3.04,-2.58]}, add:{"Stamina regeneration":[0.765,0.9],"Bullet resistance":[4.59,5.4],"Carry weight":[1.2,2]}}},
+ {name:"Cursed Rose", tooltip:{main:{"Bullet resistance":[9.86,11.6],"Explosion protection":[7.56,8.9],"Radiation":[1.06,1.25]}, add:{"Bullet resistance":[3.315,3.9],"Explosion protection":[2.55,3],"Stamina regeneration":[2.465,2.9]}}},
+ {name:"Cycle", tooltip:{main:{"Stamina":[13.09,15.4],"Biological infection":[-4.08,-3.47],"Bleeding":[-0.7,-0.6]}, add:{"Stamina":[4.28,5.2],"Health regeneration":[0.99,1.2],"Bleeding":[-0.3,-0.25]}}},
+ {name:"Dark Crystal", tooltip:{main:{"Vitality":[0.85,1],"Health regeneration":[1.36,1.6],"Stamina regeneration":[1.28,1.5],"Radiation":[-1.28,-1.09],"Psyonics":[0.53,0.62]}, add:{"Health regeneration":[0.68,0.8],"Vitality":[0.85,1],"Stamina regeneration":[0.68,0.8]}}},
+ {name:"Dark Viburnum", tooltip:{main:{"Running speed":[0.98,1.15],"Health regeneration":[2.8,3.3],"Stamina regeneration":[4.08,4.8],"Psyonics":[2.12,2.5],"Recoil":[6.46,7.6]}, add:{"Health regeneration":[0.91,1.1],"Movement speed":[0.95,1.15],"Stamina regeneration":[1.32,1.6]}}},
+ {name:"Disintegrator", tooltip:{main:{"Stamina":[10.54,12.4],"Running speed":[0.38,0.45],"Stamina regeneration":[1.62,1.9],"Psyonics":[-3.04,-2.58],"Reaction to electricity":[0.85,1]}, add:{"Movement speed":[0.37,0.45],"Stamina":[3.57,4.2],"Stamina regeneration":[0.57,0.7]}}},
+ {name:"Dumbbell", tooltip:{main:{"Vitality":[0.51,0.6],"Running speed":[0.64,0.75],"Carry weight":[8.33,9.8],"Healing effectiveness":[8.33,9.8],"Laceration protection":[11.64,13.7],"Radiation":[2.12,2.5]}, add:{"Healing effectiveness":[2.805,3.3],"Laceration protection":[3.79,4.6],"Movement speed":[0.62,0.75]}}},
+ {name:"Egg", tooltip:{main:{"Stamina":[16.49,19.4],"Carry weight":[15.81,18.6],"Radiation":[2.12,2.5]}, add:{"Stamina":[5.525,6.5],"Carry weight":[5.27,6.2],"Bleeding protection":[4.335,5.1]}}},
+ {name:"Embryo", tooltip:{main:{"Running speed":[0.3,0.35],"Stamina regeneration":[1.28,1.5],"Radiation":[0.42,0.5],"Biological infection":[-2.16,-1.84],"Bleeding":[-0.7,-0.6],"Reaction to chemical burns":[0.6,0.7]}, add:{"Stamina regeneration":[0.425,0.5],"Bleeding":[-0.3,-0.24],"Movement speed":[0.28,0.35]}}},
+ {name:"Eye of the Storm", tooltip:{main:{"Vitality":[-14.8,-12.58],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Carry weight":[8.33,9.8],"Thermal protection":[38.25,45],"Bioinfection protection":[38.25,45],"Temperature":[-2.16,-1.84],"Biological infection":[-2.16,-1.84]}, add:{"Thermal protection":[8.5,10],"Bioinfection protection":[4.25,10],"Movement speed":[0.2,0.25]}}},
+ {name:"Fahrenheit", tooltip:{main:{"Stamina":[8.84,10.4],"Bullet resistance":[7.9,9.3],"Temperature":[-1.28,-1.09],"Frost":[0.42,0.5],"Reaction to laceration":[0.85,1]}, add:{"Bullet resistance":[2.635,3.1],"Stamina":[2.88,3.5],"Health regeneration":[1.02,1.2]}}},
+ {name:"Firebird", tooltip:{main:{"Health regeneration":[1.19,1.4],"Healing effectiveness":[7.4,8.7],"Bleeding protection":[1.28,1.5],"Temperature":[1.06,1.25]}, add:{"Bleeding":[-1,-0.85],"Health regeneration":[0.425,0.5],"Healing effectiveness":[2.465,2.9]}}},
+ {name:"Flicker", tooltip:{main:{"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Health regeneration":[1.19,1.4],"Psyonics":[1.06,1.25],"Reaction to electricity":[1.19,1.4]}, add:{}}},
+ {name:"Fossil", tooltip:{main:{"Vitality":[1.78,2.1],"Periodic healing":[0.34,0.4],"Biological infection":[2.12,2.5]}, add:{"Stamina regeneration":[2.96,3.6],"Periodic healing":[0.165,0.2],"Vitality":[0.595,0.7]}}},
+ {name:"Frame", tooltip:{main:{"Carry weight":[7.9,9.3],"Stamina regeneration":[1.87,2.2],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09]}, add:{"Psy-emissions":[-1.28,-1.088],"Carry weight":[2.635,3.1],"Stamina regeneration":[0.68,0.8]}}},
+ {name:"Frost", tooltip:{main:{"Healing effectiveness":[3.91,4.6],"Bullet resistance":[2.21,2.6],"Laceration protection":[11.05,13],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to laceration":[0.76,0.9]}, add:{"Laceration protection":[3.74,4.4],"Stamina":[7.98,9.7],"Healing effectiveness":[1.36,1.6]}}},
+ {name:"Gills", tooltip:{main:{"Vitality":[1.1,1.3],"Health regeneration":[1.96,2.3],"Bleeding protection":[3.15,3.7],"Radiation":[2.12,2.5]}, add:{"Stamina regeneration":[2.72,3.2],"Health regeneration":[0.68,0.8],"Vitality":[0.425,0.5]}}},
+ {name:"Golden Prima", tooltip:{main:{"Movement speed":[0.6,0.7],"Running speed":[0.81,0.95],"Carry weight":[10.54,12.4],"Radiation":[1.06,1.25]}, add:{"Movement speed":[0.2,0.25],"Carry weight":[3.57,4.2],"Stamina":[11.05,13]}}},
+ {name:"Gum", tooltip:{main:{"Health regeneration":[0.94,1.1],"Bullet resistance":[2.21,2.6],"Radiation":[-2.16,-1.84],"Temperature":[-1.28,-1.09],"Bleeding":[-1.1,-0.94],"Reaction to chemical burns":[0.94,1.1]}, add:{"Radiation":[-0.88,-0.748],"Health regeneration":[0.34,0.4],"Bleeding":[-0.4,-0.32]}}},
+ {name:"Heart", tooltip:{main:{"Health regeneration":[1.53,1.8],"Stamina regeneration":[2.12,2.5],"Periodic healing":[0.17,0.2],"Radiation":[1.06,1.25]}, add:{"Healing effectiveness":[5.18,6.3],"Stamina regeneration":[0.66,0.8],"Health regeneration":[0.765,0.9]}}},
+ {name:"Hedgehog", tooltip:{main:{"Vitality":[-16,-13.6],"Carry weight":[5.95,7],"Radiation protection":[38.25,45],"Radiation":[-3.04,-2.58],"Reaction to laceration":[0.85,1]}, add:{"Stamina":[2.975,3.5],"Laceration protection":[7.98,9.7],"Radiation protection":[17,20]}}},
+ {name:"Heel", tooltip:{main:{"Healing effectiveness":[11.05,13],"Bullet resistance":[4.42,5.2],"Explosion protection":[11.39,13.4],"Temperature":[-0.38,-0.33],"Frost":[0.85,1],"Reaction to burns":[1.28,1.5]}, add:{"Explosion protection":[3.7,4.5],"Laceration protection":[14.98,18.2],"Healing effectiveness":[3.74,4.4]}}},
+ {name:"Helium", tooltip:{main:{"Movement speed":[0.94,1.1],"Running speed":[1.28,1.5],"Health regeneration":[1.36,1.6],"Stability":[1.62,1.9],"Biological infection":[2.12,2.5]}, add:{"Movement speed":[0.32,0.4],"Stamina regeneration":[2.72,3.2],"Health regeneration":[0.51,0.6]}}},
+ {name:"Hoop", tooltip:{main:{"Health regeneration":[1.96,2.3],"Bullet resistance":[7.74,9.1],"Psyonics":[2.12,2.5]}, add:{"Bullet resistance":[2.55,3.1],"Stamina":[12.02,14.6],"Health regeneration":[0.68,0.8]}}},
+ {name:"Ice Hedgehog", tooltip:{main:{"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Stamina regeneration":[2.47,2.9],"Biological infection":[1.06,1.25]}, add:{"Stamina":[11.05,13],"Movement speed":[0.28,0.35],"Stamina regeneration":[0.85,1]}}},
+ {name:"Ilyich Lamp", tooltip:{main:{"Vitality":[-16,-13.6],"Carry weight":[5.95,7],"Psy-emission protection":[38.25,45],"Psyonics":[-3.04,-2.58],"Reaction to electricity":[1.02,1.2]}, add:{"Carry weight":[1.98,2.4],"Psy-emission protection":[16.47,20],"Resistance to electricity":[7.99,9.7]}}},
+ {name:"Inkwell", tooltip:{main:{"Vitality":[1.02,1.2],"Health regeneration":[1.7,2],"Biological infection":[1.06,1.25],"Reaction to laceration":[1.02,1.2]}, add:{"Laceration protection":[10.37,12.2],"Health regeneration":[0.58,0.7],"Vitality":[0.34,0.4]}}},
+ {name:"Inside Out Rose", tooltip:{main:{"Healing effectiveness":[-17,-14.45],"Bullet resistance":[10.37,12.2],"Stability":[7.14,8.4],"Biological infection":[2.12,2.5]}, add:{"Stamina regeneration":[3.54,4.3],"Bullet resistance":[3.485,4.1],"Stability":[2.31,2.8]}}},
+ {name:"Jelly", tooltip:{main:{"Carry weight":[7.4,8.7],"Bullet resistance":[9.86,11.6],"Biological infection":[1.06,1.25]}, add:{"Carry weight":[2.39,2.9],"Bullet resistance":[3.21,3.9],"Laceration protection":[10.05,12.2]}}},
+ {name:"Kettlebell", tooltip:{main:{"Vitality":[-16,-13.6],"Carry weight":[5.95,7],"Thermal protection":[38.25,45],"Temperature":[-3.04,-2.58],"Reaction to burns":[0.68,0.8]}, add:{"Resistance to fire":[7.98,9.7],"Movement speed":[0.16,0.2],"Thermal protection":[17,20]}}},
+ {name:"Lard", tooltip:{main:{"Vitality":[0.34,0.4],"Health regeneration":[1.28,1.5],"Healing effectiveness":[3.91,4.6],"Radiation":[1.06,1.25]}, add:{"Stamina":[7.98,9.7],"Health regeneration":[0.425,0.5],"Healing effectiveness":[1.36,1.6]}}},
+ {name:"Larva", tooltip:{main:{"Stamina":[11.05,13],"Healing effectiveness":[7.4,8.7],"Temperature":[-1.28,-1.09],"Biological infection":[0.53,0.62]}, add:{"Vitality":[0.99,1.2],"Stamina":[3.62,4.4],"Healing effectiveness":[2.39,2.9]}}},
+ {name:"Leaded Glass", tooltip:{main:{"Health regeneration":[0.85,1],"Radiation":[-1.28,-1.09],"Temperature":[-0.19,-0.16],"Psyonics":[-1.28,-1.09],"Frost":[0.42,0.5],"Burning":[-0.2,-0.17],"Reaction to burns":[0.42,0.5]}, add:{"Burning":[-0.1,-0.085],"Health regeneration":[0.4,0.41],"Vitality":[0.51,0.6]}}},
+ {name:"Leech", tooltip:{main:{"Vitality":[-8,-6.8],"Carry weight":[4.42,5.2],"Radiation protection":[17,20],"Radiation":[-2.16,-1.84]}, add:{"Carry weight":[1.53,1.8],"Reaction to laceration":[1.36,1.6],"Radiation protection":[8.5,10]}}},
+ {name:"Lemna", tooltip:{main:{"Vitality":[-16,-13.6],"Carry weight":[5.95,7],"Bioinfection protection":[38.25,45],"Biological infection":[-3.04,-2.58],"Reaction to chemical burns":[1.02,1.2]}, add:{"Resistance to chemicals":[7.98,9.7],"Health regeneration":[0.425,0.5],"Bioinfection protection":[17,20]}}},
+ {name:"Link", tooltip:{main:{"Vitality":[1.78,2.1],"Carry weight":[9.26,10.9],"Temperature":[2.12,2.5]}, add:{"Vitality":[0.58,0.7],"Carry weight":[3.05,3.7],"Health regeneration":[1.48,1.8]}}},
+ {name:"Lollipop", tooltip:{main:{"Stamina regeneration":[1.78,2.1],"Laceration protection":[5.18,6.1],"Radiation":[-2.16,-1.84],"Biological infection":[0.42,0.5],"Reaction to laceration":[0.51,0.6]}, add:{"Laceration protection":[1.72,2.1],"Stamina regeneration":[0.595,0.7],"Vitality":[0.51,0.6]}}},
+ {name:"Loop", tooltip:{main:{"Movement speed":[1.02,1.2],"Running speed":[1.36,1.6],"Radiation":[2.12,2.5],"Recoil":[-2.6,-2.21]}, add:{"Movement speed":[0.33,0.4],"Bleeding":[-1,-0.82],"Recoil":[-0.9,-0.74]}}},
+ {name:"Magma", tooltip:{main:{"Vitality":[1.78,2.1],"Bullet resistance":[3.74,4.4],"Stability":[4.16,4.9],"Temperature":[2.12,2.5]}, add:{"Vitality":[0.576,0.699],"Stamina":[13.34,16.2],"Stability":[1.4,1.7]}}},
+ {name:"Mirror", tooltip:{main:{"Vitality":[-14.8,-12.58],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Carry weight":[8.33,9.8],"Radiation protection":[38.25,45],"Psy-emission protection":[38.25,45],"Radiation":[-2.16,-1.84],"Psyonics":[-2.16,-1.84]}, add:{"Movement speed":[0.207,0.252],"Radiation protection":[16.47,20],"Psy-emission protection":[16.47,20]}}},
+ {name:"Mug", tooltip:{main:{"Vitality":[1.02,1.2],"Carry weight":[3.23,3.8],"Explosion protection":[10.8,12.7],"Radiation":[0.53,0.62],"Biological infection":[-1.28,-1.09]}, add:{"Vitality":[0.32,0.4],"Health regeneration":[1.15,1.4],"Explosion protection":[3.54,4.3]}}},
+ {name:"Onion", tooltip:{main:{"Stamina":[9.44,11.1],"Bullet resistance":[4.16,4.9],"Radiation":[0.53,0.62],"Psyonics":[-1.28,-1.09]}, add:{"Bullet resistance":[1.4,1.7],"Stamina":[3.05,3.7],"Bleeding protection":[1.72,2.1]}}},
+ {name:"Opal", tooltip:{main:{"Vitality":[-2.9,-2.47],"Stamina":[18.36,21.6],"Bullet resistance":[16.4,19.3],"Temperature":[-0.38,-0.33],"Frost":[0.85,1]}, add:{"Stamina":[5.93,7.2],"Bullet resistance":[5.35,6.5],"Stability":[5.35,6.5]}}},
+ {name:"Peg-Top", tooltip:{main:{"Laceration protection":[12.33,14.5],"Explosion protection":[6.38,7.5],"Psyonics":[-4.08,-3.47]}, add:{"Bullet resistance":[5.6,6.8],"Laceration protection":[4.03,4.9],"Explosion protection":[2.06,2.5]}}},
+ {name:"Phlegm", tooltip:{main:{"Movement speed":[0.21,0.25],"Running speed":[0.21,0.25],"Healing effectiveness":[5.52,6.5],"Bleeding protection":[2.21,2.6],"Biological infection":[1.06,1.25]}, add:{"Bleeding":[-0.8,-0.68],"Bleeding protection":[0.765,0.9],"Healing effectiveness":[1.87,2.2]}}},
+ {name:"Polyhedron", tooltip:{main:{"Stamina":[17.68,20.8],"Running speed":[0.64,0.75],"Stamina regeneration":[2.72,3.2],"Radiation":[2.12,2.5]}, add:{"Stamina regeneration":[0.91,1.1],"Stamina":[5.76,7],"Movement speed":[0.618,0.75]}}},
+ {name:"Prima", tooltip:{main:{"Carry weight":[7.9,9.3],"Laceration protection":[7.74,9.1],"Radiation":[1.06,1.25]}, add:{"Laceration protection":[2.635,3.1],"Carry weight":[2.635,3.1],"Bleeding":[-0.8,-0.68]}}},
+ {name:"Prism", tooltip:{main:{"Bullet resistance":[12.33,14.5],"Explosion protection":[9.52,11.2],"Stability":[2.21,2.6],"Psyonics":[2.12,2.5]}, add:{"Bullet resistance":[4.165,4.9],"Explosion protection":[3.23,3.8],"Stamina regeneration":[3.06,3.6]}}},
+ {name:"Proto-Onion", tooltip:{main:{"Stamina regeneration":[2.3,2.7],"Healing effectiveness":[3.49,4.1],"Radiation":[-3.04,-2.58]}, add:{"Health regeneration":[0.82,1],"Stamina regeneration":[0.765,0.9],"Healing effectiveness":[1.15,1.4]}}},
+ {name:"Pumpkin", tooltip:{main:{"Carry weight":[6.21,7.3],"Stamina regeneration":[2.89,3.4],"Radiation":[-4.08,-3.47]}, add:{"Vitality":[0.82,1],"Carry weight":[2.06,2.5],"Stamina regeneration":[0.99,1.2]}}},
+ {name:"Radiator", tooltip:{main:{"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Temperature":[-2.16,-1.84],"Psyonics":[-1.28,-1.09],"Burning":[-0.3,-0.26],"Reaction to burns":[0.68,0.8]}, add:{"Burning":[-0.1,-0.08],"Movement speed":[0.16,0.2],"Temperature":[-0.88,-0.748]}}},
+ {name:"Raisin", tooltip:{main:{"Vitality":[-2.7,-2.3],"Stamina":[18.36,21.6],"Movement speed":[1.36,1.6],"Running speed":[1.83,2.15],"Stability":[2.21,2.6],"Temperature":[2.12,2.5]}, add:{"Stamina":[6.12,7.2],"Movement speed":[0.45,0.55],"Stamina regeneration":[4.08,4.8]}}},
+ {name:"Rattle", tooltip:{main:{"Stamina":[11.82,13.9],"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Temperature":[1.06,1.25]}, add:{"Stamina regeneration":[1.87,2.2],"Stamina":[3.995,4.7],"Movement speed":[0.16,0.2]}}},
+ {name:"Red Crystal", tooltip:{main:{"Vitality":[-8,-6.8],"Stamina":[6.63,7.8],"Thermal protection":[17,20],"Temperature":[-2.16,-1.84],"Reaction to burns":[0.51,0.6]}, add:{"Resistance to fire":[6.01,7.3],"Thermal protection":[8.5,10],"Stamina":[2.21,2.6]}}},
+ {name:"Retina", tooltip:{main:{"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Stamina regeneration":[2.47,2.9],"Biological infection":[-1.28,-1.09],"Psyonics":[1.06,1.25],"Reaction to burns":[-4.9,-4.16]}, add:{"Movement speed":[0.288,0.35],"Stamina regeneration":[0.85,1],"Bleeding":[-1,-0.85]}}},
+ {name:"Rime", tooltip:{main:{"Bullet resistance":[8.59,10.1],"Laceration protection":[9.1,10.7],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5]}, add:{"Laceration protection":[3.06,3.6],"Bullet resistance":[2.89,3.4],"Explosion protection":[6.63,7.8]}}},
+ {name:"Rose", tooltip:{main:{"Bullet resistance":[7.4,8.7],"Explosion protection":[5.7,6.7],"Psyonics":[1.06,1.25]}, add:{"Bullet resistance":[2.465,2.9],"Explosion protection":[1.955,2.3],"Carry weight":[5.525,6.5]}}},
+ {name:"Scallop", tooltip:{main:{"Bullet resistance":[8.59,10.1],"Explosion protection":[6.63,7.8],"Radiation":[1.06,1.25]}, add:{"Bullet resistance":[2.89,3.4],"Explosion protection":[2.21,2.6],"Bleeding":[-0.9,-0.765]}}},
+ {name:"Scrubber", tooltip:{main:{"Stamina regeneration":[2.64,3.1],"Healing effectiveness":[3.91,4.6],"Radiation":[-1.28,-1.09],"Biological infection":[-2.16,-1.84],"Reaction to laceration":[0.76,0.9]}, add:{"Stamina regeneration":[0.9,1.1],"Biological infection":[-0.88,-0.748],"Healing effectiveness":[1.36,1.6]}}},
+ {name:"Shard", tooltip:{main:{"Vitality":[1.62,1.9],"Health regeneration":[0.6,0.7],"Healing effectiveness":[5.87,6.9],"Biological infection":[2.12,2.5]}, add:{"Vitality":[0.595,0.7],"Stamina regeneration":[2.72,3.2],"Healing effectiveness":[1.955,2.3]}}},
+ {name:"Shrimp", tooltip:{main:{"Vitality":[-0.5,-0.42],"Carry weight":[9.26,10.9],"Bullet resistance":[6.04,7.1],"Psyonics":[1.06,1.25]}, add:{"Bullet resistance":[2.04,2.4],"Explosion protection":[6.63,7.8],"Carry weight":[3.145,3.7]}}},
+ {name:"Snail", tooltip:{main:{"Stamina":[10.54,12.4],"Health regeneration":[0.85,1],"Biological infection":[-3.04,-2.58],"Bleeding":[-0.3,-0.26]}, add:{"Bleeding protection":[1.955,2.3],"Stamina":[3.57,4.2],"Health regeneration":[0.34,0.4]}}},
+ {name:"Snake Eye", tooltip:{main:{"Vitality":[1.62,1.9],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Healing effectiveness":[-4.5,-3.82],"Psyonics":[2.12,2.5]}, add:{"Stamina":[12.41,14.6],"Movement speed":[0.2,0.25],"Vitality":[0.595,0.7]}}},
+ {name:"Snares", tooltip:{main:{"Movement speed":[0.6,0.7],"Running speed":[0.81,0.95],"Laceration protection":[14.79,17.4],"Biological infection":[0.53,0.62],"Psyonics":[-1.28,-1.09]}, add:{"Movement speed":[0.206,0.25],"Health regeneration":[1.15,1.4],"Laceration protection":[4.78,5.8]}}},
+ {name:"Spectral Crystal", tooltip:{main:{"Vitality":[-8,-6.8],"Stamina regeneration":[1.44,1.7],"Psy-emission protection":[17,20],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Resistance to electricity":[6.01,7.3],"Psy-emission protection":[8.5,10],"Stamina regeneration":[0.51,0.6]}}},
+ {name:"Spiral", tooltip:{main:{"Vitality":[-0.5,-0.42],"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Carry weight":[7.4,8.7],"Radiation":[1.06,1.25]}, add:{"Carry weight":[2.465,2.9],"Movement speed":[0.28,0.35],"Healing effectiveness":[6.12,7.2]}}},
+ {name:"Sponge", tooltip:{main:{"Carry weight":[2.38,2.8],"Laceration protection":[7.74,9.1],"Explosion protection":[8.16,9.6],"Radiation":[1.06,1.25],"Reaction to laceration":[0.76,0.9]}, add:{"Laceration protection":[2.635,3.1],"Explosion protection":[2.63,3.2],"Health regeneration":[0.9,1.1]}}},
+ {name:"Static", tooltip:{main:{"Bullet resistance":[8.59,10.1],"Radiation":[2.12,2.5],"Recoil":[-3.7,-3.15]}, add:{"Stamina":[13.34,16.2],"Bullet resistance":[2.8,3.4],"Recoil":[-1.3,-1.07]}}},
+ {name:"Steel Hedgehog", tooltip:{main:{"Stamina":[12.41,14.6],"Healing effectiveness":[2.55,3],"Bullet resistance":[11.05,13],"Psyonics":[2.12,2.5],"Reaction to laceration":[1.1,1.3]}, add:{"Bullet resistance":[3.74,4.4],"Laceration protection":[11.28,13.7],"Stamina":[4.03,4.9]}}},
+ {name:"Sticky Burr", tooltip:{main:{"Stamina":[9.18,10.8],"Movement speed":[0.34,0.4],"Running speed":[0.47,0.55],"Radiation":[-2.16,-1.84]}, add:{"Radiation":[-0.88,-0.748],"Stamina":[3.06,3.6],"Movement speed":[0.12,0.15]}}},
+ {name:"Stress Fest", tooltip:{main:{"Movement speed":[0.6,0.7],"Running speed":[0.81,0.95],"Healing effectiveness":[7.4,8.7],"Bullet resistance":[-2,-1.7],"Temperature":[1.06,1.25]}, add:{"Movement speed":[0.2,0.25],"Healing effectiveness":[2.465,2.9],"Carry weight":[7.395,8.7]}}},
+ {name:"Sun", tooltip:{main:{"Vitality":[1.62,1.9],"Health regeneration":[1.36,1.6],"Temperature":[2.12,2.5],"Reaction to burns":[0.94,1.1]}, add:{"Health regeneration":[0.51,0.6],"Bleeding protection":[3.315,3.9],"Vitality":[0.595,0.7]}}},
+ {name:"Swamp Rot", tooltip:{main:{"Vitality":[0.26,0.3],"Stamina regeneration":[2.04,2.4],"Healing effectiveness":[3.06,3.6],"Biological infection":[-2.16,-1.84],"Reaction to chemical burns":[0.76,0.9]}, add:{"Biological infection":[-0.88,-0.748],"Stamina regeneration":[0.65,0.8],"Healing effectiveness":[1.02,1.2]}}},
+ {name:"Tallow", tooltip:{main:{"Health regeneration":[1.19,1.4],"Healing effectiveness":[7.4,8.7],"Radiation":[1.06,1.25],"Temperature":[-1.28,-1.09]}, add:{"Health regeneration":[0.41,0.5],"Healing effectiveness":[2.465,2.9],"Explosion protection":[6.12,7.2]}}},
+ {name:"Timber", tooltip:{main:{"Stamina regeneration":[3.49,4.1],"Bullet resistance":[6.89,8.1],"Radiation":[-1.28,-1.09],"Temperature":[0.53,0.62]}, add:{"Health regeneration":[1.15,1.4],"Stamina regeneration":[1.15,1.4],"Bullet resistance":[2.22,2.7]}}},
+ {name:"Tiny Key", tooltip:{main:{"Radiation":[2.12,2.5],"Recoil":[-4.4,-3.74],"Sway":[-6.1,-5.18]}, add:{"Bullet resistance":[10.37,12.2],"Recoil":[-1.5,-1.275],"Sway":[-2.1,-1.785]}}},
+ {name:"Transformer", tooltip:{main:{"Stamina":[11.82,13.9],"Carry weight":[5.52,6.5],"Biological infection":[-1.28,-1.09],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.94,1.1]}, add:{"Stamina":[3.995,4.7],"Carry weight":[1.87,2.2],"Psy-emissions":[-0.88,-0.748]}}},
+ {name:"Veiner", tooltip:{main:{"Carry weight":[7.4,8.7],"Bullet resistance":[4.84,5.7],"Radiation":[0.53,0.62],"Psyonics":[-1.28,-1.09]}, add:{"Bullet resistance":[1.615,1.9],"Stamina regeneration":[1.7,2],"Carry weight":[2.465,2.9]}}},
+ {name:"Viburnum Branch", tooltip:{main:{"Vitality":[1.28,1.5],"Healing effectiveness":[9.26,10.9],"Radiation":[2.12,2.5],"Bleeding":[-0.4,-0.34]}, add:{"Stamina":[13.77,16.2],"Healing effectiveness":[3.05,3.7],"Vitality":[0.425,0.5]}}},
+ {name:"Whirlwind", tooltip:{main:{"Movement speed":[0.94,1.1],"Running speed":[1.28,1.5],"Resistance to electricity":[11.64,13.7],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to burns":[0.94,1.1]}, add:{"Resistance to electricity":[3.78,4.6],"Burning":[-0.3,-0.24],"Movement speed":[0.32,0.4]}}},
+ {name:"White Rose", tooltip:{main:{"Stamina":[6.46,7.6],"Carry weight":[6.21,7.3],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Psy-emissions":[-0.88,-0.748],"Stamina":[2.14,2.6],"Carry weight":[2.125,2.5]}}},
+ {name:"Wicked Hedgehog", tooltip:{main:{"Stamina":[11.82,13.9],"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09],"Reaction to laceration":[0.76,0.9]}, add:{"Stamina":[3.87,4.7],"Movement speed":[0.17,0.2],"Psy-emissions":[-1.28,-1.06]}}},
+ {name:"Wolf Tears", tooltip:{main:{"Stamina":[7.9,9.3],"Carry weight":[3.74,4.4],"Radiation":[0.42,0.5],"Temperature":[-2.16,-1.84],"Reaction to burns":[0.42,0.5]}, add:{"Bullet resistance":[3.485,4.1],"Stamina":[2.55,3.1],"Carry weight":[1.275,1.5]}}}
 ];
 
+// Derives the single value used in calculations from a [min,max] tooltip range:
+// the higher of the two bracketed numbers (see comment above ARTIFACTS).
+function deriveStatValue(range){ return range[0] > range[1] ? range[0] : range[1]; }
 const MAIN_VECS = ARTIFACTS.map(a=>{
   const v = new Float64Array(NS);
-  for (const k in a.main) v[STAT_IDX[k]] = a.main[k];
+  for (const k in a.tooltip.main) v[STAT_IDX[k]] = deriveStatValue(a.tooltip.main[k]);
   return v;
 });
 const ADD_VECS = ARTIFACTS.map(a=>{
   const v = new Float64Array(NS);
-  for (const k in a.add) v[STAT_IDX[k]] = a.add[k];
+  for (const k in a.tooltip.add) v[STAT_IDX[k]] = deriveStatValue(a.tooltip.add[k]);
   return v;
 });
 // Active per-artefact vectors used by the search; rebuilt by rebuildVecs()
@@ -796,10 +816,7 @@ statListEl.addEventListener('click', e=>{
 // Artefacts excluded from the "Available artefacts" list by default
 // (still selectable - just unticked on load).
 const DEFAULT_OFF = new Set([
-  "Snares","Coil","Static","Pumpkin","Wicked Hedgehog",
-  "Cycle","Link","Loop","Jelly","Gills","Cone","Colophony",
-  "Stress Fest","Mug","Peg-Top","Timber","Rime","Opal",
-  "Retina","Chicken God","Inside Out Rose"
+  "Snares"
 ]);
 
 // --- Persistence (this is a standalone file with no backend, so the available-artefacts
@@ -1003,7 +1020,7 @@ function renderPopoverMain(idx){
   const vec = VECS[idx];
   const statRows = STAT_NAMES
     .map((s, i) => ({ name: s, val: vec[i] }))
-    .filter(r => Math.abs(r.val) > 1e-9)
+    .filter(r => Math.abs(r.val) > 1e-6)
     .map(r => {
       const good = isGoodValue(r.name, r.val);
       return `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;font-size:11.5px;">
@@ -1185,12 +1202,18 @@ document.getElementById('statClearBtn').onclick = ()=>{
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
 };
 document.getElementById('artAllBtn').onclick = ()=>{
-  artifactListEl.querySelectorAll('input').forEach(c=>c.checked=true);
+  artifactListEl.querySelectorAll('input').forEach(c=>{
+    if (!DEFAULT_OFF.has(ARTIFACTS[parseInt(c.dataset.idx)].name)) c.checked = true;
+  });
   saveExcludedNames();
 };
 document.getElementById('artNoneBtn').onclick = ()=>{
   artifactListEl.querySelectorAll('input').forEach(c=>c.checked=false);
   saveExcludedNames();
+};
+document.getElementById('artUnpinBtn').onclick = ()=>{
+  PINNED.clear();
+  updateAllLockStates();
 };
 document.getElementById('clearLoadoutBtn').onclick = ()=>{
   OWNED = {};
@@ -1349,6 +1372,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   // Restore button label if it was stuck on "Searching…"
   const btn = document.getElementById('calcBtn');
   btn.disabled = false;
+  btn.classList.remove('stop-mode');
   btn.textContent = 'Find best combination';
   // Clear results panel
   document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit \u201cFind best combination\u201d.</div>';
@@ -1489,7 +1513,7 @@ self.onmessage = function(e){
       var t=thresholds[i];
       var raw=sum[t.idx];
       var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
-      if(eff>t.cap+1e-9) return false;
+      if(eff>t.cap+1e-6) return false;
     }
     return true;
   }
@@ -1498,7 +1522,7 @@ self.onmessage = function(e){
       var t=thresholds[i];
       var raw=sum[t.idx];
       var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
-      if(eff>t.extCap+1e-9) return false;
+      if(eff>t.extCap+1e-6) return false;
     }
     return true;
   }
@@ -1522,14 +1546,14 @@ self.onmessage = function(e){
     var c=0;
     for(var i=0;i<targetStats.length;i++){
       var t=targetStats[i];
-      if(sum[t.idx]*t.dir>1e-9) c++;
+      if(sum[t.idx]*t.dir>1e-6) c++;
     }
     return c;
   }
   function beats(a,b){
     if(a.cov!==b.cov) return a.cov>b.cov;
-    if(Math.abs(a.ts.h-b.ts.h)>1e-9) return a.ts.h>b.ts.h;
-    if(Math.abs(a.ts.m-b.ts.m)>1e-9) return a.ts.m>b.ts.m;
+    if(Math.abs(a.ts.h-b.ts.h)>1e-6) return a.ts.h>b.ts.h;
+    if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
     return a.ts.l>b.ts.l;
   }
   var TOP_MISS = 30;
@@ -1542,7 +1566,7 @@ self.onmessage = function(e){
       self.postMessage({type:'progress',done:checked,total:total});
       nextReport+=REPORT_EVERY;
     }
-    var vitalityOk=!(d.noVitalityDebuff && sum[d.vitalityIdx] < -1e-9);
+    var vitalityOk=!(d.noVitalityDebuff && sum[d.vitalityIdx] < -1e-6);
     if(!vitalityOk) return;
     var passes=passesThreshold();
     var sc=rawScore();
@@ -1616,109 +1640,11 @@ function passesThreshold(sum, protection){
   for (const s of THRESHOLD_STATS){
     const raw = sum[STAT_IDX[s]];
     const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
-    if (eff > thresholdCap(s) + 1e-9) return false;
+    if (eff > thresholdCap(s) + 1e-6) return false;
   }
   return true;
 }
 
-const TOP_N = 10;
-
-function findBest(includedIdx, slots, protection, targetStats){
-  const n = includedIdx.length;
-  const sum = new Float64Array(NS);
-  const counts = new Array(n).fill(0);
-  const top = []; // sorted descending by tier scores, max length TOP_N
-
-  // Best single-artefact beneficial value per target stat for normalization.
-  const statMaxMap = {};
-  for (const t of targetStats) {
-    const si = STAT_IDX[t.name];
-    const dir = STAT_META[t.name].good ? 1 : -1;
-    let mx = 0;
-    for (const ai of includedIdx) { const v = VECS[ai][si] * dir; if (v > mx) mx = v; }
-    statMaxMap[t.name] = mx;
-  }
-
-  function tierScores(){
-    let h=0, m=0, l=0;
-    for (const t of targetStats){
-      const si = STAT_IDX[t.name];
-      const dir = STAT_META[t.name].good ? 1 : -1;
-      const sm = statMaxMap[t.name];
-      const normed = sm > 1e-12 ? sum[si] * dir / sm : 0;
-      if (t.tier === 'high') h += normed;
-      else if (t.tier === 'low') l += normed;
-      else m += normed;
-    }
-    return {h, m, l};
-  }
-
-  function rawScore(){
-    let s = 0;
-    for (const t of targetStats){
-      const dir = STAT_META[t.name].good ? 1 : -1;
-      s += sum[STAT_IDX[t.name]] * dir * t.weight;
-    }
-    return s;
-  }
-
-  // Count how many target stats have a beneficial non-zero contribution.
-  // Primary sort key: coverage first, tier scores break ties within same coverage.
-  function coverage(){
-    let c = 0;
-    for (const t of targetStats){
-      const dir = STAT_META[t.name].good ? 1 : -1;
-      if (sum[STAT_IDX[t.name]] * dir > 1e-9) c++;
-    }
-    return c;
-  }
-
-  function beats(a, b){
-    if (a.cov !== b.cov) return a.cov > b.cov;
-    if (Math.abs(a.ts.h - b.ts.h) > 1e-9) return a.ts.h > b.ts.h;
-    if (Math.abs(a.ts.m - b.ts.m) > 1e-9) return a.ts.m > b.ts.m;
-    return a.ts.l > b.ts.l;
-  }
-
-  function considerLeaf(){
-    if (!passesThreshold(sum, protection)) return;
-    const ts = tierScores();
-    const sc = rawScore();
-    const cv = coverage();
-    const entry = {counts: counts.slice(), score: sc, ts, cov: cv, sum: sum.slice()};
-    if (top.length === TOP_N && !beats(entry, top[top.length-1])) return;
-    let i = top.length;
-    top.push(entry);
-    while (i > 0 && beats(entry, top[i-1])){
-      top[i] = top[i-1]; top[i-1] = entry; i--;
-    }
-    if (top.length > TOP_N) top.length = TOP_N;
-  }
-
-  function recurse(start, remaining){
-    if (remaining === 0){
-      considerLeaf();
-      return;
-    }
-    for (let i=start; i<n; i++){
-      const vec = VECS[includedIdx[i]];
-      counts[i]++;
-      for (let k=0;k<NS;k++) sum[k]+=vec[k];
-      recurse(i, remaining-1);
-      for (let k=0;k<NS;k++) sum[k]-=vec[k];
-      counts[i]--;
-    }
-  }
-  recurse(0, slots);
-
-  return top.map(best=>{
-    const chosen = [];
-    best.counts.forEach((c, localI)=>{
-      if (c>0) chosen.push({idx: includedIdx[localI], count: c});
-    });
-    return {chosen, sum: best.sum, score: best.score, ts: best.ts};
-  });
-}
 
 /* ---------- Render results ---------- */
 // Returns true if OWNED contains at least one unit of this artefact at >= the given quality.
@@ -1749,7 +1675,7 @@ function computeTopStatSets(results, targetStats){
     const set = new Set();
     if (scored.length){
       const cutoff = scored[Math.min(1, scored.length-1)].val;
-      scored.forEach(s=>{ if (s.val >= cutoff - 1e-9) set.add(s.i); });
+      scored.forEach(s=>{ if (s.val >= cutoff - 1e-6) set.add(s.i); });
     }
     topSets[t.name] = set;
   });
@@ -1772,7 +1698,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     THRESHOLD_STATS.forEach(s=>{
       const raw = sum[STAT_IDX[s]];
       const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
-      if (eff > thresholdCap(s) + 1e-9){
+      if (eff > thresholdCap(s) + 1e-6){
         overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;margin-left:4px;">${s} ${eff.toFixed(2)}</span>`;
       }
     });
@@ -1815,8 +1741,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const extCap = thresholdExtCap(s);
     const ratio = Math.max(0, eff) / cap;
     let color = 'var(--good)', statusColor='var(--good)', statusText='safe';
-    if (eff > extCap + 1e-9){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
-    else if (eff > cap + 1e-9){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
+    if (eff > extCap + 1e-6){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
+    else if (eff > cap + 1e-6){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
     else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
     const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
     const markerPct = (cap / extCap) * (100/1.15);
@@ -1833,7 +1759,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const statCells = [];
   STAT_NAMES.forEach(s=>{
     const val = sum[STAT_IDX[s]];
-    if (Math.abs(val) < 1e-9) return;
+    if (Math.abs(val) < 1e-6) return;
     const good = isGoodValue(s, val);
     const isTarget = targetStats.some(t => t.name === s);
     statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
@@ -1863,14 +1789,14 @@ function renderConsumableZone(results, extResults, targetStats, protection){
   // With no valid builds, show every collected extended-zone build (no top-3 filter).
   // With valid builds, only show ones that would rank in the top 3 if they were valid.
   const shown = hasValid
-    ? (extResults || []).filter(r => results.filter(v => v.score > r.score + 1e-9).length + 1 <= 3)
+    ? (extResults || []).filter(r => results.filter(v => v.score > r.score + 1e-6).length + 1 <= 3)
     : (extResults || []);
   if (shown.length === 0){ el.innerHTML = ''; return; }
 
   let html = `<div class="section-title" style="margin-top:20px;">⚠ Consumable zone (0.49–0.54)</div>
   <div class="flag-note" style="margin-bottom:12px;">These builds exceed the 0.49 damage threshold but stay within 0.54${hasValid ? ', and would rank top 3 if valid' : ''}. A suitable consumable or drug can cover the gap - use at your own risk.</div>`;
   shown.forEach((r,i)=>{
-    const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-9).length + 1 : undefined;
+    const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-6).length + 1 : undefined;
     html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank);
   });
   el.innerHTML = html;
@@ -2036,7 +1962,7 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
       const upgradedScore = scoreSum(upgradedSum);
 
       // Only surface if it beats the 3rd-best valid result
-      if (upgradedScore <= minValidScore + 1e-9) return;
+      if (upgradedScore <= minValidScore + 1e-6) return;
 
       // Dedup key: sorted artifact indices + counts + enabler + level
       const buildKey = chosen.map(c=>`${c.idx}x${c.count}`).sort().join(',') + `|${enablerGlobalIdx}@${minLevel}`;
@@ -2113,8 +2039,8 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
       const extCap = thresholdExtCap(s);
       const ratio = Math.max(0, eff) / cap;
       let color = 'var(--good)', statusColor='var(--good)', statusText='safe';
-      if (eff > extCap + 1e-9){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
-      else if (eff > cap + 1e-9){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
+      if (eff > extCap + 1e-6){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
+      else if (eff > cap + 1e-6){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
       else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
       const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
       const markerPct = (cap / extCap) * (100/1.15);
@@ -2130,7 +2056,7 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
     const tipStatCells = [];
     STAT_NAMES.forEach(s=>{
       const val = sum[STAT_IDX[s]];
-      if (Math.abs(val) < 1e-9) return;
+      if (Math.abs(val) < 1e-6) return;
       const good = isGoodValue(s, val);
       const isTarget = targetStats.some(t => t.name === s);
       tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
@@ -2183,6 +2109,15 @@ document.getElementById('results').addEventListener('click', e=>{
 });
 
 document.getElementById('calcBtn').onclick = ()=>{
+  if (activeWorker){
+    activeWorker.terminate();
+    activeWorker = null;
+    const btn = document.getElementById('calcBtn');
+    btn.classList.remove('stop-mode');
+    btn.textContent = 'Find best combination';
+    document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Search stopped.</div>';
+    return;
+  }
   const slots = Math.max(1, Math.min(6, parseInt(document.getElementById('slotsInput').value) || 1));
   const protection = Math.max(0, Math.min(100, parseFloat(document.getElementById('protInput').value) || 0));
   const effectiveness = Math.max(-100, Math.min(200, parseFloat(document.getElementById('effInput').value) || 0));
@@ -2302,8 +2237,8 @@ document.getElementById('calcBtn').onclick = ()=>{
   const totalFmt = total.toLocaleString();
 
   // Show progress UI
-  btn.disabled = true;
-  btn.textContent = 'Searching\u2026';
+  btn.classList.add('stop-mode');
+  btn.textContent = 'STOP';
   el.innerHTML = `
     <h2>Scanning</h2>
     <p class="prog-tagline">checking <b>${totalFmt}</b> possible combinations</p>
@@ -2363,6 +2298,7 @@ document.getElementById('calcBtn').onclick = ()=>{
       URL.revokeObjectURL(workerUrl);
       activeWorker = null;
       btn.disabled = false;
+      btn.classList.remove('stop-mode');
       btn.textContent = 'Find best combination';
 
       // Build the pinned-artefact base once and merge it into every worker result.
@@ -2406,6 +2342,7 @@ document.getElementById('calcBtn').onclick = ()=>{
     URL.revokeObjectURL(workerUrl);
     activeWorker = null;
     btn.disabled = false;
+    btn.classList.remove('stop-mode');
     btn.textContent = 'Find best combination';
     el.innerHTML = '<h2>Result</h2><div class="msg-error">Search error: ' + (err.message || 'unknown error') + '</div>';
   };
