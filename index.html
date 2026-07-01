@@ -514,66 +514,49 @@
 // threshold:true -> damage-cap stats. 5 of them (Biological infection, Psyonics,
 // Psy-emissions, Radiation, Temperature) are capped at 0.49 net after backpack
 // protection; Frost is the exception, capped at 0.99 and ignoring protection.
+// percent:true    -> stat uses a % unit when displayed (rest are flat values)
+// group:1/2       -> Level/Quality scaling group (see isFormulaB below); stats with
+//                    no group always use Formula A (scales with level/quality)
 const STAT_META = {
-  "Bioinfection protection":    {good:true},
-  "Biological infection":       {good:false, threshold:true},
+  "Bioinfection protection":    {good:true, percent:true},
+  "Biological infection":       {good:false, threshold:true, group:1},
   "Bleeding":                   {good:false},
-  "Bleeding protection":        {good:true},
-  "Bullet resistance":          {good:true},
-  "Burning":                    {good:false},
+  "Bleeding protection":        {good:true, percent:true},
+  "Bullet resistance":          {good:true, group:2},
+  "Burning":                    {good:false, percent:true},
   "Carry weight":               {good:true},
   "Explosion protection":       {good:true},
-  "Frost":                      {good:false, threshold:true},
-  "Health regeneration":        {good:true},
-  "Healing effectiveness":      {good:true},
+  "Frost":                      {good:false, threshold:true, group:1},
+  "Health regeneration":        {good:true, percent:true},
+  "Healing effectiveness":      {good:true, percent:true, group:2},
   "Laceration protection":      {good:true},
-  "Movement speed":             {good:true},
-  "Periodic healing":           {good:true},
-  "Psyonics":                   {good:false, threshold:true},
+  "Movement speed":             {good:true, percent:true},
+  "Periodic healing":           {good:true, percent:true},
+  "Psyonics":                   {good:false, threshold:true, group:1},
   "Psy-emission protection":    {good:true},
-  "Psy-emissions":              {good:false},
-  "Radiation":                  {good:false, threshold:true},
+  "Psy-emissions":              {good:false, group:1},
+  "Radiation":                  {good:false, threshold:true, group:1},
   "Radiation protection":       {good:true},
-  "Reaction to burns":          {good:true},
-  "Reaction to chemical burns": {good:true},
-  "Reaction to electricity":    {good:true},
-  "Reaction to laceration":     {good:true},
-  "Recoil":                     {good:false},
+  "Reaction to burns":          {good:true, percent:true},
+  "Reaction to chemical burns": {good:true, percent:true},
+  "Reaction to electricity":    {good:true, percent:true},
+  "Reaction to laceration":     {good:true, percent:true},
+  "Recoil":                     {good:false, percent:true},
   "Resistance to chemicals":    {good:true},
-  "Resistance to electricity":  {good:true},
+  "Resistance to electricity":  {good:true, percent:true},
   "Resistance to fire":         {good:true},
-  "Running speed":              {good:true},
-  "Stability":                  {good:true},
-  "Stamina":                    {good:true},
-  "Stamina regeneration":       {good:true},
-  "Sway":                       {good:false},
-  "Temperature":                {good:false, threshold:true},
+  "Running speed":              {good:true, percent:true},
+  "Stability":                  {good:true, percent:true},
+  "Stamina":                    {good:true, percent:true},
+  "Stamina regeneration":       {good:true, percent:true},
+  "Sway":                       {good:false, percent:true},
+  "Temperature":                {good:false, threshold:true, group:1},
   "Thermal protection":         {good:true},
-  "Vitality":                   {good:true}
+  "Vitality":                   {good:true, percent:true, group:2}
 };
 
-// stats that use a % unit when displayed (rest are flat values)
-const PERCENT_STATS = new Set([
-  "Bioinfection protection",
-  "Bleeding protection",
-  "Burning",
-  "Health regeneration",
-  "Healing effectiveness",
-  "Movement speed",
-  "Periodic healing",
-  "Reaction to burns",
-  "Reaction to chemical burns",
-  "Reaction to electricity",
-  "Reaction to laceration",
-  "Recoil",
-  "Resistance to electricity",
-  "Running speed",
-  "Stability",
-  "Stamina",
-  "Stamina regeneration",
-  "Sway",
-  "Vitality"
-]);
+// stats that use a % unit when displayed (rest are flat values) - derived from STAT_META
+const PERCENT_STATS = new Set(Object.keys(STAT_META).filter(s => STAT_META[s].percent));
 
 const STAT_NAMES = Object.keys(STAT_META).sort();
 const STAT_IDX = {}; STAT_NAMES.forEach((s,i)=>STAT_IDX[s]=i);
@@ -587,9 +570,9 @@ const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-1
 
 // --- Level / Quality scaling (stalcraft-artifact-formula.md) ---
 // Group 1: positive value = DEBUFF (Formula B, no scaling); negative = BUFF (Formula A, scales).
-const GROUP1_DEBUFF = new Set(["Temperature","Frost","Psy-emissions","Biological infection","Radiation","Psyonics"]);
+const GROUP1_DEBUFF = new Set(STAT_NAMES.filter(s => STAT_META[s].group === 1));
 // Group 2: negative value = DEBUFF (Formula B, no scaling); positive = BUFF (Formula A, scales).
-const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
+const GROUP2_DEBUFF = new Set(STAT_NAMES.filter(s => STAT_META[s].group === 2));
 
 // Returns true if this (stat, value) pair uses Formula B (fixed debuff - no level/quality scale).
 function isFormulaB(statName, value) {
@@ -769,8 +752,6 @@ const STAT_CATEGORIES = [
   { label: 'Combat',  names: ["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"] },
   { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emissions","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
 ];
-const CATEGORIZED = new Set(STAT_CATEGORIES.flatMap(c => c.names));
-
 function addStatItem(name){
   const good = STAT_META[name].good;
   const id = 'stat_'+name.replace(/[^a-z0-9]/gi,'_');
@@ -1647,6 +1628,18 @@ function passesThreshold(sum, protection){
   return true;
 }
 
+// Client-side mirror of the worker's beats(a,b): coverage first, then normalized
+// H/M/L tier sums. This is the single ranking criterion the main Top-N list is
+// sorted by; reuse it anywhere a build needs to be compared against another
+// (consumable-zone "would be rank #X", upgrade-tip qualification bar) instead of
+// falling back to raw score, which can disagree with it.
+function resultBeats(a, b){
+  if (a.cov !== b.cov) return a.cov > b.cov;
+  if (Math.abs(a.ts.h - b.ts.h) > 1e-6) return a.ts.h > b.ts.h;
+  if (Math.abs(a.ts.m - b.ts.m) > 1e-6) return a.ts.m > b.ts.m;
+  return a.ts.l > b.ts.l;
+}
+
 
 /* ---------- Render results ---------- */
 // Returns true if OWNED contains at least one unit of this artefact at >= the given quality.
@@ -1791,14 +1784,14 @@ function renderConsumableZone(results, extResults, targetStats, protection){
   // With no valid builds, show every collected extended-zone build (no top-3 filter).
   // With valid builds, only show ones that would rank in the top 3 if they were valid.
   const shown = hasValid
-    ? (extResults || []).filter(r => results.filter(v => v.score > r.score + 1e-6).length + 1 <= 3)
+    ? (extResults || []).filter(r => results.filter(v => resultBeats(v, r)).length + 1 <= 3)
     : (extResults || []);
   if (shown.length === 0){ el.innerHTML = ''; return; }
 
   let html = `<div class="section-title" style="margin-top:20px;">⚠ Consumable zone (0.49–0.54)</div>
   <div class="flag-note" style="margin-bottom:12px;">These builds exceed the 0.49 damage threshold but stay within 0.54${hasValid ? ', and would rank top 3 if valid' : ''}. A suitable consumable or drug can cover the gap - use at your own risk.</div>`;
   shown.forEach((r,i)=>{
-    const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-6).length + 1 : undefined;
+    const wouldBeRank = hasValid ? results.filter(v => resultBeats(v, r)).length + 1 : undefined;
     html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank);
   });
   el.innerHTML = html;
@@ -1886,23 +1879,38 @@ function renderResults(results, extResults, targetStats, protection){
 // (levels 1–15) and find the minimum level that makes the build valid.
 // Returns tip objects only if the upgraded build would beat any of the top-3
 // valid results by score.
-function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults){
+function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults, statMaxMap){
   if (!misses || misses.length === 0) return [];
   const tips = [];
   const seen = new Set(); // deduplicate by (build-key, enabler-idx, min-level)
 
-  // Score threshold: must be at least as good as the 3rd valid result
-  const minValidScore = validResults.length > 0
-    ? validResults[Math.min(2, validResults.length - 1)].score
-    : -Infinity;
+  // Qualification bar: must beat the 3rd valid result under the same coverage/tier
+  // criterion the main list is ranked by (resultBeats), not raw score.
+  const qualifyBar = validResults.length > 0
+    ? validResults[Math.min(2, validResults.length - 1)]
+    : null;
 
-  // Pre-compute per-stat index+direction for scoring
-  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight }));
+  // Pre-compute per-stat index+direction+tier/statMax for scoring and tiering
+  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight, tier: t.tier, statMax: statMaxMap[t.name] }));
 
   function scoreSum(sumArr){
     let s = 0;
     for (const t of tsDirs) s += sumArr[t.idx] * t.dir * t.weight;
     return s;
+  }
+  // Mirrors the worker's tierScores()/coverage(), so upgrade tips are judged by the
+  // same beats()-style criterion as the main list ranking.
+  function tierScoresAndCoverage(sumArr){
+    let h=0,m=0,l=0,cov=0;
+    for (const t of tsDirs){
+      const val = sumArr[t.idx] * t.dir;
+      const normed = t.statMax > 1e-12 ? val / t.statMax : 0;
+      if (t.tier === 'high') h += normed;
+      else if (t.tier === 'low') l += normed;
+      else m += normed;
+      if (val > 1e-6) cov++;
+    }
+    return {ts:{h,m,l}, cov};
   }
 
   // Rebuild sum vector for a combination with one artifact upgraded to overrideLvl.
@@ -1962,9 +1970,11 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
       // Score this upgraded build
       const upgradedSum = buildSum(miss.counts, localIndices, enablerGlobalIdx, minLevel);
       const upgradedScore = scoreSum(upgradedSum);
+      const {ts: upgradedTs, cov: upgradedCov} = tierScoresAndCoverage(upgradedSum);
 
-      // Only surface if it beats the 3rd-best valid result
-      if (upgradedScore <= minValidScore + 1e-6) return;
+      // Only surface if it beats the 3rd-best valid result under the same ranking
+      // criterion as the main list (coverage, then normalized H/M/L)
+      if (qualifyBar && !resultBeats({cov: upgradedCov, ts: upgradedTs}, qualifyBar)) return;
 
       // Dedup key: sorted artifact indices + counts + enabler + level
       const buildKey = chosen.map(c=>`${c.idx}x${c.count}`).sort().join(',') + `|${enablerGlobalIdx}@${minLevel}`;
@@ -2319,8 +2329,8 @@ document.getElementById('calcBtn').onclick = ()=>{
         });
         return chosen;
       }
-      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
+      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
       renderResults(results, extResults, targetStats, protection);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
@@ -2332,7 +2342,7 @@ document.getElementById('calcBtn').onclick = ()=>{
         if (misses.length > 0 && results.length > 0){
           const tips = analyzeUpgrades(
             misses, includedIdx, targetStats, protection,
-            includeAdditional, effectiveness, results
+            includeAdditional, effectiveness, results, statMaxMap
           );
           renderUpgradeTips(tips, targetStats, protection, results);
         }
