@@ -68,6 +68,9 @@
     width:100%;background:var(--panel-2);border:1px solid var(--border);
     color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--mono);font-size:14px;
   }
+  input[type=number]{-moz-appearance:textfield;}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   input[type=number]:focus,input[type=text]:focus{outline:1px solid var(--accent-dim);}
   input[type=text]::placeholder{color:var(--muted);font-size:13px;}
 
@@ -208,10 +211,20 @@
     border-radius:3px;padding:2px 7px;letter-spacing:0.03em;
   }
   .target-line{margin:8px 0 2px;display:flex;flex-wrap:wrap;gap:6px;}
-  .target-pill{font-size:11.5px;font-family:var(--mono);padding:3px 8px;border-radius:3px;border:1px solid var(--border);}
+  .target-pill{font-size:11.5px;font-family:var(--mono);padding:3px 8px;border-radius:3px;border:1px solid var(--border);position:relative;}
   .target-pill.good{color:var(--good);}
   .target-pill.bad{color:var(--bad);}
   .target-pill.top-stat{border-color:var(--accent);}
+  .target-pill .min-star{position:absolute;top:-6px;right:-6px;font-size:11px;line-height:1;color:var(--warn);}
+
+  /* Min-threshold met/unmet labels + banner, replacing the old green result-card highlight */
+  .min-warning-banner{
+    font-size:12px;color:var(--warn);background:rgba(201,162,63,0.1);
+    border:1px solid var(--warn);padding:8px 10px;border-radius:4px;margin-bottom:12px;
+  }
+  .results-grid-view .min-warning-banner{grid-column:1/-1;}
+  .min-status-note{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:3px;letter-spacing:0.02em;}
+  .min-status-note.met{color:var(--good);background:var(--good-bg);border:1px solid var(--good);}
   .result-card details{margin-top:10px;}
   .result-card summary{cursor:pointer;font-size:11.5px;color:var(--accent);letter-spacing:0.03em;margin-bottom:6px;}
   .result-card details[open] summary{margin-bottom:10px;}
@@ -246,6 +259,13 @@
   }
   .tier-btn:last-child{border-right:none;}
   .tier-btn.active{background:var(--accent-dim);color:var(--text);}
+  input.stat-min-input{
+    width:50px;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:2px 4px;border-radius:3px;font-family:var(--mono);
+    font-size:11px;text-align:center;
+  }
+  input.stat-min-input:focus{outline:1px solid var(--accent-dim);}
+  input.stat-min-input::placeholder{color:var(--muted);}
 
   button.primary:disabled{opacity:0.45;cursor:not-allowed;}
   button.primary:disabled:hover{background:var(--accent);}
@@ -514,49 +534,66 @@
 // threshold:true -> damage-cap stats. 5 of them (Biological infection, Psyonics,
 // Psy-emissions, Radiation, Temperature) are capped at 0.49 net after backpack
 // protection; Frost is the exception, capped at 0.99 and ignoring protection.
-// percent:true    -> stat uses a % unit when displayed (rest are flat values)
-// group:1/2       -> Level/Quality scaling group (see isFormulaB below); stats with
-//                    no group always use Formula A (scales with level/quality)
 const STAT_META = {
-  "Bioinfection protection":    {good:true, percent:true},
-  "Biological infection":       {good:false, threshold:true, group:1},
+  "Bioinfection protection":    {good:true},
+  "Biological infection":       {good:false, threshold:true},
   "Bleeding":                   {good:false},
-  "Bleeding protection":        {good:true, percent:true},
-  "Bullet resistance":          {good:true, group:2},
-  "Burning":                    {good:false, percent:true},
+  "Bleeding protection":        {good:true},
+  "Bullet resistance":          {good:true},
+  "Burning":                    {good:false},
   "Carry weight":               {good:true},
   "Explosion protection":       {good:true},
-  "Frost":                      {good:false, threshold:true, group:1},
-  "Health regeneration":        {good:true, percent:true},
-  "Healing effectiveness":      {good:true, percent:true, group:2},
+  "Frost":                      {good:false, threshold:true},
+  "Health regeneration":        {good:true},
+  "Healing effectiveness":      {good:true},
   "Laceration protection":      {good:true},
-  "Movement speed":             {good:true, percent:true},
-  "Periodic healing":           {good:true, percent:true},
-  "Psyonics":                   {good:false, threshold:true, group:1},
+  "Movement speed":             {good:true},
+  "Periodic healing":           {good:true},
+  "Psyonics":                   {good:false, threshold:true},
   "Psy-emission protection":    {good:true},
-  "Psy-emissions":              {good:false, group:1},
-  "Radiation":                  {good:false, threshold:true, group:1},
+  "Psy-emissions":              {good:false, threshold:true},
+  "Radiation":                  {good:false, threshold:true},
   "Radiation protection":       {good:true},
-  "Reaction to burns":          {good:true, percent:true},
-  "Reaction to chemical burns": {good:true, percent:true},
-  "Reaction to electricity":    {good:true, percent:true},
-  "Reaction to laceration":     {good:true, percent:true},
-  "Recoil":                     {good:false, percent:true},
+  "Reaction to burns":          {good:true},
+  "Reaction to chemical burns": {good:true},
+  "Reaction to electricity":    {good:true},
+  "Reaction to laceration":     {good:true},
+  "Recoil":                     {good:false},
   "Resistance to chemicals":    {good:true},
-  "Resistance to electricity":  {good:true, percent:true},
+  "Resistance to electricity":  {good:true},
   "Resistance to fire":         {good:true},
-  "Running speed":              {good:true, percent:true},
-  "Stability":                  {good:true, percent:true},
-  "Stamina":                    {good:true, percent:true},
-  "Stamina regeneration":       {good:true, percent:true},
-  "Sway":                       {good:false, percent:true},
-  "Temperature":                {good:false, threshold:true, group:1},
+  "Running speed":              {good:true},
+  "Stability":                  {good:true},
+  "Stamina":                    {good:true},
+  "Stamina regeneration":       {good:true},
+  "Sway":                       {good:false},
+  "Temperature":                {good:false, threshold:true},
   "Thermal protection":         {good:true},
-  "Vitality":                   {good:true, percent:true, group:2}
+  "Vitality":                   {good:true}
 };
 
-// stats that use a % unit when displayed (rest are flat values) - derived from STAT_META
-const PERCENT_STATS = new Set(Object.keys(STAT_META).filter(s => STAT_META[s].percent));
+// stats that use a % unit when displayed (rest are flat values)
+const PERCENT_STATS = new Set([
+  "Bioinfection protection",
+  "Bleeding protection",
+  "Burning",
+  "Health regeneration",
+  "Healing effectiveness",
+  "Movement speed",
+  "Periodic healing",
+  "Reaction to burns",
+  "Reaction to chemical burns",
+  "Reaction to electricity",
+  "Reaction to laceration",
+  "Recoil",
+  "Resistance to electricity",
+  "Running speed",
+  "Stability",
+  "Stamina",
+  "Stamina regeneration",
+  "Sway",
+  "Vitality"
+]);
 
 const STAT_NAMES = Object.keys(STAT_META).sort();
 const STAT_IDX = {}; STAT_NAMES.forEach((s,i)=>STAT_IDX[s]=i);
@@ -570,15 +607,16 @@ const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-1
 
 // --- Level / Quality scaling (stalcraft-artifact-formula.md) ---
 // Group 1: positive value = DEBUFF (Formula B, no scaling); negative = BUFF (Formula A, scales).
-const GROUP1_DEBUFF = new Set(STAT_NAMES.filter(s => STAT_META[s].group === 1));
+const GROUP1_DEBUFF = new Set(["Temperature","Frost","Psy-emissions","Biological infection","Radiation","Psyonics"]);
 // Group 2: negative value = DEBUFF (Formula B, no scaling); positive = BUFF (Formula A, scales).
-const GROUP2_DEBUFF = new Set(STAT_NAMES.filter(s => STAT_META[s].group === 2));
+const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
 
 // Returns true if this (stat, value) pair uses Formula B (fixed debuff - no level/quality scale).
 function isFormulaB(statName, value) {
   if (value === 0) return false;
   if (GROUP1_DEBUFF.has(statName)) return value > 0; // positive = debuff
   if (GROUP2_DEBUFF.has(statName)) return value < 0; // negative = debuff
+  if (statName === "Bleeding protection") return value < 0; // negative = debuff (confirmed via Black Hole, fixed regardless of level/quality)
   return false; // all other stats always use Formula A
 }
 
@@ -623,7 +661,7 @@ const ARTIFACTS = [
  {name:"Cryogen", tooltip:{main:{"Carry weight":[7.06,8.3],"Stamina regeneration":[1.62,1.9],"Temperature":[-3.04,-2.58]}, add:{"Stamina regeneration":[0.765,0.9],"Bullet resistance":[4.59,5.4],"Carry weight":[1.2,2]}}},
  {name:"Cursed Rose", tooltip:{main:{"Bullet resistance":[9.86,11.6],"Explosion protection":[7.56,8.9],"Radiation":[1.06,1.25]}, add:{"Bullet resistance":[3.315,3.9],"Explosion protection":[2.55,3],"Stamina regeneration":[2.465,2.9]}}},
  {name:"Cycle", tooltip:{main:{"Stamina":[13.09,15.4],"Biological infection":[-4.08,-3.47],"Bleeding":[-0.7,-0.6]}, add:{"Stamina":[4.28,5.2],"Health regeneration":[0.99,1.2],"Bleeding":[-0.3,-0.25]}}},
- {name:"Dark Crystal", tooltip:{main:{"Vitality":[0.85,1],"Health regeneration":[1.36,1.6],"Stamina regeneration":[1.28,1.5],"Radiation":[-1.28,-1.09],"Psyonics":[0.53,0.62]}, add:{"Health regeneration":[0.68,0.8],"Vitality":[0.85,1],"Stamina regeneration":[0.68,0.8]}}},
+ {name:"Dark Crystal", tooltip:{main:{"Vitality":[0.85,1],"Health regeneration":[1.36,1.6],"Stamina regeneration":[1.28,1.5],"Radiation":[-1.28,-1.09],"Psyonics":[0.53,0.62]}, add:{"Health regeneration":[0.49,0.6],"Vitality":[0.33,0.4],"Stamina regeneration":[0.66,0.8]}}},
  {name:"Dark Viburnum", tooltip:{main:{"Running speed":[0.98,1.15],"Health regeneration":[2.8,3.3],"Stamina regeneration":[4.08,4.8],"Psyonics":[2.12,2.5],"Recoil":[6.46,7.6]}, add:{"Health regeneration":[0.91,1.1],"Movement speed":[0.95,1.15],"Stamina regeneration":[1.32,1.6]}}},
  {name:"Disintegrator", tooltip:{main:{"Stamina":[10.54,12.4],"Running speed":[0.38,0.45],"Stamina regeneration":[1.62,1.9],"Psyonics":[-3.04,-2.58],"Reaction to electricity":[0.85,1]}, add:{"Movement speed":[0.37,0.45],"Stamina":[3.57,4.2],"Stamina regeneration":[0.57,0.7]}}},
  {name:"Dumbbell", tooltip:{main:{"Vitality":[0.51,0.6],"Running speed":[0.64,0.75],"Carry weight":[8.33,9.8],"Healing effectiveness":[8.33,9.8],"Laceration protection":[11.64,13.7],"Radiation":[2.12,2.5]}, add:{"Healing effectiveness":[2.805,3.3],"Laceration protection":[3.79,4.6],"Movement speed":[0.62,0.75]}}},
@@ -696,18 +734,21 @@ const ARTIFACTS = [
  {name:"Tallow", tooltip:{main:{"Health regeneration":[1.19,1.4],"Healing effectiveness":[7.4,8.7],"Radiation":[1.06,1.25],"Temperature":[-1.28,-1.09]}, add:{"Health regeneration":[0.41,0.5],"Healing effectiveness":[2.465,2.9],"Explosion protection":[6.12,7.2]}}},
  {name:"Timber", tooltip:{main:{"Stamina regeneration":[3.49,4.1],"Bullet resistance":[6.89,8.1],"Radiation":[-1.28,-1.09],"Temperature":[0.53,0.62]}, add:{"Health regeneration":[1.15,1.4],"Stamina regeneration":[1.15,1.4],"Bullet resistance":[2.22,2.7]}}},
  {name:"Tiny Key", tooltip:{main:{"Radiation":[2.12,2.5],"Recoil":[-4.4,-3.74],"Sway":[-6.1,-5.18]}, add:{"Bullet resistance":[10.37,12.2],"Recoil":[-1.5,-1.275],"Sway":[-2.1,-1.785]}}},
- {name:"Transformer", tooltip:{main:{"Stamina":[11.82,13.9],"Carry weight":[5.52,6.5],"Biological infection":[-1.28,-1.09],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.94,1.1]}, add:{"Stamina":[3.995,4.7],"Carry weight":[1.87,2.2],"Psy-emissions":[-0.88,-0.748]}}},
+ {name:"Transformer", tooltip:{main:{"Stamina":[11.82,13.9],"Carry weight":[5.52,6.5],"Biological infection":[-1.28,-1.09],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.94,1.1]}, add:{"Stamina":[3.995,4.7],"Carry weight":[1.87,2.2],"Psyonics":[-0.88,-0.748]}}},
  {name:"Veiner", tooltip:{main:{"Carry weight":[7.4,8.7],"Bullet resistance":[4.84,5.7],"Radiation":[0.53,0.62],"Psyonics":[-1.28,-1.09]}, add:{"Bullet resistance":[1.615,1.9],"Stamina regeneration":[1.7,2],"Carry weight":[2.465,2.9]}}},
  {name:"Viburnum Branch", tooltip:{main:{"Vitality":[1.28,1.5],"Healing effectiveness":[9.26,10.9],"Radiation":[2.12,2.5],"Bleeding":[-0.4,-0.34]}, add:{"Stamina":[13.77,16.2],"Healing effectiveness":[3.05,3.7],"Vitality":[0.425,0.5]}}},
  {name:"Whirlwind", tooltip:{main:{"Movement speed":[0.94,1.1],"Running speed":[1.28,1.5],"Resistance to electricity":[11.64,13.7],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to burns":[0.94,1.1]}, add:{"Resistance to electricity":[3.78,4.6],"Burning":[-0.3,-0.24],"Movement speed":[0.32,0.4]}}},
- {name:"White Rose", tooltip:{main:{"Stamina":[6.46,7.6],"Carry weight":[6.21,7.3],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Psy-emissions":[-0.88,-0.748],"Stamina":[2.14,2.6],"Carry weight":[2.125,2.5]}}},
+ {name:"White Rose", tooltip:{main:{"Stamina":[6.46,7.6],"Carry weight":[6.21,7.3],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Psyonics":[-0.88,-0.748],"Stamina":[2.14,2.6],"Carry weight":[2.125,2.5]}}},
  {name:"Wicked Hedgehog", tooltip:{main:{"Stamina":[11.82,13.9],"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09],"Reaction to laceration":[0.76,0.9]}, add:{"Stamina":[3.87,4.7],"Movement speed":[0.17,0.2],"Psy-emissions":[-1.28,-1.06]}}},
  {name:"Wolf Tears", tooltip:{main:{"Stamina":[7.9,9.3],"Carry weight":[3.74,4.4],"Radiation":[0.42,0.5],"Temperature":[-2.16,-1.84],"Reaction to burns":[0.42,0.5]}, add:{"Bullet resistance":[3.485,4.1],"Stamina":[2.55,3.1],"Carry weight":[1.275,1.5]}}}
 ];
 
 // Derives the single value used in calculations from a [min,max] tooltip range:
 // the higher of the two bracketed numbers (see comment above ARTIFACTS).
-function deriveStatValue(range){ return range[0] > range[1] ? range[0] : range[1]; }
+function deriveStatValue(range){
+  if (range[0] < 0 && range[1] < 0) return Math.min(range[0], range[1]); // fully-negative range: game uses the more-negative bound
+  return range[0] > range[1] ? range[0] : range[1];
+}
 const MAIN_VECS = ARTIFACTS.map(a=>{
   const v = new Float64Array(NS);
   for (const k in a.tooltip.main) v[STAT_IDX[k]] = deriveStatValue(a.tooltip.main[k]);
@@ -722,6 +763,9 @@ const ADD_VECS = ARTIFACTS.map(a=>{
 // depending on whether Additional stat lines are included.
 // Effectiveness multiplies all stats EXCEPT the 5 infection/threshold stats.
 const THRESHOLD_IDX = new Set(THRESHOLD_STATS.map(s => STAT_IDX[s]));
+// Stats that bypass the container effectiveness multiplier entirely: the 6 threshold
+// stats, plus Bleeding (confirmed - see EFFMULT_EXEMPT_IDX usage below).
+const EFFMULT_EXEMPT_IDX = new Set([...THRESHOLD_IDX, STAT_IDX["Bleeding"]]);
 let VECS = MAIN_VECS;
 // Scales one artefact's Main(+Additional) stats to a given quality, independent of the
 // global Quality selector. Used by rebuildVecs (global quality) and by the My Loadout
@@ -735,7 +779,7 @@ function scaleArtifactVec(artifactIdx, quality, includeAdditional, effectiveness
     const scaledMain = scaleStat(v[k], statName, level, quality);
     const scaledAdd = includeAdditional ? scaleStat(ADD_VECS[artifactIdx][k], statName, level, quality) : 0;
     const base = scaledMain + scaledAdd;
-    c[k] = THRESHOLD_IDX.has(k) ? base : base * effMult;
+    c[k] = EFFMULT_EXEMPT_IDX.has(k) ? base : base * effMult;
   }
   return c;
 }
@@ -752,6 +796,8 @@ const STAT_CATEGORIES = [
   { label: 'Combat',  names: ["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"] },
   { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emissions","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
 ];
+const CATEGORIZED = new Set(STAT_CATEGORIES.flatMap(c => c.names));
+
 function addStatItem(name){
   const good = STAT_META[name].good;
   const id = 'stat_'+name.replace(/[^a-z0-9]/gi,'_');
@@ -763,6 +809,7 @@ function addStatItem(name){
       <span class="name">${name}</span>
     </label>
     <div class="stat-controls">
+      <input type="number" class="stat-min-input" placeholder="min" title="Guarantee at least this much benefit in ${name}">
       <div class="tier-group">
         <button type="button" class="tier-btn" data-tier="high">H</button>
         <button type="button" class="tier-btn active" data-tier="med">M</button>
@@ -1337,6 +1384,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   // Stats: uncheck all, reset tiers to M
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
+  statListEl.querySelectorAll('.stat-min-input').forEach(i=>i.value='');
   // Artifacts → restore DEFAULT_OFF state (and persist it, overwriting any saved customization)
   artifactListEl.querySelectorAll('input').forEach(c=>{
     c.checked = !DEFAULT_OFF.has(ARTIFACTS[parseInt(c.dataset.idx)].name);
@@ -1486,6 +1534,7 @@ self.onmessage = function(e){
   var REPORT_EVERY = 500000;
   var nextReport = REPORT_EVERY;
   var thresholds = d.thresholds;
+  var minStats = d.minStats || [];
   var targetStats = d.targetStats;
   var ns = d.ns;
   var protection = d.protection;
@@ -1497,6 +1546,13 @@ self.onmessage = function(e){
       var raw=sum[t.idx];
       var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
       if(eff>t.cap+1e-6) return false;
+    }
+    return true;
+  }
+  function passesMinStats(){
+    for(var i=0;i<minStats.length;i++){
+      var m=minStats[i];
+      if(sum[m.idx]*m.dir < m.min - 1e-6) return false;
     }
     return true;
   }
@@ -1539,10 +1595,33 @@ self.onmessage = function(e){
     if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
     return a.ts.l>b.ts.l;
   }
+  // For leaves that pass the damage threshold but miss one or more requested minimums:
+  // count how many are unmet, and sum the normalized (statMax-scaled, same scale as H/M/L)
+  // achieved value on just the unmet ones - used to rank "closest to the minimum" first.
+  function unmetMinInfo(){
+    var count=0, crit=0;
+    for(var i=0;i<minStats.length;i++){
+      var m=minStats[i];
+      var val=sum[m.idx]*m.dir;
+      if(val < m.min - 1e-6){
+        count++;
+        crit += m.statMax>1e-12 ? val/m.statMax : 0;
+      }
+    }
+    return {count:count, crit:crit};
+  }
+  // Ranks min-stat fallback candidates: fewest unmet minimums wins first, then closest
+  // (highest normalized value) on the unmet minimum(s), then the existing H/M/L comparator.
+  function beatsFallback(a,b){
+    if(a.unmetCount!==b.unmetCount) return a.unmetCount<b.unmetCount;
+    if(Math.abs(a.crit-b.crit)>1e-6) return a.crit>b.crit;
+    return beats(a,b);
+  }
   var TOP_MISS = 30;
   var top_miss = [];
   var TOP_EXT = 10;
   var top_ext = [];
+  var topMinFallback = [];
   function considerLeaf(){
     checked++;
     if(checked>=nextReport){
@@ -1552,15 +1631,29 @@ self.onmessage = function(e){
     var vitalityOk=!(d.noVitalityDebuff && sum[d.vitalityIdx] < -1e-6);
     if(!vitalityOk) return;
     var passes=passesThreshold();
+    var minsOk=passesMinStats();
+    // A leaf that fails both the damage threshold and a minimum is still fully discarded,
+    // same as before - the fallback pool only ever backfills from builds that are otherwise safe.
+    if(!minsOk && !passes) return;
     var sc=rawScore();
     if(passes){
       var ts=tierScores(),cv=coverage();
-      var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
-      if(top.length===TOP_N&&!beats(entry,top[top.length-1])) return;
-      var i=top.length;
-      top.push(entry);
-      while(i>0&&beats(entry,top[i-1])){top[i]=top[i-1];top[i-1]=entry;i--;}
-      if(top.length>TOP_N) top.length=TOP_N;
+      if(minsOk){
+        var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
+        if(top.length===TOP_N&&!beats(entry,top[top.length-1])) return;
+        var i=top.length;
+        top.push(entry);
+        while(i>0&&beats(entry,top[i-1])){top[i]=top[i-1];top[i-1]=entry;i--;}
+        if(top.length>TOP_N) top.length=TOP_N;
+      } else {
+        var mi=unmetMinInfo();
+        var entryF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum),unmetCount:mi.count,crit:mi.crit};
+        if(topMinFallback.length===TOP_N&&!beatsFallback(entryF,topMinFallback[topMinFallback.length-1])) return;
+        var fi=topMinFallback.length;
+        topMinFallback.push(entryF);
+        while(fi>0&&beatsFallback(entryF,topMinFallback[fi-1])){topMinFallback[fi]=topMinFallback[fi-1];topMinFallback[fi-1]=entryF;fi--;}
+        if(topMinFallback.length>TOP_N) topMinFallback.length=TOP_N;
+      }
     } else if(passesExtended()){
       // Extended zone: over hard cap but within consumable range
       var ts2=tierScores(),cv2=coverage();
@@ -1604,7 +1697,7 @@ self.onmessage = function(e){
     }
   }
   recurse(0,d.slots-(d.lockedSlots||0));
-  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext});
+  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback});
 };
 `;
 
@@ -1628,18 +1721,6 @@ function passesThreshold(sum, protection){
   return true;
 }
 
-// Client-side mirror of the worker's beats(a,b): coverage first, then normalized
-// H/M/L tier sums. This is the single ranking criterion the main Top-N list is
-// sorted by; reuse it anywhere a build needs to be compared against another
-// (consumable-zone "would be rank #X", upgrade-tip qualification bar) instead of
-// falling back to raw score, which can disagree with it.
-function resultBeats(a, b){
-  if (a.cov !== b.cov) return a.cov > b.cov;
-  if (Math.abs(a.ts.h - b.ts.h) > 1e-6) return a.ts.h > b.ts.h;
-  if (Math.abs(a.ts.m - b.ts.m) > 1e-6) return a.ts.m > b.ts.m;
-  return a.ts.l > b.ts.l;
-}
-
 
 /* ---------- Render results ---------- */
 // Returns true if OWNED contains at least one unit of this artefact at >= the given quality.
@@ -1656,6 +1737,16 @@ function fmt(name, val){
 }
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
+}
+// Builds a readable "Stat (min N)[, Stat2 (min N2)] and Stat3 (min N3)" label
+// from every targetStat that has a minimum set, used in the min-threshold banners.
+function minCriteriaLabel(targetStats){
+  const mins = targetStats
+    .filter(t => t.min !== null && t.min !== undefined)
+    .map(t => `${t.name} (min ${t.min}${PERCENT_STATS.has(t.name) ? '%' : ''})`);
+  if (mins.length === 0) return '';
+  if (mins.length === 1) return mins[0];
+  return mins.slice(0, -1).join(', ') + ' and ' + mins[mins.length - 1];
 }
 // For each target stat, finds which results are in the top 2 by that stat's
 // beneficial direction (so for "lower is better" stats, lowest/most negative
@@ -1677,7 +1768,7 @@ function computeTopStatSets(results, targetStats){
   return topSets;
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank){
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus){
   const {chosen, sum, score, ts} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
   let html = `<div class="result-card" style="${borderStyle}">`;
@@ -1706,7 +1797,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const copyBtn = (!isExtended && resultIndex >= 0)
     ? `<button type="button" class="copy-result-btn" data-result-idx="${resultIndex}" title="Copy to clipboard for Discord">📋 copy</button>`
     : '';
-  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span><span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}${copyBtn}</div>`;
+  const minStatusNote = minStatus === 'met'
+    ? '<span class="min-status-note met">(Meet thresholds)</span>'
+    : '';
+  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span>${minStatusNote}<span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}${copyBtn}</div>`;
 
   html += '<div class="loadout-list">';
   chosen.forEach(c=>{
@@ -1721,7 +1815,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const name = t.name;
     const valStr = fmt(name, sum[STAT_IDX[name]]);
     const isTopStat = topSets && topSets[name] && topSets[name].has(resultIndex);
-    html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${name}: ${valStr}</span>`;
+    const dir = STAT_META[name].good ? 1 : -1;
+    const meetsMin = (t.min !== null && t.min !== undefined) && (sum[STAT_IDX[name]] * dir >= t.min - 1e-6);
+    const star = meetsMin ? '<span class="min-star">★</span>' : '';
+    html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${star}${name}: ${valStr}</span>`;
   });
   html += '</div>';
 
@@ -1784,14 +1881,14 @@ function renderConsumableZone(results, extResults, targetStats, protection){
   // With no valid builds, show every collected extended-zone build (no top-3 filter).
   // With valid builds, only show ones that would rank in the top 3 if they were valid.
   const shown = hasValid
-    ? (extResults || []).filter(r => results.filter(v => resultBeats(v, r)).length + 1 <= 3)
+    ? (extResults || []).filter(r => results.filter(v => v.score > r.score + 1e-6).length + 1 <= 3)
     : (extResults || []);
   if (shown.length === 0){ el.innerHTML = ''; return; }
 
   let html = `<div class="section-title" style="margin-top:20px;">⚠ Consumable zone (0.49–0.54)</div>
   <div class="flag-note" style="margin-bottom:12px;">These builds exceed the 0.49 damage threshold but stay within 0.54${hasValid ? ', and would rank top 3 if valid' : ''}. A suitable consumable or drug can cover the gap - use at your own risk.</div>`;
   shown.forEach((r,i)=>{
-    const wouldBeRank = hasValid ? results.filter(v => resultBeats(v, r)).length + 1 : undefined;
+    const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-6).length + 1 : undefined;
     html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank);
   });
   el.innerHTML = html;
@@ -1821,18 +1918,36 @@ function equalizeGridCardChips(resultsEl){
   }
 }
 
-function renderResults(results, extResults, targetStats, protection){
-  lastRenderArgs = {results, extResults, targetStats, protection};
-  highlightUsedArtifacts(usedArtifactIndices(results));
+// Total cards shown in the main list - must match the worker's TOP_N.
+const RESULTS_DISPLAY_CAP = 10;
+
+function renderResults(results, extResults, targetStats, protection, minFallbackResults){
+  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults};
+  const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
+
+  // Backfill with min-stat fallback builds when fewer than RESULTS_DISPLAY_CAP results
+  // satisfy every requested minimum. metCount of those get a "meets thresholds" label,
+  // the backfilled ones get a "next best" label (or, if metCount is 0, a single banner).
+  let displayResults = results;
+  const metCount = results.length;
+  if (hasMin && metCount < RESULTS_DISPLAY_CAP && minFallbackResults && minFallbackResults.length){
+    displayResults = results.concat(minFallbackResults.slice(0, RESULTS_DISPLAY_CAP - metCount));
+  }
+  const minLabel = hasMin ? minCriteriaLabel(targetStats) : '';
+  const showPartialLabels = hasMin && metCount > 0 && metCount < RESULTS_DISPLAY_CAP && displayResults.length > metCount;
+  const showZeroBanner = hasMin && metCount === 0 && displayResults.length > 0;
+  lastRenderArgs.displayResults = displayResults;
+
+  highlightUsedArtifacts(usedArtifactIndices(displayResults));
   const el = document.getElementById('results');
-  if (!results || results.length === 0){
+  if (!displayResults || displayResults.length === 0){
     el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics / Psy-emissions). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
     renderConsumableZone(results, extResults, targetStats, protection);
     return;
   }
-  const topSets = topStatHighlightOn ? computeTopStatSets(results, targetStats) : null;
+  const topSets = topStatHighlightOn ? computeTopStatSets(displayResults, targetStats) : null;
 
-  const viewToggleHtml = results.length > 1
+  const viewToggleHtml = displayResults.length > 1
     ? `<div class="results-view-toggle">
         <button type="button" class="view-btn${!gridView ? ' active' : ''}" data-view="list">List</button>
         <button type="button" class="view-btn${gridView ? ' active' : ''}" data-view="grid">Grid</button>
@@ -1844,30 +1959,42 @@ function renderResults(results, extResults, targetStats, protection){
       </div>`;
   const toggleHtml = `<div class="results-toggles">${hlToggleHtml}${viewToggleHtml}</div>`;
 
-  let html = `<div class="results-header"><h2>Top ${results.length} combination${results.length>1?'s':''}</h2>${toggleHtml}</div>`;
+  let html = `<div class="results-header"><h2>Top ${displayResults.length} combination${displayResults.length>1?'s':''}</h2>${toggleHtml}</div>`;
 
-  if (gridView && results.length > 1) {
-    html += '<div class="results-grid-view">';
-    results.forEach((r,i)=>{ html += renderResultCard(r, targetStats, protection, i+1, false, topSets, i); });
-    html += '</div>';
+  const zeroBannerHtml = showZeroBanner
+    ? `<div class="min-warning-banner">There is no possible combination that meets ${minLabel}. Here's the best you can get with the stats and priority you selected:</div>`
+    : '';
+  const partialBannerHtml = showPartialLabels
+    ? `<div class="min-warning-banner">The next builds do not fill ${minLabel} but are the highest you can get with the stats and priority you selected:</div>`
+    : '';
+
+  let cardsHtml = zeroBannerHtml;
+  displayResults.forEach((r,i)=>{
+    if (showPartialLabels && i === metCount) cardsHtml += partialBannerHtml;
+    const minStatus = showPartialLabels && i < metCount ? 'met' : null;
+    cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus);
+  });
+
+  if (gridView && displayResults.length > 1) {
+    html += '<div class="results-grid-view">' + cardsHtml + '</div>';
   } else {
-    results.forEach((r,i)=>{ html += renderResultCard(r, targetStats, protection, i+1, false, topSets, i); });
+    html += cardsHtml;
   }
   el.innerHTML = html;
-  if (gridView && results.length > 1) equalizeGridCardChips(el);
+  if (gridView && displayResults.length > 1) equalizeGridCardChips(el);
 
   // Attach toggle handlers after innerHTML is set
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults);
     });
   });
   el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
       else topStatHighlightOn = !topStatHighlightOn;
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults);
     });
   });
 
@@ -1879,38 +2006,23 @@ function renderResults(results, extResults, targetStats, protection){
 // (levels 1–15) and find the minimum level that makes the build valid.
 // Returns tip objects only if the upgraded build would beat any of the top-3
 // valid results by score.
-function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults, statMaxMap){
+function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults){
   if (!misses || misses.length === 0) return [];
   const tips = [];
   const seen = new Set(); // deduplicate by (build-key, enabler-idx, min-level)
 
-  // Qualification bar: must beat the 3rd valid result under the same coverage/tier
-  // criterion the main list is ranked by (resultBeats), not raw score.
-  const qualifyBar = validResults.length > 0
-    ? validResults[Math.min(2, validResults.length - 1)]
-    : null;
+  // Score threshold: must be at least as good as the 3rd valid result
+  const minValidScore = validResults.length > 0
+    ? validResults[Math.min(2, validResults.length - 1)].score
+    : -Infinity;
 
-  // Pre-compute per-stat index+direction+tier/statMax for scoring and tiering
-  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight, tier: t.tier, statMax: statMaxMap[t.name] }));
+  // Pre-compute per-stat index+direction for scoring
+  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight }));
 
   function scoreSum(sumArr){
     let s = 0;
     for (const t of tsDirs) s += sumArr[t.idx] * t.dir * t.weight;
     return s;
-  }
-  // Mirrors the worker's tierScores()/coverage(), so upgrade tips are judged by the
-  // same beats()-style criterion as the main list ranking.
-  function tierScoresAndCoverage(sumArr){
-    let h=0,m=0,l=0,cov=0;
-    for (const t of tsDirs){
-      const val = sumArr[t.idx] * t.dir;
-      const normed = t.statMax > 1e-12 ? val / t.statMax : 0;
-      if (t.tier === 'high') h += normed;
-      else if (t.tier === 'low') l += normed;
-      else m += normed;
-      if (val > 1e-6) cov++;
-    }
-    return {ts:{h,m,l}, cov};
   }
 
   // Rebuild sum vector for a combination with one artifact upgraded to overrideLvl.
@@ -1935,7 +2047,7 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
           if (overrideLvl === 15){
             val += scaleStat(ADD_VECS[globalIdx][k], statName, overrideLvl, 100);
           }
-          s[k] += cnt * (THRESHOLD_IDX.has(k) ? val : val * effMult);
+          s[k] += cnt * (EFFMULT_EXEMPT_IDX.has(k) ? val : val * effMult);
         }
       }
     });
@@ -1970,11 +2082,9 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
       // Score this upgraded build
       const upgradedSum = buildSum(miss.counts, localIndices, enablerGlobalIdx, minLevel);
       const upgradedScore = scoreSum(upgradedSum);
-      const {ts: upgradedTs, cov: upgradedCov} = tierScoresAndCoverage(upgradedSum);
 
-      // Only surface if it beats the 3rd-best valid result under the same ranking
-      // criterion as the main list (coverage, then normalized H/M/L)
-      if (qualifyBar && !resultBeats({cov: upgradedCov, ts: upgradedTs}, qualifyBar)) return;
+      // Only surface if it beats the 3rd-best valid result
+      if (upgradedScore <= minValidScore + 1e-6) return;
 
       // Dedup key: sorted artifact indices + counts + enabler + level
       const buildKey = chosen.map(c=>`${c.idx}x${c.count}`).sort().join(',') + `|${enablerGlobalIdx}@${minLevel}`;
@@ -2110,7 +2220,7 @@ document.getElementById('results').addEventListener('click', e=>{
   const btn = e.target.closest('.copy-result-btn');
   if (!btn || !lastRenderArgs) return;
   const idx = parseInt(btn.dataset.resultIdx);
-  const result = lastRenderArgs.results[idx];
+  const result = lastRenderArgs.displayResults[idx];
   if (!result) return;
   const text = formatResultForDiscord(result, idx + 1, lastRenderArgs.targetStats);
   navigator.clipboard.writeText(text).then(()=>{
@@ -2141,7 +2251,9 @@ document.getElementById('calcBtn').onclick = ()=>{
     const activeBtn = item.querySelector('.tier-btn.active');
     const tier = activeBtn ? activeBtn.dataset.tier : 'med';
     const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
-    return {name: chk.dataset.stat, weight, tier};
+    const minInput = item.querySelector('.stat-min-input');
+    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value) : null;
+    return {name: chk.dataset.stat, weight, tier, min: (min !== null && !isNaN(min)) ? min : null};
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
   const includeAdditional = document.getElementById('includeAdditionalChk').checked;
@@ -2274,6 +2386,11 @@ document.getElementById('calcBtn').onclick = ()=>{
     tier: t.tier,
     statMax: statMaxMap[t.name]
   }));
+  // Direction-aware: dir already flips bad-stats so "min" always means "at least this
+  // much benefit", e.g. min 5 on Recoil requires Recoil <= -5.
+  const workerMinStats = targetStats
+    .filter(t=>t.min !== null)
+    .map(t=>({idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, min: t.min, statMax: statMaxMap[t.name]}));
   const workerThresholds = THRESHOLD_STATS.map(s=>({
     idx: STAT_IDX[s],
     isFrost: s === 'Frost',
@@ -2329,9 +2446,10 @@ document.getElementById('calcBtn').onclick = ()=>{
         });
         return chosen;
       }
-      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
-      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
-      renderResults(results, extResults, targetStats, protection);
+      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const minFallbackResults = (e.data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      renderResults(results, extResults, targetStats, protection, minFallbackResults);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
       // build while sweeping one enabler's level -- that doesn't hold for a bounded,
@@ -2342,7 +2460,7 @@ document.getElementById('calcBtn').onclick = ()=>{
         if (misses.length > 0 && results.length > 0){
           const tips = analyzeUpgrades(
             misses, includedIdx, targetStats, protection,
-            includeAdditional, effectiveness, results, statMaxMap
+            includeAdditional, effectiveness, results
           );
           renderUpgradeTips(tips, targetStats, protection, results);
         }
@@ -2367,6 +2485,7 @@ document.getElementById('calcBtn').onclick = ()=>{
     protection,
     targetStats: workerTargetStats,
     thresholds: workerThresholds,
+    minStats: workerMinStats,
     ns: NS,
     total,
     noVitalityDebuff,
