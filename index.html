@@ -532,8 +532,16 @@
 // good:true  -> positive value is beneficial (display green when >=0)
 // good:false -> negative value is beneficial (display green when <=0)
 // threshold:true -> damage-cap stats. 5 of them (Biological infection, Psyonics,
-// Psy-emissions, Radiation, Temperature) are capped at 0.49 net after backpack
-// protection; Frost is the exception, capped at 0.99 and ignoring protection.
+// Radiation, Temperature, and whatever combination of Psyonics-labeled artefact
+// rolls apply) are capped at 0.49 net after backpack protection; Frost is the
+// exception, capped at 0.99 and ignoring protection.
+// NOTE: "Psy-emissions" is not a separate stat - some artefact tooltips label
+// their Psyonics roll "Psy-emissions" instead, but it's the same underlying
+// game value and shares the same pool/cap as Psyonics (confirmed: two
+// independent builds pairing a Psy-emissions-labeled artefact with a
+// Psyonics-labeled artefact both produced a single net Psyonics value equal
+// to the straight sum of both contributions, not two separate values).
+// All artefact data below stores every such roll under "Psyonics".
 const STAT_META = {
   "Bioinfection protection":    {good:true},
   "Biological infection":       {good:false, threshold:true},
@@ -551,7 +559,6 @@ const STAT_META = {
   "Periodic healing":           {good:true},
   "Psyonics":                   {good:false, threshold:true},
   "Psy-emission protection":    {good:true},
-  "Psy-emissions":              {good:false, threshold:true},
   "Radiation":                  {good:false, threshold:true},
   "Radiation protection":       {good:true},
   "Reaction to burns":          {good:true},
@@ -607,7 +614,7 @@ const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-1
 
 // --- Level / Quality scaling (stalcraft-artifact-formula.md) ---
 // Group 1: positive value = DEBUFF (Formula B, no scaling); negative = BUFF (Formula A, scales).
-const GROUP1_DEBUFF = new Set(["Temperature","Frost","Psy-emissions","Biological infection","Radiation","Psyonics"]);
+const GROUP1_DEBUFF = new Set(["Temperature","Frost","Biological infection","Radiation","Psyonics"]);
 // Group 2: negative value = DEBUFF (Formula B, no scaling); positive = BUFF (Formula A, scales).
 const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
 
@@ -672,7 +679,7 @@ const ARTIFACTS = [
  {name:"Firebird", tooltip:{main:{"Health regeneration":[1.19,1.4],"Healing effectiveness":[7.4,8.7],"Bleeding protection":[1.28,1.5],"Temperature":[1.06,1.25]}, add:{"Bleeding":[-1,-0.85],"Health regeneration":[0.425,0.5],"Healing effectiveness":[2.465,2.9]}}},
  {name:"Flicker", tooltip:{main:{"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Health regeneration":[1.19,1.4],"Psyonics":[1.06,1.25],"Reaction to electricity":[1.19,1.4]}, add:{}}},
  {name:"Fossil", tooltip:{main:{"Vitality":[1.78,2.1],"Periodic healing":[0.34,0.4],"Biological infection":[2.12,2.5]}, add:{"Stamina regeneration":[2.96,3.6],"Periodic healing":[0.165,0.2],"Vitality":[0.595,0.7]}}},
- {name:"Frame", tooltip:{main:{"Carry weight":[7.9,9.3],"Stamina regeneration":[1.87,2.2],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09]}, add:{"Psy-emissions":[-1.28,-1.088],"Carry weight":[2.635,3.1],"Stamina regeneration":[0.68,0.8]}}},
+ {name:"Frame", tooltip:{main:{"Carry weight":[7.9,9.3],"Stamina regeneration":[1.87,2.2],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09]}, add:{"Psyonics":[-1.28,-1.088],"Carry weight":[2.635,3.1],"Stamina regeneration":[0.68,0.8]}}},
  {name:"Frost", tooltip:{main:{"Healing effectiveness":[3.91,4.6],"Bullet resistance":[2.21,2.6],"Laceration protection":[11.05,13],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to laceration":[0.76,0.9]}, add:{"Laceration protection":[3.74,4.4],"Stamina":[7.98,9.7],"Healing effectiveness":[1.36,1.6]}}},
  {name:"Gills", tooltip:{main:{"Vitality":[1.1,1.3],"Health regeneration":[1.96,2.3],"Bleeding protection":[3.15,3.7],"Radiation":[2.12,2.5]}, add:{"Stamina regeneration":[2.72,3.2],"Health regeneration":[0.68,0.8],"Vitality":[0.425,0.5]}}},
  {name:"Golden Prima", tooltip:{main:{"Movement speed":[0.6,0.7],"Running speed":[0.81,0.95],"Carry weight":[10.54,12.4],"Radiation":[1.06,1.25]}, add:{"Movement speed":[0.2,0.25],"Carry weight":[3.57,4.2],"Stamina":[11.05,13]}}},
@@ -739,7 +746,7 @@ const ARTIFACTS = [
  {name:"Viburnum Branch", tooltip:{main:{"Vitality":[1.28,1.5],"Healing effectiveness":[9.26,10.9],"Radiation":[2.12,2.5],"Bleeding":[-0.4,-0.34]}, add:{"Stamina":[13.77,16.2],"Healing effectiveness":[3.05,3.7],"Vitality":[0.425,0.5]}}},
  {name:"Whirlwind", tooltip:{main:{"Movement speed":[0.94,1.1],"Running speed":[1.28,1.5],"Resistance to electricity":[11.64,13.7],"Temperature":[-0.19,-0.16],"Frost":[0.42,0.5],"Reaction to burns":[0.94,1.1]}, add:{"Resistance to electricity":[3.78,4.6],"Burning":[-0.3,-0.24],"Movement speed":[0.32,0.4]}}},
  {name:"White Rose", tooltip:{main:{"Stamina":[6.46,7.6],"Carry weight":[6.21,7.3],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Psyonics":[-0.88,-0.748],"Stamina":[2.14,2.6],"Carry weight":[2.125,2.5]}}},
- {name:"Wicked Hedgehog", tooltip:{main:{"Stamina":[11.82,13.9],"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09],"Reaction to laceration":[0.76,0.9]}, add:{"Stamina":[3.87,4.7],"Movement speed":[0.17,0.2],"Psy-emissions":[-1.28,-1.06]}}},
+ {name:"Wicked Hedgehog", tooltip:{main:{"Stamina":[11.82,13.9],"Movement speed":[0.42,0.5],"Running speed":[0.6,0.7],"Radiation":[-1.28,-1.09],"Temperature":[-1.28,-1.09],"Biological infection":[-1.28,-1.09],"Reaction to laceration":[0.76,0.9]}, add:{"Stamina":[3.87,4.7],"Movement speed":[0.17,0.2],"Psyonics":[-1.28,-1.06]}}},
  {name:"Wolf Tears", tooltip:{main:{"Stamina":[7.9,9.3],"Carry weight":[3.74,4.4],"Radiation":[0.42,0.5],"Temperature":[-2.16,-1.84],"Reaction to burns":[0.42,0.5]}, add:{"Bullet resistance":[3.485,4.1],"Stamina":[2.55,3.1],"Carry weight":[1.275,1.5]}}}
 ];
 
@@ -794,7 +801,7 @@ const statListEl = document.getElementById('statList');
 const STAT_CATEGORIES = [
   { label: 'Utility', names: ["Carry weight","Movement speed","Running speed","Stamina","Stamina regeneration"] },
   { label: 'Combat',  names: ["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"] },
-  { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emissions","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
+  { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
 ];
 const CATEGORIZED = new Set(STAT_CATEGORIES.flatMap(c => c.names));
 
@@ -1941,7 +1948,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   highlightUsedArtifacts(usedArtifactIndices(displayResults));
   const el = document.getElementById('results');
   if (!displayResults || displayResults.length === 0){
-    el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics / Psy-emissions). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
     renderConsumableZone(results, extResults, targetStats, protection);
     return;
   }
