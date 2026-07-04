@@ -95,6 +95,11 @@
 
   .row-inline{display:flex;gap:10px;}
   .row-inline label.field{flex:1;}
+  /* The backpack row now has 4 fields of uneven label length (Slots / Protection % /
+     Effectiveness % / Carry weight) - reserve a consistent 2-line label height so a
+     longer label wrapping in its narrower column can't push just that one input down
+     out of line with the other three. */
+  #bpFieldsRow .lbl{min-height:2.6em;line-height:1.3;}
 
   .check-list{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px;background:var(--panel-2);}
   #artifactList{max-height:600px;}
@@ -350,6 +355,35 @@
     padding:3px 8px;border-radius:3px;font-family:var(--mono);letter-spacing:0.05em;
   }
   .loadout-action-btn:hover{filter:brightness(1.35);}
+  /* statClearBtn sits inside .toggle-row (like artAllBtn/artNoneBtn/artUnpinBtn), so it
+     needs ID-level specificity to beat that container's plain-text-link button style.
+     Declarations mirror .loadout-action-btn (My Loadout's export/import/clear all) so
+     the two panels' action buttons look consistent. */
+  #statClearBtn{
+    background:none;border:1px solid currentColor;color:var(--accent);
+    font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;text-decoration:none;
+  }
+  #statClearBtn:hover{filter:brightness(1.35);}
+
+  /* "Avoid builds with these debuffs" toggle row (Valuable Stats > Extra Options).
+     Off-state mirrors .loadout-action-btn (My Loadout's export/import/clear all) exactly;
+     on-state fills solid, same amber-fill/dark-text pairing as button.primary, so an
+     engaged filter reads as clearly "on" at a glance. */
+  .debuff-toggle-label{font-size:11.5px;color:var(--muted);margin:2px 0 6px;line-height:1.4;}
+  .debuff-toggle-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;}
+  .debuff-toggle-btn{
+    background:none;border:1px solid currentColor;color:var(--accent);
+    font-size:10px;cursor:pointer;padding:7px 10px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;width:100%;
+  }
+  .debuff-toggle-btn.full-width{grid-column:1 / -1;}
+  .debuff-toggle-btn:hover{filter:brightness(1.35);}
+  .debuff-toggle-btn.active{
+    background:var(--accent);color:#1a1306;filter:none;
+  }
+  .debuff-toggle-btn.active:hover{background:#dd9849;}
+
   .copy-result-btn{
     background:none;border:1px solid var(--border);color:var(--muted);
     font-size:10px;cursor:pointer;padding:2px 7px;border-radius:3px;
@@ -405,10 +439,10 @@
 
       <div class="panel">
         <h2>Backpack</h2>
-        <div class="row-inline">
+        <div class="row-inline" id="bpFieldsRow">
           <label class="field">
             <span class="lbl">Slots</span>
-            <input type="number" id="slotsInput" min="1" max="6" value="4">
+            <input type="number" id="slotsInput" min="1" max="7" value="4">
           </label>
           <label class="field">
             <span class="lbl">Protection %</span>
@@ -418,8 +452,16 @@
             <span class="lbl">Effectiveness %</span>
             <input type="number" id="effInput" min="-100" max="200" value="83.5">
           </label>
+          <label class="field">
+            <span class="lbl">Carry weight</span>
+            <input type="number" id="bonusCarryInput" value="48">
+          </label>
         </div>
-        <div id="backpackPresets" style="display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 14px;"></div>
+        <label class="field" style="margin-bottom:6px;">
+          <span class="lbl">Backpack / Container</span>
+          <select id="backpackSelect"><option value="custom" selected style="color:var(--text);">Custom (manual entry)</option></select>
+        </label>
+        <div class="note" id="backpackBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
         <div class="row-inline">
           <!-- GRANULAR LEVEL INPUT: hidden - set label display:block and remove lvl-toggle div below to revert -->
           <label class="field" style="display:none;">
@@ -462,11 +504,14 @@
           <input type="checkbox" id="includeAdditionalChk">
           <span class="name">Include additional stats</span>
         </label>
-        <label class="check-item">
-          <input type="checkbox" id="noVitalityDebuffChk" checked>
-          <span class="name">No Vitality debuff</span>
+        <label class="check-item" style="margin-bottom:4px;">
+          <input type="checkbox" id="includeContainerBuffsChk">
+          <span class="name">Add containers bonus stats in results</span>
         </label>
+        <div class="debuff-toggle-label">Avoid builds with these debuffs:</div>
+        <div class="debuff-toggle-row" id="debuffToggleRow"></div>
       </div>
+
 
       <div class="panel">
         <h2>My Loadout</h2>
@@ -617,6 +662,25 @@ const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-1
 const GROUP1_DEBUFF = new Set(["Temperature","Frost","Biological infection","Radiation","Psyonics"]);
 // Group 2: negative value = DEBUFF (Formula B, no scaling); positive = BUFF (Formula A, scales).
 const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
+
+// "Avoid builds with these debuffs" toggle buttons (Extra Options, Valuable Stats panel).
+// Each pairs a button id + display label with a stat whose net post-effMult sum must stay
+// >= 0 for a build to be considered at all (checked at the search leaf, same idea as the
+// original Vitality-only filter). All five stats here are "higher is better"
+// (STAT_META[...].good === true), so a negative sum is unambiguously a debuff - no
+// dir-flipping needed. defaultOn controls both the button's initial toggled state and what
+// Reset restores it to. The row is rendered from this array (see renderDebuffToggles below).
+// Layout is a fixed 2-column grid: Vitality/Movespeed share the top row, and the 3 longer
+// labels are each pinned fullWidth (spans both columns) so their box always matches the
+// combined width of the row above - explicit placement instead of relying on flex-wrap,
+// which would wrap at different points depending on which monospace font the browser has.
+const NO_DEBUFF_FILTERS = [
+  {btn:'noVitalityDebuffBtn',             stat:'Vitality',              label:'Vitality',              defaultOn:true},
+  {btn:'noMovementSpeedDebuffBtn',        stat:'Movement speed',        label:'Movespeed',             defaultOn:true},
+  {btn:'noBleedingProtectionDebuffBtn',   stat:'Bleeding protection',   label:'Bleeding Protection',   defaultOn:false, fullWidth:true},
+  {btn:'noHealingEffectivenessDebuffBtn', stat:'Healing effectiveness', label:'Healing Effectiveness', defaultOn:false, fullWidth:true},
+  {btn:'noBulletResistanceDebuffBtn',     stat:'Bullet resistance',     label:'Bullet Resistance',     defaultOn:false, fullWidth:true},
+];
 
 // Returns true if this (stat, value) pair uses Formula B (fixed debuff - no level/quality scale).
 function isFormulaB(statName, value) {
@@ -848,6 +912,36 @@ statListEl.addEventListener('click', e=>{
   const group = btn.closest('.tier-group');
   group.querySelectorAll('.tier-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+});
+
+// "Avoid builds with these debuffs" toggle row - built from NO_DEBUFF_FILTERS so the
+// label text lives in exactly one place. Clicking a button just flips its own .active
+// class; current on/off state is read directly off the DOM at search time.
+function renderDebuffToggles(){
+  const row = document.getElementById('debuffToggleRow');
+  NO_DEBUFF_FILTERS.forEach(f=>{
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = f.btn;
+    btn.className = 'debuff-toggle-btn' + (f.defaultOn ? ' active' : '') + (f.fullWidth ? ' full-width' : '');
+    btn.textContent = f.label;
+    btn.addEventListener('click', ()=>btn.classList.toggle('active'));
+    row.appendChild(btn);
+  });
+}
+renderDebuffToggles();
+
+// "Add containers bonus stats in results" - purely a display concern (see
+// includeContainerBuffs above), so toggling it just re-renders whatever's already cached
+// instead of re-running the search.
+document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
+  includeContainerBuffs = e.target.checked;
+  if (lastRenderArgs){
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
+  }
+  if (lastTipsArgs){
+    renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
+  }
 });
 
 // Artefacts excluded from the "Available artefacts" list by default
@@ -1376,18 +1470,23 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   document.getElementById('slotsInput').value = 4;
   document.getElementById('protInput').value = 60;
   document.getElementById('effInput').value = 83.5;
+  document.getElementById('bonusCarryInput').value = 48;
   clearBackpackSelection();
   document.getElementById('levelInput').value = 0;
   document.getElementById('qualityInput').value = 100;
   // Include additional stats → default off (driven by level toggle)
   document.getElementById('includeAdditionalChk').checked = false;
+  // Add containers bonus stats in results → default off
+  document.getElementById('includeContainerBuffsChk').checked = false;
+  includeContainerBuffs = false;
   // Level toggle → reset to LVL 0
   document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.lvl==='0'));
   const lvlNote = document.getElementById('lvlNote');
   lvlNote.textContent = 'Additional stats excluded';
   lvlNote.className = 'lvl-note';
-  // No Vitality debuff → default on
-  document.getElementById('noVitalityDebuffChk').checked = true;
+  // No-debuff filters (Vitality, Movespeed, Bleeding Protection, Healing
+  // Effectiveness, Bullet Resistance) → each restored to its own default
+  NO_DEBUFF_FILTERS.forEach(f=>{ document.getElementById(f.btn).classList.toggle('active', f.defaultOn); });
   // Stats: uncheck all, reset tiers to M
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
@@ -1416,6 +1515,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit \u201cFind best combination\u201d.</div>';
   document.getElementById('consumableZone').innerHTML = '';
   document.getElementById('upgradeTips').innerHTML = '';
+  lastTipsArgs = null;
 };
 
 
@@ -1438,34 +1538,123 @@ document.querySelectorAll('.lvl-btn').forEach(btn=>{
   });
 });
 
-/* ---------- Backpack presets: click a pill to autofill slots/protection/effectiveness ---------- */
-const BACKPACK_PRESETS = [
-  { name: "MBSS Backpack",              qClass: "q-130", slots: 4, protection: 60,   effectiveness: 83.5 },
-  { name: "Tri-Zip Assault Backpack",   qClass: "q-130", slots: 5, protection: 60,   effectiveness: 78.5 },
-  { name: "Soviet Travel Backpack",     qClass: "q-145", slots: 5, protection: 60,   effectiveness: 90 },
-  { name: "Berloga-6 Container",        qClass: "q-160", slots: 6, protection: 78.5, effectiveness: 100 },
-  { name: "Hive Container",             qClass: "q-160", slots: 5, protection: 89.5, effectiveness: 105 },
+/* ---------- Backpacks / Containers: dropdown autofills slots/protection/effectiveness
+   AND bakes the container's own flat bonus stats into every searched build (as an
+   unscaled, fixed addition - no Level/Quality/Effectiveness formulas applied to it,
+   exactly like the game's own tooltip number). See activeContainerBonus below. ---------- */
+const CONTAINER_TIER_META = {
+  exclusive: { label: "Exclusive", qClass: "q-160", color: "var(--q-exclusive)" },
+  rare:      { label: "Rare",      qClass: "q-145", color: "var(--q-rare)" },
+  special:   { label: "Special",   qClass: "q-130", color: "var(--q-special)" },
+  uncommon:  { label: "Uncommon",  qClass: "q-115", color: "var(--q-uncommon)" },
+};
+const CONTAINERS = [
+  // Red - Exclusive
+  { name:"Freezer Container",           tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Temperature":-2.5, "Biological infection":0.5} },
+  { name:"ZIVCAS ArcticSafe-6",         tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Psyonics":0.5, "Frost":-2.5} },
+  { name:"Sheaf Container",             tier:"exclusive", slots:7, protection:60,   effectiveness:97,   bonus:{"Frost":1} },
+  { name:"CRAW-6 Container",            tier:"exclusive", slots:6, protection:60,   effectiveness:97,   bonus:{"Bullet resistance":23, "Laceration protection":46} },
+  { name:"Berloga-6 Container",         tier:"exclusive", slots:6, protection:78.5, effectiveness:100,  bonus:{} },
+  { name:"Overton Container",           tier:"exclusive", slots:6, protection:60,   effectiveness:100,  bonus:{"Healing effectiveness":28.3} },
+  { name:"Hive Container",              tier:"exclusive", slots:5, protection:89.5, effectiveness:105,  bonus:{} },
+  { name:"Utility Vest ADR-WRBT",       tier:"exclusive", slots:4, protection:89.5, effectiveness:105,  bonus:{"Movement speed":6.2, "Carry weight":40} },
+  // Purple - Rare
+  { name:"Marathon Bag",                tier:"rare", slots:3, protection:78.5, effectiveness:113,   bonus:{"Movement speed":5.7, "Carry weight":37, "Biological infection":-1.62} },
+  { name:"Utility Vest Black Eagle Y-73", tier:"rare", slots:3, protection:89.5, effectiveness:110, bonus:{"Movement speed":5.7, "Carry weight":37} },
+  { name:"Forager Container",           tier:"rare", slots:4, protection:78.5, effectiveness:113,   bonus:{"Radiation":-1.62} },
+  { name:"Fridge Container",            tier:"rare", slots:4, protection:78.5, effectiveness:113,   bonus:{"Temperature":-1.62} },
+  { name:"Shiver Container",            tier:"rare", slots:5, protection:75,   effectiveness:102.5, bonus:{"Temperature":-1.88, "Biological infection":0.5} },
+  { name:"Saddlebag",                   tier:"rare", slots:3, protection:78.5, effectiveness:113,   bonus:{"Movement speed":5.7, "Carry weight":37, "Biological infection":-1.62} },
+  { name:"Soviet Travel Backpack",      tier:"rare", slots:5, protection:60,   effectiveness:90,    bonus:{"Carry weight":73} },
+  // Blue - Special
+  { name:"MBSS Backpack",               tier:"special", slots:4, protection:60,   effectiveness:83.5, bonus:{"Carry weight":48} },
+  { name:"Pouch Black Eagle B-33",      tier:"special", slots:3, protection:89.5, effectiveness:95,   bonus:{"Movement speed":4.3, "Carry weight":28} },
+  { name:"PROTECT 3B Waist Bag",        tier:"special", slots:2, protection:89.5, effectiveness:110,  bonus:{"Movement speed":3.7, "Carry weight":24} },
+  { name:"Cool Container",              tier:"special", slots:5, protection:75,   effectiveness:92.5, bonus:{"Temperature":-1.88, "Biological infection":0.5} },
+  { name:"Tri-Zip Assault Backpack",    tier:"special", slots:5, protection:60,   effectiveness:78.5, bonus:{"Carry weight":56} },
+  // Green - Uncommon
+  { name:"Sports Bag",                  tier:"uncommon", slots:2, protection:89.5, effectiveness:100, bonus:{"Movement speed":2.7, "Carry weight":18} },
 ];
-const backpackPresetsEl = document.getElementById('backpackPresets');
-BACKPACK_PRESETS.forEach((p, i)=>{
-  backpackPresetsEl.insertAdjacentHTML('beforeend',
-    `<button type="button" class="quality-pill ${p.qClass}" data-i="${i}">${p.name}</button>`);
+
+const backpackSelectEl = document.getElementById('backpackSelect');
+['exclusive','rare','special','uncommon'].forEach(tier=>{
+  const meta = CONTAINER_TIER_META[tier];
+  const group = document.createElement('optgroup');
+  group.label = meta.label;
+  group.style.color = meta.color;
+  CONTAINERS.forEach((c,i)=>{
+    if (c.tier !== tier) return;
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = c.name;
+    opt.style.color = meta.color;
+    group.appendChild(opt);
+  });
+  backpackSelectEl.appendChild(group);
 });
-backpackPresetsEl.addEventListener('click', e=>{
-  const btn = e.target.closest('button[data-i]');
-  if (!btn) return;
-  const p = BACKPACK_PRESETS[parseInt(btn.dataset.i)];
-  document.getElementById('slotsInput').value = p.slots;
-  document.getElementById('protInput').value = p.protection;
-  document.getElementById('effInput').value = p.effectiveness;
-  backpackPresetsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('active', b===btn));
-});
-// Manually editing a field after picking a preset means the values no longer
-// necessarily match that container, so drop the highlight.
-function clearBackpackSelection(){
-  backpackPresetsEl.querySelectorAll('button.active').forEach(b=>b.classList.remove('active'));
+
+// The currently selected container's own EXTRA flat bonus stats - i.e. everything other
+// than Carry weight, which has its own always-editable "Bonus Carry weight" field since
+// every plain, non-special backpack in the game only varies on that one stat. Empty when
+// on "Custom" (aside from whatever's in the Bonus Carry weight field).
+let activeContainerBonus = {};
+
+// Merges the selected container's extra bonus stats with the Bonus Carry weight field
+// into one stat-name -> value map. Single source of truth for both the note display and
+// the calculation baseline, so they can never drift apart.
+function getEffectiveContainerBonus(){
+  const carry = parseFloat(document.getElementById('bonusCarryInput').value) || 0;
+  const merged = {...activeContainerBonus};
+  if (carry) merged['Carry weight'] = carry;
+  return merged;
 }
-['slotsInput','protInput','effInput'].forEach(id=>{
+
+function formatBonusStat(name, val){
+  const sign = val > 0 ? '+' : ''; // negative values already carry their own minus sign
+  const suffix = PERCENT_STATS.has(name) ? '%' : '';
+  const color = isGoodValue(name, val) ? 'var(--good)' : 'var(--bad)';
+  return `${name} <span style="color:${color};">${sign}${val}${suffix}</span>`;
+}
+function updateBackpackBonusNote(){
+  const note = document.getElementById('backpackBonusNote');
+  const entries = Object.entries(getEffectiveContainerBonus());
+  if (entries.length === 0){
+    note.style.display = 'none';
+    note.innerHTML = '';
+    return;
+  }
+  note.style.display = 'block';
+  note.innerHTML = entries.map(([n,v])=>formatBonusStat(n,v)).join(', ');
+}
+
+backpackSelectEl.addEventListener('change', ()=>{
+  if (backpackSelectEl.value === 'custom'){
+    activeContainerBonus = {};
+    backpackSelectEl.style.color = '';
+    updateBackpackBonusNote();
+    return;
+  }
+  const c = CONTAINERS[parseInt(backpackSelectEl.value)];
+  document.getElementById('slotsInput').value = c.slots;
+  document.getElementById('protInput').value = c.protection;
+  document.getElementById('effInput').value = c.effectiveness;
+  document.getElementById('bonusCarryInput').value = c.bonus['Carry weight'] || 0;
+  const { ['Carry weight']: _carryOut, ...rest } = c.bonus;
+  activeContainerBonus = rest;
+  backpackSelectEl.style.color = CONTAINER_TIER_META[c.tier].color;
+  updateBackpackBonusNote();
+});
+// Manually editing a field after picking a container means the values/bonus stats no
+// longer necessarily match that container, so fall back to Custom (no bonus baked in),
+// except Bonus Carry weight itself, which stays exactly as typed - see
+// getEffectiveContainerBonus above.
+function clearBackpackSelection(){
+  backpackSelectEl.value = 'custom';
+  backpackSelectEl.style.color = '';
+  activeContainerBonus = {};
+  updateBackpackBonusNote();
+}
+['slotsInput','protInput','effInput','bonusCarryInput'].forEach(id=>{
   document.getElementById(id).addEventListener('input', clearBackpackSelection);
 });
 
@@ -1635,8 +1824,10 @@ self.onmessage = function(e){
       self.postMessage({type:'progress',done:checked,total:total});
       nextReport+=REPORT_EVERY;
     }
-    var vitalityOk=!(d.noVitalityDebuff && sum[d.vitalityIdx] < -1e-6);
-    if(!vitalityOk) return;
+    var noDebuffIdx=d.noDebuffIdx||[];
+    for(var ndi=0;ndi<noDebuffIdx.length;ndi++){
+      if(sum[noDebuffIdx[ndi]] < -1e-6) return;
+    }
     var passes=passesThreshold();
     var minsOk=passesMinStats();
     // A leaf that fails both the damage threshold and a minimum is still fully discarded,
@@ -1742,6 +1933,23 @@ function fmt(name, val){
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}${pct}`;
 }
+// When a container contributes a flat bonus to this stat, show it depending on the stat kind:
+// threshold stats (Radiation/Temperature/Frost/Biological infection/Psyonics) have their bonus
+// baked into totalVal already (part of the calculation baseline - see containerBaseVec), so it's
+// always split out as "artefact-only (+bonus)" - these are enabling stats, not simple flat buffs.
+// Non-threshold bonus stats (Carry weight, Bullet resistance, etc.) never had their bonus added
+// to totalVal (display-only) - the "Add containers bonus stats" toggle controls
+// whether that bonus is merged into the shown total or left out entirely.
+function fmtWithBonus(name, totalVal, containerBonus){
+  const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
+  if (!bonus) return fmt(name, totalVal);
+  if (STAT_META[name].threshold){
+    const artefactVal = totalVal - bonus;
+    const bonusColor = isGoodValue(name, bonus) ? 'var(--good)' : 'var(--bad)';
+    return `${fmt(name, artefactVal)} <span style="color:${bonusColor};">(${fmt(name, bonus)})</span>`;
+  }
+  return fmt(name, includeContainerBuffs ? totalVal + bonus : totalVal);
+}
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
 }
@@ -1775,7 +1983,7 @@ function computeTopStatSets(results, targetStats){
   return topSets;
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus){
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus){
   const {chosen, sum, score, ts} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
   let html = `<div class="result-card" style="${borderStyle}">`;
@@ -1820,11 +2028,11 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   html += '<div class="target-line">';
   targetStats.forEach(t=>{
     const name = t.name;
-    const valStr = fmt(name, sum[STAT_IDX[name]]);
-    const isTopStat = topSets && topSets[name] && topSets[name].has(resultIndex);
+    const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus);
     const dir = STAT_META[name].good ? 1 : -1;
     const meetsMin = (t.min !== null && t.min !== undefined) && (sum[STAT_IDX[name]] * dir >= t.min - 1e-6);
     const star = meetsMin ? '<span class="min-star">★</span>' : '';
+    const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
     html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${star}${name}: ${valStr}</span>`;
   });
   html += '</div>';
@@ -1858,12 +2066,18 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const statCells = [];
   STAT_NAMES.forEach(s=>{
     const val = sum[STAT_IDX[s]];
-    if (Math.abs(val) < 1e-6) return;
-    const good = isGoodValue(s, val);
+    // Non-threshold bonus stats never enter `sum` (display-only, see containerBaseVec), so a
+    // stat purely from the container bonus (e.g. Carry weight with 0 from artefacts) would
+    // otherwise be skipped here. Only count it when the include-buffs toggle is on though -
+    // with it off, a bonus-only stat has nothing of its own to show, so the row stays hidden.
+    const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
+    const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
+    if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
+    const good = isGoodValue(s, val || shownBonusVal);
     const isTarget = targetStats.some(t => t.name === s);
     statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
       <span style="font-family:var(--sans);">${s}</span>
-      <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmt(s,val)}</span>
+      <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus)}</span>
     </div>`);
   });
 
@@ -1882,7 +2096,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   return html;
 }
 
-function renderConsumableZone(results, extResults, targetStats, protection){
+function renderConsumableZone(results, extResults, targetStats, protection, containerBonus){
   const el = document.getElementById('consumableZone');
   const hasValid = results && results.length > 0;
   // With no valid builds, show every collected extended-zone build (no top-3 filter).
@@ -1896,7 +2110,7 @@ function renderConsumableZone(results, extResults, targetStats, protection){
   <div class="flag-note" style="margin-bottom:12px;">These builds exceed the 0.49 damage threshold but stay within 0.54${hasValid ? ', and would rank top 3 if valid' : ''}. A suitable consumable or drug can cover the gap - use at your own risk.</div>`;
   shown.forEach((r,i)=>{
     const wouldBeRank = hasValid ? results.filter(v => v.score > r.score + 1e-6).length + 1 : undefined;
-    html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank);
+    html += renderResultCard(r, targetStats, protection, i+1, false, null, -1, true, wouldBeRank, undefined, containerBonus);
   });
   el.innerHTML = html;
 }
@@ -1928,8 +2142,8 @@ function equalizeGridCardChips(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
-function renderResults(results, extResults, targetStats, protection, minFallbackResults){
-  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults};
+function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus){
+  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus};
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
 
   // Backfill with min-stat fallback builds when fewer than RESULTS_DISPLAY_CAP results
@@ -1949,7 +2163,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   const el = document.getElementById('results');
   if (!displayResults || displayResults.length === 0){
     el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
-    renderConsumableZone(results, extResults, targetStats, protection);
+    renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
     return;
   }
   const topSets = topStatHighlightOn ? computeTopStatSets(displayResults, targetStats) : null;
@@ -1979,7 +2193,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   displayResults.forEach((r,i)=>{
     if (showPartialLabels && i === metCount) cardsHtml += partialBannerHtml;
     const minStatus = showPartialLabels && i < metCount ? 'met' : null;
-    cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus);
+    cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus, containerBonus);
   });
 
   if (gridView && displayResults.length > 1) {
@@ -1994,18 +2208,18 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
     });
   });
   el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
       else topStatHighlightOn = !topStatHighlightOn;
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
     });
   });
 
-  renderConsumableZone(results, extResults, targetStats, protection);
+  renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
 }
 
 /* ---------- Upgrade analysis ---------- */
@@ -2013,7 +2227,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
 // (levels 1–15) and find the minimum level that makes the build valid.
 // Returns tip objects only if the upgraded build would beat any of the top-3
 // valid results by score.
-function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults){
+function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults, containerBase){
   if (!misses || misses.length === 0) return [];
   const tips = [];
   const seen = new Set(); // deduplicate by (build-key, enabler-idx, min-level)
@@ -2040,6 +2254,7 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
   function buildSum(counts, localIndices, overrideIdx, overrideLvl){
     const effMult = effectiveness / 100;
     const s = new Float64Array(NS);
+    if (containerBase) { for (let k = 0; k < NS; k++) s[k] = containerBase[k]; }
     localIndices.forEach((globalIdx, localI)=>{
       const cnt = counts[localI];
       if (cnt === 0) return;
@@ -2113,7 +2328,7 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
   return tips.slice(0, 5);
 }
 
-function renderUpgradeTips(tips, targetStats, protection, validResults){
+function renderUpgradeTips(tips, targetStats, protection, validResults, containerBonus){
   const el = document.getElementById('upgradeTips');
   if (!tips || tips.length === 0){ el.innerHTML = ''; return; }
 
@@ -2153,7 +2368,7 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
     html += '<div class="target-line">';
     targetStats.forEach(t=>{
       const name = t.name;
-      const valStr = fmt(name, sum[STAT_IDX[name]]);
+      const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus);
       html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}">${name}: ${valStr}</span>`;
     });
     html += '</div>';
@@ -2185,12 +2400,16 @@ function renderUpgradeTips(tips, targetStats, protection, validResults){
     const tipStatCells = [];
     STAT_NAMES.forEach(s=>{
       const val = sum[STAT_IDX[s]];
-      if (Math.abs(val) < 1e-6) return;
-      const good = isGoodValue(s, val);
+      // Same reasoning as the main result card: non-threshold bonus stats never enter `sum`,
+      // and only count toward showing/coloring a bonus-only row when the toggle is on.
+      const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
+      const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
+      if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
+      const good = isGoodValue(s, val || shownBonusVal);
       const isTarget = targetStats.some(t => t.name === s);
       tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
         <span style="font-family:var(--sans);">${s}</span>
-        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmt(s,val)}</span>
+        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus)}</span>
       </div>`);
     });
     let tipGrid = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
@@ -2210,7 +2429,14 @@ let showOwnedHighlight = false; // false in Mode B: every chip is from the loado
 let gridView = false;           // true = 3-column grid layout for results
 let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (still gated by showOwnedHighlight/Mode B above)
 let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
+let includeContainerBuffs = false; // user toggle (Valuable Stats > Extra Options): merge non-threshold
+                                    // backpack/container bonus buffs (Carry weight, Bullet resistance,
+                                    // etc.) into the displayed total instead of hiding them. Read
+                                    // directly by fmtWithBonus and the stat-breakdown filters below -
+                                    // purely a display concern, doesn't affect calc, so toggling it
+                                    // re-renders cached results/tips without re-running the search.
 let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
+let lastTipsArgs = null;        // cached upgrade-tips render args, same purpose
 
 function formatResultForDiscord(result, rank, targetStats){
   const {chosen, sum} = result;
@@ -2247,7 +2473,7 @@ document.getElementById('calcBtn').onclick = ()=>{
     document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Search stopped.</div>';
     return;
   }
-  const slots = Math.max(1, Math.min(6, parseInt(document.getElementById('slotsInput').value) || 1));
+  const slots = Math.max(1, Math.min(7, parseInt(document.getElementById('slotsInput').value) || 1));
   const protection = Math.max(0, Math.min(100, parseFloat(document.getElementById('protInput').value) || 0));
   const effectiveness = Math.max(-100, Math.min(200, parseFloat(document.getElementById('effInput').value) || 0));
   const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
@@ -2264,7 +2490,11 @@ document.getElementById('calcBtn').onclick = ()=>{
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
   const includeAdditional = document.getElementById('includeAdditionalChk').checked;
-  const noVitalityDebuff = document.getElementById('noVitalityDebuffChk').checked;
+  // Stat indices for every currently-toggled-on "avoid debuff" button; the worker rejects
+  // any leaf where one of these stats sums negative.
+  const noDebuffIdx = NO_DEBUFF_FILTERS
+    .filter(f=>document.getElementById(f.btn).classList.contains('active'))
+    .map(f=>STAT_IDX[f.stat]);
   const useLoadout = document.getElementById('useLoadoutChk').checked;
   showOwnedHighlight = !useLoadout;
 
@@ -2295,12 +2525,33 @@ document.getElementById('calcBtn').onclick = ()=>{
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
   document.getElementById('consumableZone').innerHTML = '';
   document.getElementById('upgradeTips').innerHTML = '';
+  lastTipsArgs = null;
 
   rebuildVecs(includeAdditional, effectiveness, level, quality);
+
+  // The selected container's own flat bonus stats (if any), plus the manually-entered
+  // Bonus Carry weight - used exactly as listed/typed, with no Level/Quality/
+  // Effectiveness formulas applied. containerBonusMap is kept around in full
+  // (unaggregated) so result cards can show "artefact-only (+ container bonus)".
+  //
+  // Only the 5 threshold/gauge stats get baked into containerBaseVec (the actual
+  // calculation baseline fed to the worker): those bonuses can push a build over or
+  // under the damage cap, so they legitimately enable or rule out builds - they need
+  // to be part of the search. Every other bonus stat (Carry weight, Movement speed,
+  // Bullet resistance, etc.) is display-only: it's added on top for the result cards
+  // but never enters containerBaseVec, so it can't let the backpack itself satisfy a
+  // stat the search should be finding artefacts for.
+  const containerBonusMap = getEffectiveContainerBonus();
+  const containerBaseVec = new Float64Array(NS);
+  Object.entries(containerBonusMap).forEach(([name, val]) => {
+    const si = STAT_IDX[name];
+    if (si !== undefined && STAT_META[name].threshold) containerBaseVec[si] += val;
+  });
 
   // Pre-compute the stat sum for locked artefacts; the worker starts from this non-zero
   // base and only searches the remaining (slots − lockedSlots) free slots.
   const lockedSum = new Float64Array(NS);
+  for (let k=0;k<NS;k++) lockedSum[k] = containerBaseVec[k];
   if (!useLoadout) {
     pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
   }
@@ -2456,20 +2707,22 @@ document.getElementById('calcBtn').onclick = ()=>{
       const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const minFallbackResults = (e.data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      renderResults(results, extResults, targetStats, protection, minFallbackResults);
+      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
       // build while sweeping one enabler's level -- that doesn't hold for a bounded,
       // per-unit-quality My Loadout pool, so it's skipped in that mode.
       document.getElementById('upgradeTips').innerHTML = '';
+      lastTipsArgs = null;
       if (!useLoadout){
         const misses = e.data.top_miss || [];
         if (misses.length > 0 && results.length > 0){
           const tips = analyzeUpgrades(
             misses, includedIdx, targetStats, protection,
-            includeAdditional, effectiveness, results
+            includeAdditional, effectiveness, results, containerBaseVec
           );
-          renderUpgradeTips(tips, targetStats, protection, results);
+          renderUpgradeTips(tips, targetStats, protection, results, containerBonusMap);
+          lastTipsArgs = {tips, targetStats, protection, validResults: results, containerBonus: containerBonusMap};
         }
       }
     }
@@ -2495,8 +2748,7 @@ document.getElementById('calcBtn').onclick = ()=>{
     minStats: workerMinStats,
     ns: NS,
     total,
-    noVitalityDebuff,
-    vitalityIdx: STAT_IDX['Vitality'],
+    noDebuffIdx,
     lockedSum: Array.from(lockedSum),
     lockedSlots: pinnedIdx.length
   });
