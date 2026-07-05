@@ -2198,11 +2198,14 @@ function isGoodValue(name, val){
 // disagree with what's actually printed (e.g. a build whose artefact-only total is a debuff but
 // whose protected total plus an unprotected negative container bonus nets out beneficial).
 function displayGoodValue(name, sumVal, containerBonus, protection){
+  const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
   if (STAT_META[name].threshold){
-    const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
     return isGoodValue(name, thresholdEffValue(sumVal, bonus, name, protection));
   }
-  return isGoodValue(name, sumVal);
+  // Non-threshold: color must track whatever fmtWithBonus actually prints - merged
+  // total when the toggle is on, artefact-only otherwise - not just the artefact-only
+  // sign, or a buff-only-from-container stat (artefact contribution ~0) shows the wrong color.
+  return isGoodValue(name, includeContainerBuffs ? sumVal + bonus : sumVal);
 }
 // Builds a readable "Stat (min N)[, Stat2 (min N2)] and Stat3 (min N3)" label
 // from every targetStat that has a minimum set, used in the min-threshold banners.
@@ -2334,7 +2337,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
     const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
     if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
-    const good = displayGoodValue(s, val || shownBonusVal, containerBonus, protection);
+    const good = displayGoodValue(s, val, containerBonus, protection);
     const isTarget = targetStats.some(t => t.name === s);
     statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
       <span style="font-family:var(--sans);">${s}</span>
@@ -2667,7 +2670,7 @@ function renderUpgradeTips(tips, targetStats, protection, validResults, containe
       const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
       const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
       if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
-      const good = displayGoodValue(s, val || shownBonusVal, containerBonus, protection);
+      const good = displayGoodValue(s, val, containerBonus, protection);
       const isTarget = targetStats.some(t => t.name === s);
       tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
         <span style="font-family:var(--sans);">${s}</span>
@@ -2794,7 +2797,8 @@ document.getElementById('calcBtn').onclick = ()=>{
   // The selected container's own flat bonus stats (if any), plus the manually-entered
   // Bonus Carry weight - used exactly as listed/typed, with no Level/Quality/
   // Effectiveness formulas applied. containerBonusMap is kept around in full
-  // (unaggregated) so result cards can show "artefact-only (+ container bonus)".
+  // (unaggregated) so result cards can show either the artefact-only total or the
+  // artefact+bonus merged total, per the "Add containers bonus stats" toggle.
   //
   // Only the 5 threshold/gauge stats get baked into containerBaseVec (the actual
   // calculation baseline fed to the worker): those bonuses can push a build over or
