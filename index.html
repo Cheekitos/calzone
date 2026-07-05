@@ -110,7 +110,8 @@
   .check-item .dir{font-family:var(--mono);font-size:11px;width:14px;text-align:center;flex-shrink:0;}
   .dir.good{color:var(--good);}
   .dir.bad{color:var(--bad);}
-  .check-item .name{flex:1;}
+  .check-item .name{flex:1;cursor:pointer;user-select:none;}
+  .check-item .name:hover{color:var(--accent);}
   .check-item .name small{color:var(--muted);}
   .check-item.used-highlight{background:rgba(201,137,63,0.12);border:1px solid var(--accent-dim);}
   .check-item.used-highlight:hover{background:rgba(201,137,63,0.18);}
@@ -462,6 +463,11 @@
           <select id="backpackSelect"><option value="custom" selected style="color:var(--text);">Custom (manual entry)</option></select>
         </label>
         <div class="note" id="backpackBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
+        <label class="field" style="margin-bottom:4px;">
+          <span class="lbl">Armor</span>
+          <select id="armorSelect"><option value="none" selected style="color:var(--text);">None</option></select>
+        </label>
+        <div class="note" style="margin-top:-2px;margin-bottom:14px;">Only for Effective Health calculation</div>
         <div class="row-inline">
           <!-- GRANULAR LEVEL INPUT: hidden - set label display:block and remove lvl-toggle div below to revert -->
           <label class="field" style="display:none;">
@@ -548,7 +554,7 @@
 
       </div>
 
-      <div class="panel">
+      <div class="panel" id="availableArtefactsPanel">
         <h2>Available artefacts</h2>
         <div class="toggle-row">
           <button type="button" id="artAllBtn">select all</button>
@@ -1006,6 +1012,9 @@ artifactListEl.addEventListener('change', e=>{
 });
 // Heart button: open a quick "add to favorites" popover for this artefact.
 // Lock button: toggle this artefact as a must-include pin for the next search.
+// Name: no click handling here at all - clicking it falls through to the
+// row's default <label> behavior and toggles the checkbox, same as clicking
+// anywhere else on the row. The tooltip is shown on hover instead (below).
 artifactListEl.addEventListener('click', e=>{
   const lock = e.target.closest('.art-lock');
   if (lock){
@@ -1016,19 +1025,67 @@ artifactListEl.addEventListener('click', e=>{
     return;
   }
   const heart = e.target.closest('.art-heart');
-  if (!heart) return;
-  e.stopPropagation(); // prevent the document outside-click listener from closing the popover we're about to open
-  const idx = parseInt(heart.dataset.idx);
-  if (chipPopoverEl.classList.contains('open') && popoverOpenIdx === idx){
-    closeChipPopover();
+  if (heart){
+    e.stopPropagation(); // prevent the document outside-click listener from closing the popover we're about to open
+    const idx = parseInt(heart.dataset.idx);
+    if (chipPopoverEl.classList.contains('open') && popoverOpenIdx === idx){
+      closeChipPopover();
+      return;
+    }
+    popoverOpenIdx = idx;
+    popoverAnchorEl = heart;
+    popoverOpenedViaHover = false;
+    renderPopoverHeartAdd(idx);
+    positionPopover(heart);
+    chipPopoverEl.classList.add('open');
     return;
   }
-  popoverOpenIdx = idx;
-  popoverAnchorEl = heart;
-  renderPopoverHeartAdd(idx);
-  positionPopover(heart);
-  chipPopoverEl.classList.add('open');
 });
+
+// Hover tooltip: hovering an artefact name in the Available artefacts panel
+// opens the same popover shown for a loadout chip in results (stat breakdown
+// + Favorite/Pin/Exclude buttons), and it auto-closes shortly after the mouse
+// leaves both the name and the popover itself (a short delay lets the cursor
+// travel from one to the other, e.g. to click a button inside the popover,
+// without it disappearing first). popoverOpenedViaHover gates the auto-close
+// so it never fires for popovers opened by clicking a loadout chip elsewhere.
+let hoverCloseTimer = null;
+function cancelHoverClose(){
+  if (hoverCloseTimer){ clearTimeout(hoverCloseTimer); hoverCloseTimer = null; }
+}
+function scheduleHoverClose(){
+  hoverCloseTimer = setTimeout(()=>{
+    hoverCloseTimer = null;
+    if (popoverOpenedViaHover) closeChipPopover();
+  }, 200);
+}
+artifactListEl.addEventListener('mouseover', e=>{
+  const name = e.target.closest('.name');
+  if (!name) return;
+  if (e.relatedTarget && name.contains(e.relatedTarget)) return; // moving within the same name span
+  cancelHoverClose();
+  const idx = parseInt(name.closest('.check-item').querySelector('input').dataset.idx);
+  if (popoverOpenIdx === idx && chipPopoverEl.classList.contains('open')){
+    popoverOpenedViaHover = true; // already open (e.g. re-entering) - keep it under hover control
+    return;
+  }
+  openChipPopover(name, idx);
+  positionPopoverBesidePanel(name); // override openChipPopover's default below/above-anchor placement, which overlapped neighboring rows in this narrow panel
+  popoverOpenedViaHover = true;
+});
+artifactListEl.addEventListener('mouseout', e=>{
+  const name = e.target.closest('.name');
+  if (!name) return;
+  if (e.relatedTarget && (name.contains(e.relatedTarget) || chipPopoverEl.contains(e.relatedTarget))) return;
+  scheduleHoverClose();
+});
+// Note: chipPopoverEl's own mouseover/mouseout listeners (to keep the tooltip open
+// while the cursor is over it) are registered further down, right after chipPopoverEl
+// itself is declared - see there. They can't be registered here: at this point in the
+// script chipPopoverEl hasn't been declared yet (it's a later `const`), so calling
+// chipPopoverEl.addEventListener() from this early would throw a "Cannot access
+// 'chipPopoverEl' before initialization" error and silently abort the rest of the
+// script (this actually happened - it's why hovering did nothing at all).
 
 // Pins the artefacts used in the last search results to the top of the
 // "Available artefacts" list, highlighted, so the user can quickly untick
@@ -1113,15 +1170,24 @@ ownedListEl.addEventListener('click', e=>{
 const chipPopoverEl = document.createElement('div');
 chipPopoverEl.className = 'artchip-popover';
 document.body.appendChild(chipPopoverEl);
+// Keeps the hover-triggered tooltip (see artifactListEl mouseover/mouseout above) open
+// while the cursor is over the popover itself, e.g. to click a Favorite/Pin/Exclude button.
+chipPopoverEl.addEventListener('mouseover', cancelHoverClose);
+chipPopoverEl.addEventListener('mouseout', e=>{
+  if (e.relatedTarget && chipPopoverEl.contains(e.relatedTarget)) return;
+  scheduleHoverClose();
+});
 let popoverOpenIdx = null;
 let popoverAnchorEl = null;
 let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
+let popoverOpenedViaHover = false; // true only when opened by hovering an artefact name (see hover-tooltip logic below) - controls whether mouseout auto-closes it; click-triggered opens (loadout chips, heart-add) never auto-close on mouseout
 
 function closeChipPopover(){
   chipPopoverEl.classList.remove('open');
   popoverOpenIdx = null;
   popoverAnchorEl = null;
   popoverOpenQi = null;
+  popoverOpenedViaHover = false;
 }
 // Positions against the popover's *actual* current size (it stays in the layout tree even
 // while closed/transparent, so this is accurate), clamped fully inside the viewport. Re-call
@@ -1137,6 +1203,26 @@ function positionPopover(anchorEl){
   let top = r.bottom + 6;
   if (top + popH > window.innerHeight - 8) top = r.top - popH - 6;
   top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+  chipPopoverEl.style.left = left + 'px';
+  chipPopoverEl.style.top = top + 'px';
+}
+// Used only for the Available artefacts panel's hover tooltip. Anchoring to the row
+// itself (like positionPopover above) meant the popup landed inside/over the narrow
+// checkbox list and overlapped neighboring artefact names. Instead this pins the
+// popup just outside the panel's right edge, at a fixed horizontal position
+// regardless of which row is hovered, with only its vertical position tracking the
+// hovered row (top-aligned with it).
+const availableArtefactsPanelEl = document.getElementById('availableArtefactsPanel');
+function positionPopoverBesidePanel(anchorEl){
+  const panelRect = availableArtefactsPanelEl.getBoundingClientRect();
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const popRect = chipPopoverEl.getBoundingClientRect();
+  const popW = Math.max(popRect.width, 230);
+  const popH = popRect.height;
+  let left = panelRect.right + 10;
+  if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8; // not enough room to the right - pull back in rather than clip offscreen
+  left = Math.max(8, left);
+  let top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - popH - 8));
   chipPopoverEl.style.left = left + 'px';
   chipPopoverEl.style.top = top + 'px';
 }
@@ -1307,6 +1393,7 @@ chipPopoverEl.addEventListener('click', e=>{
 function openChipPopover(anchorEl, idx){
   popoverOpenIdx = idx;
   popoverAnchorEl = anchorEl;
+  popoverOpenedViaHover = false;
   renderPopoverMain(idx);
   positionPopover(anchorEl);
   chipPopoverEl.classList.add('open');
@@ -1472,6 +1559,10 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   document.getElementById('effInput').value = 83.5;
   document.getElementById('bonusCarryInput').value = 48;
   clearBackpackSelection();
+  // Armor → None
+  armorSelectEl.value = 'none';
+  armorSelectEl.style.color = '';
+  selectedArmor = null;
   document.getElementById('levelInput').value = 0;
   document.getElementById('qualityInput').value = 100;
   // Include additional stats → default off (driven by level toggle)
@@ -1582,14 +1673,17 @@ const backpackSelectEl = document.getElementById('backpackSelect');
   const group = document.createElement('optgroup');
   group.label = meta.label;
   group.style.color = meta.color;
-  CONTAINERS.forEach((c,i)=>{
-    if (c.tier !== tier) return;
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = c.name;
-    opt.style.color = meta.color;
-    group.appendChild(opt);
-  });
+  CONTAINERS
+    .map((c,i)=>({c,i}))
+    .filter(o => o.c.tier === tier)
+    .sort((a,b) => a.c.name.localeCompare(b.c.name)) // alphabetical within each tier; CONTAINERS array order/indices untouched
+    .forEach(({c,i})=>{
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = c.name;
+      opt.style.color = meta.color;
+      group.appendChild(opt);
+    });
   backpackSelectEl.appendChild(group);
 });
 
@@ -1657,6 +1751,135 @@ function clearBackpackSelection(){
 ['slotsInput','protInput','effInput','bonusCarryInput'].forEach(id=>{
   document.getElementById(id).addEventListener('input', clearBackpackSelection);
 });
+
+/* ---------- Armor: Bullet Resistance -> Effective Health ----------
+   Display-only (not fed into the search/scoring). Each armor's tooltip Bullet
+   resistance does NOT add 1:1 like artefact Bullet resistance does - it goes through
+   its own conversion first. Confirmed against 20 in-game "armor equipped alone, no
+   artefacts" tests spanning every rarity tier (Grey through Red) and every armor
+   category (Suit / Exoarmor / Jumpsuit):
+     effectiveBR = min(2 * tooltipBR, 1.3 * tooltipBR + 30)
+   i.e. every point of tooltip BR is worth 2x up to ~42.86 tooltip BR (a hard
+   two-segment cap, not a smooth diminishing curve), then the rate drops to 1.3x
+   with a +30 offset. Matches 19 of those 20 points within +-0.5 EH; Arc Jumpsuit is
+   a lone +1.87 outlier (kept as an ARMOR_BR_OVERRIDE entry below instead of bending
+   the curve to fit it).
+   Composition with artefacts + Vitality, confirmed exactly against two full in-game
+   combined tests (Arc Jumpsuit + artefacts, Mule Exoarmor + artefacts): armor's
+   effectiveBR simply adds linearly with artefact Bullet resistance before the
+   Vitality multiplier applies, same as the base artefacts-only formula:
+     EH_total = (100 + effectiveBR + artefactBR) * (1 + Vitality/100)
+   ARMOR_BR_OVERRIDE holds exact in-game effectiveBR values for armors that have
+   been tested directly (takes priority over the formula above) - add more here as
+   they get verified; everything else in ARMORS falls back to the formula. */
+const ARMOR_BR_OVERRIDE = {
+  "RAPS AH-6 Nomad": 297.88,
+  "Centurion Armored Suit": 355.00,
+  "Prometheus Armored Suit": 330.79,
+  "Reiter Super-Heavy Armored Suit": 396.77,
+  "Arc Jumpsuit": 295.77,
+  "Mule Exoarmor": 325.29,
+  "Saturn Jumpsuit": 261.48,
+  "Navigator Jumpsuit": 287.50,
+  "Investigator Exoarmor": 258.90,
+};
+function armorEffectiveBR(armor){
+  if (Object.prototype.hasOwnProperty.call(ARMOR_BR_OVERRIDE, armor.name)) return ARMOR_BR_OVERRIDE[armor.name];
+  return Math.min(2 * armor.br, 1.3 * armor.br + 30);
+}
+
+const ARMOR_TIER_META = {
+  legendary: { label: "Legendary", color: "var(--q-legendary)" },
+  exclusive: { label: "Exclusive", color: "var(--q-exclusive)" },
+};
+// name + tooltip Bullet resistance only, parsed from Stats_Armors.md - every other stat
+// in that file (Carry weight, elemental resistances, Bleeding protection, etc.) is
+// ignored, this tool only cares about Bullet resistance / Effective Health here.
+const ARMORS = [
+  // Yellow - Legendary
+  { name:"Albatross Heavy Assault Armored Exoskeleton", tier:"legendary", br:239 },
+  { name:"ZIVCAS M2-C Exoarmor", tier:"legendary", br:216 },
+  // Red - Exclusive
+  { name:"Ace Exoarmor", tier:"exclusive", br:227 },
+  { name:"Albatross Interceptor Armored Exoskeleton", tier:"exclusive", br:196 },
+  { name:"Antares Exoarmor", tier:"exclusive", br:230 },
+  { name:"Apostle Super-Heavy Armored Suit", tier:"exclusive", br:282 },
+  { name:"Arc Jumpsuit", tier:"exclusive", br:203 },
+  { name:"Beast Slayer Exoarmor", tier:"exclusive", br:217 },
+  { name:"CD-4 Armored Suit", tier:"exclusive", br:231 },
+  { name:"Centurion Armored Suit", tier:"exclusive", br:250 },
+  { name:"Chieftain Super-Heavy Armored Suit", tier:"exclusive", br:282 },
+  { name:"Ganymede Jumpsuit", tier:"exclusive", br:184 },
+  { name:"Granite Super-Heavy Armored Suit", tier:"exclusive", br:282 },
+  { name:"Hector Exoarmor", tier:"exclusive", br:217 },
+  { name:"Hounds Exoarmor", tier:"exclusive", br:173 },
+  { name:"Investigator Exoarmor", tier:"exclusive", br:176 },
+  { name:"JD ZIVCAS 2A Exoarmor", tier:"exclusive", br:189 },
+  { name:"Longevity", tier:"exclusive", br:172 },
+  { name:"Marten Exoarmor", tier:"exclusive", br:196 },
+  { name:"MIS-X ATLAS", tier:"exclusive", br:178 },
+  { name:"Missionary Exoarmor", tier:"exclusive", br:183 },
+  { name:"Mule Exoarmor", tier:"exclusive", br:227 },
+  { name:"Navigator Jumpsuit", tier:"exclusive", br:198 },
+  { name:"Orion Jumpsuit", tier:"exclusive", br:192 },
+  { name:"Peresvet Jumpsuit", tier:"exclusive", br:209 },
+  { name:"Prometheus Armored Suit", tier:"exclusive", br:231 },
+  { name:"Punisher Exoarmor", tier:"exclusive", br:176 },
+  { name:"RAPS AH-6 Nomad", tier:"exclusive", br:206 },
+  { name:"Reiter Super-Heavy Armored Suit", tier:"exclusive", br:282 },
+  { name:"Rigel Exoarmor", tier:"exclusive", br:235 },
+  { name:"Ronin Armored Suit", tier:"exclusive", br:236 },
+  { name:"Saturn Jumpsuit", tier:"exclusive", br:178 },
+  { name:"SBA TANK", tier:"exclusive", br:272 },
+  { name:"Scythian-5 Armored Suit", tier:"exclusive", br:210 },
+  { name:"Templar Armored Suit", tier:"exclusive", br:243 },
+  { name:"Vanguard Armored Suit", tier:"exclusive", br:236 },
+];
+
+const armorSelectEl = document.getElementById('armorSelect');
+['legendary','exclusive'].forEach(tier=>{
+  const meta = ARMOR_TIER_META[tier];
+  const group = document.createElement('optgroup');
+  group.label = meta.label;
+  group.style.color = meta.color;
+  ARMORS.forEach((a,i)=>{
+    if (a.tier !== tier) return;
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = a.name;
+    opt.style.color = meta.color;
+    group.appendChild(opt);
+  });
+  armorSelectEl.appendChild(group);
+});
+
+// The currently selected armor (or null on "None") - read at render time by
+// computeEffectiveHealth, never fed into the search/scoring.
+let selectedArmor = null;
+armorSelectEl.addEventListener('change', ()=>{
+  if (armorSelectEl.value === 'none'){
+    selectedArmor = null;
+    armorSelectEl.style.color = '';
+    return;
+  }
+  selectedArmor = ARMORS[parseInt(armorSelectEl.value)];
+  armorSelectEl.style.color = ARMOR_TIER_META[selectedArmor.tier].color;
+});
+
+// Effective Health for a result build: artefact-derived Bullet resistance and Vitality
+// (plus their container-bonus components, included/excluded exactly like the
+// "Add containers bonus stats in results" toggle already does for the displayed stat
+// pills - so this number always matches what's shown elsewhere for the same build) plus
+// the selected armor's own converted Bullet resistance, combined per the confirmed
+// formula above.
+function computeEffectiveHealth(sum, containerBonus){
+  const brBonus = containerBonus ? (containerBonus['Bullet resistance'] || 0) : 0;
+  const vitBonus = containerBonus ? (containerBonus['Vitality'] || 0) : 0;
+  const artefactBR = sum[STAT_IDX['Bullet resistance']] + (includeContainerBuffs ? brBonus : 0);
+  const vitality = sum[STAT_IDX['Vitality']] + (includeContainerBuffs ? vitBonus : 0);
+  const armorBR = selectedArmor ? armorEffectiveBR(selectedArmor) : 0;
+  return (100 + artefactBR + armorBR) * (1 + vitality / 100);
+}
 
 /* ---------- Combination count: C(n+k-1, k) multiset formula ---------- */
 function combinationCount(n, k){
@@ -1740,7 +1963,9 @@ self.onmessage = function(e){
     for(var i=0;i<thresholds.length;i++){
       var t=thresholds[i];
       var raw=sum[t.idx];
-      var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
+      var artOnly=raw-t.bonus;
+      var effArt=(artOnly>0&&!t.isFrost)?artOnly*(1-protection/100):artOnly;
+      var eff=effArt+t.bonus;
       if(eff>t.cap+1e-6) return false;
     }
     return true;
@@ -1756,7 +1981,9 @@ self.onmessage = function(e){
     for(var i=0;i<thresholds.length;i++){
       var t=thresholds[i];
       var raw=sum[t.idx];
-      var eff=(raw>0&&!t.isFrost)?raw*(1-protection/100):raw;
+      var artOnly=raw-t.bonus;
+      var effArt=(artOnly>0&&!t.isFrost)?artOnly*(1-protection/100):artOnly;
+      var eff=effArt+t.bonus;
       if(eff>t.extCap+1e-6) return false;
     }
     return true;
@@ -1910,10 +2137,24 @@ const THRESH_EXT_FROST = 0.99; // Frost has no consumables - extended zone disab
 function thresholdCap(statName){ return statName === 'Frost' ? THRESH_CAP_FROST : THRESH_CAP; }
 function thresholdExtCap(statName){ return statName === 'Frost' ? THRESH_EXT_FROST : THRESH_EXT; }
 
-function passesThreshold(sum, protection){
+// Protection applies only to the artefact-derived portion of a threshold stat, by its own
+// sign - a container's flat bonus for that stat always passes through unprotected, regardless
+// of its own sign or the combined total's sign. Confirmed in-game via four paired builds
+// (bonus negative/combined positive, bonus positive/combined negative, bonus positive/combined
+// positive on two different stats) - a container bonus is never run through the protection
+// formula at all.
+function thresholdEffValue(raw, bonus, statName, protection){
+  const artOnly = raw - bonus;
+  const effArt = (artOnly > 0 && statName !== 'Frost') ? artOnly * (1 - protection/100) : artOnly;
+  return effArt + bonus;
+}
+
+function passesThreshold(sum, protection, bonusVec){
   for (const s of THRESHOLD_STATS){
-    const raw = sum[STAT_IDX[s]];
-    const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
+    const idx = STAT_IDX[s];
+    const raw = sum[idx];
+    const bonus = bonusVec ? bonusVec[idx] : 0;
+    const eff = thresholdEffValue(raw, bonus, s, protection);
     if (eff > thresholdCap(s) + 1e-6) return false;
   }
   return true;
@@ -1934,24 +2175,34 @@ function fmt(name, val){
   return `${sign}${val.toFixed(2)}${pct}`;
 }
 // When a container contributes a flat bonus to this stat, show it depending on the stat kind:
-// threshold stats (Radiation/Temperature/Frost/Biological infection/Psyonics) have their bonus
-// baked into totalVal already (part of the calculation baseline - see containerBaseVec), so it's
-// always split out as "artefact-only (+bonus)" - these are enabling stats, not simple flat buffs.
+// threshold stats (Radiation/Temperature/Frost/Biological infection/Psyonics) just show the
+// final effective value (see thresholdEffValue) - the artefact/bonus split isn't useful to the
+// end user, only the number that actually matters against the damage cap.
 // Non-threshold bonus stats (Carry weight, Bullet resistance, etc.) never had their bonus added
 // to totalVal (display-only) - the "Add containers bonus stats" toggle controls
 // whether that bonus is merged into the shown total or left out entirely.
-function fmtWithBonus(name, totalVal, containerBonus){
+function fmtWithBonus(name, totalVal, containerBonus, protection){
   const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
-  if (!bonus) return fmt(name, totalVal);
   if (STAT_META[name].threshold){
-    const artefactVal = totalVal - bonus;
-    const bonusColor = isGoodValue(name, bonus) ? 'var(--good)' : 'var(--bad)';
-    return `${fmt(name, artefactVal)} <span style="color:${bonusColor};">(${fmt(name, bonus)})</span>`;
+    return fmt(name, thresholdEffValue(totalVal, bonus, name, protection));
   }
+  if (!bonus) return fmt(name, totalVal);
   return fmt(name, includeContainerBuffs ? totalVal + bonus : totalVal);
 }
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
+}
+// For threshold stats, `sum` already has the container bonus baked in (unprotected) but not
+// protection applied to the artefact portion - the same math thresholdEffValue/fmtWithBonus use
+// for the displayed number. Coloring off the raw baked sum instead of that effective value can
+// disagree with what's actually printed (e.g. a build whose artefact-only total is a debuff but
+// whose protected total plus an unprotected negative container bonus nets out beneficial).
+function displayGoodValue(name, sumVal, containerBonus, protection){
+  if (STAT_META[name].threshold){
+    const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
+    return isGoodValue(name, thresholdEffValue(sumVal, bonus, name, protection));
+  }
+  return isGoodValue(name, sumVal);
 }
 // Builds a readable "Stat (min N)[, Stat2 (min N2)] and Stat3 (min N3)" label
 // from every targetStat that has a minimum set, used in the min-threshold banners.
@@ -1998,7 +2249,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   if (isExtended){
     THRESHOLD_STATS.forEach(s=>{
       const raw = sum[STAT_IDX[s]];
-      const eff = (raw > 0 && s !== 'Frost') ? raw * (1 - protection/100) : raw;
+      const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
+      const eff = thresholdEffValue(raw, bonus, s, protection);
       if (eff > thresholdCap(s) + 1e-6){
         overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;margin-left:4px;">${s} ${eff.toFixed(2)}</span>`;
       }
@@ -2017,6 +2269,14 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     : '';
   html += `<div class="rank-row"><span class="rank-badge">#${rank}</span>${minStatusNote}<span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}${copyBtn}</div>`;
 
+  // Effective Health: display-only, computed from this build's Bullet resistance +
+  // Vitality (respecting the "Add containers bonus stats" toggle, so it always matches
+  // whatever those two stats show elsewhere for this card) plus the selected armor's own
+  // converted Bullet resistance, if any. See computeEffectiveHealth for the formula.
+  const ehVal = computeEffectiveHealth(sum, containerBonus);
+  const ehArmorNote = selectedArmor ? ` <span style="color:var(--muted);">w/ ${selectedArmor.name}</span>` : '';
+  html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
+
   html += '<div class="loadout-list">';
   chosen.forEach(c=>{
     const effectiveQuality = c.quality != null ? c.quality : (parseInt(document.getElementById('qualityInput').value) || 100);
@@ -2028,12 +2288,12 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   html += '<div class="target-line">';
   targetStats.forEach(t=>{
     const name = t.name;
-    const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus);
+    const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus, protection);
     const dir = STAT_META[name].good ? 1 : -1;
     const meetsMin = (t.min !== null && t.min !== undefined) && (sum[STAT_IDX[name]] * dir >= t.min - 1e-6);
     const star = meetsMin ? '<span class="min-star">★</span>' : '';
     const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
-    html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${star}${name}: ${valStr}</span>`;
+    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${star}${name}: ${valStr}</span>`;
   });
   html += '</div>';
 
@@ -2043,7 +2303,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const gaugeCells = [];
   THRESHOLD_STATS.forEach(s=>{
     const raw = sum[STAT_IDX[s]];
-    const eff = (raw > 0 && s !== 'Frost') ? raw * (1-protection/100) : raw;
+    const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
+    const eff = thresholdEffValue(raw, bonus, s, protection);
     const cap = thresholdCap(s);
     const extCap = thresholdExtCap(s);
     const ratio = Math.max(0, eff) / cap;
@@ -2073,11 +2334,11 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
     const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
     if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
-    const good = isGoodValue(s, val || shownBonusVal);
+    const good = displayGoodValue(s, val || shownBonusVal, containerBonus, protection);
     const isTarget = targetStats.some(t => t.name === s);
     statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
       <span style="font-family:var(--sans);">${s}</span>
-      <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus)}</span>
+      <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus,protection)}</span>
     </div>`);
   });
 
@@ -2294,7 +2555,7 @@ function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAd
       let minLevel = null;
       for (let lvl = 1; lvl <= 15; lvl++){
         const sum = buildSum(miss.counts, localIndices, enablerGlobalIdx, lvl);
-        if (passesThreshold(sum, protection)){
+        if (passesThreshold(sum, protection, containerBase)){
           minLevel = lvl;
           break;
         }
@@ -2368,8 +2629,8 @@ function renderUpgradeTips(tips, targetStats, protection, validResults, containe
     html += '<div class="target-line">';
     targetStats.forEach(t=>{
       const name = t.name;
-      const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus);
-      html += `<span class="target-pill ${isGoodValue(name, sum[STAT_IDX[name]])?'good':'bad'}">${name}: ${valStr}</span>`;
+      const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus, protection);
+      html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}">${name}: ${valStr}</span>`;
     });
     html += '</div>';
 
@@ -2378,7 +2639,8 @@ function renderUpgradeTips(tips, targetStats, protection, validResults, containe
     const tipGaugeCells = [];
     THRESHOLD_STATS.forEach(s=>{
       const raw = sum[STAT_IDX[s]];
-      const eff = (raw > 0 && s !== 'Frost') ? raw * (1-protection/100) : raw;
+      const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
+      const eff = thresholdEffValue(raw, bonus, s, protection);
       const cap = thresholdCap(s);
       const extCap = thresholdExtCap(s);
       const ratio = Math.max(0, eff) / cap;
@@ -2405,11 +2667,11 @@ function renderUpgradeTips(tips, targetStats, protection, validResults, containe
       const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
       const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
       if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6) return;
-      const good = isGoodValue(s, val || shownBonusVal);
+      const good = displayGoodValue(s, val || shownBonusVal, containerBonus, protection);
       const isTarget = targetStats.some(t => t.name === s);
       tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
         <span style="font-family:var(--sans);">${s}</span>
-        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus)}</span>
+        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus,protection)}</span>
       </div>`);
     });
     let tipGrid = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
@@ -2653,7 +2915,8 @@ document.getElementById('calcBtn').onclick = ()=>{
     idx: STAT_IDX[s],
     isFrost: s === 'Frost',
     cap: thresholdCap(s),
-    extCap: thresholdExtCap(s)
+    extCap: thresholdExtCap(s),
+    bonus: containerBaseVec[STAT_IDX[s]]
   }));
 
   const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
