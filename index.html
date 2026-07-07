@@ -221,6 +221,8 @@
   .target-pill.good{color:var(--good);}
   .target-pill.bad{color:var(--bad);}
   .target-pill.top-stat{border-color:var(--accent);}
+  .target-pill.no-benefit{color:var(--warn);border-color:var(--warn);border-style:dashed;}
+  .target-pill .no-benefit-badge{margin-right:3px;}
   .target-pill .min-star{position:absolute;top:-6px;right:-6px;font-size:11px;line-height:1;color:var(--warn);}
 
   /* Min-threshold met/unmet labels + banner, replacing the old green result-card highlight */
@@ -951,7 +953,7 @@ renderDebuffToggles();
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
   if (lastRenderArgs){
-    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
   }
   if (lastTipsArgs){
     renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
@@ -1967,6 +1969,12 @@ self.onmessage = function(e){
   var protection = d.protection;
   var total = d.total;
   var noDebuffIdx = d.noDebuffIdx || [];
+  // A stat only counts toward coverage if its contribution would actually be visible once
+  // rendered - fmt()/fmtWithBonus() print with toFixed(2), so anything below this rounds to
+  // "0.00" (or "-0.00") on the card even though it's technically nonzero. 0.006 rather than
+  // the exact 0.005 rounding boundary to safely clear floating-point representation error
+  // right at that boundary.
+  var COVERAGE_EPS = 0.006;
 
   function passesThreshold(){
     for(var i=0;i<thresholds.length;i++){
@@ -2017,7 +2025,7 @@ self.onmessage = function(e){
     var c=0;
     for(var i=0;i<targetStats.length;i++){
       var t=targetStats[i];
-      if(sum[t.idx]*t.dir>1e-6) c++;
+      if(sum[t.idx]*t.dir>COVERAGE_EPS) c++;
     }
     return c;
   }
@@ -2054,6 +2062,11 @@ self.onmessage = function(e){
   var TOP_EXT = 10;
   var top_ext = [];
   var topMinFallback = [];
+  // Closest-to-full-coverage builds: leaves that clear the damage threshold but don't give
+  // every checked stat a beneficial contribution. Ranked with the same beats() comparator as
+  // top (coverage count first, then H/M/L) so "most stats covered" wins - the UI's last-
+  // resort "here's the best we can do" fallback when no build achieves full coverage.
+  var topCoverageFallback = [];
   // Set when a leaf clears the damage threshold (and any explicit min) but still fails to
   // give every checked stat a beneficial contribution - lets the UI report the real reason
   // for an empty result set instead of always blaming the damage threshold.
@@ -2168,6 +2181,7 @@ self.onmessage = function(e){
     if(top.length!==TOP_N) return false;
     if(top_ext.length!==TOP_EXT) return false;
     if(minStats.length>0 && topMinFallback.length!==TOP_N) return false;
+    if(topCoverageFallback.length!==TOP_N) return false;
     if(top_miss.length!==TOP_MISS) return false;
 
     // Bullet: raw-score reachability vs. top_miss's current worst.
@@ -2179,9 +2193,9 @@ self.onmessage = function(e){
     var covBound=curCov;
     for(var ti=0; ti<nT; ti++){
       var t2=targetStats[ti];
-      if(sum[t2.idx]*t2.dir<=1e-6){
+      if(sum[t2.idx]*t2.dir<=COVERAGE_EPS){
         var best=sum[t2.idx]*t2.dir+remaining*suffixMaxDirAdj[ti][start];
-        if(best>1e-6) covBound++;
+        if(best>COVERAGE_EPS) covBound++;
       }
     }
     var tsBound={
@@ -2191,6 +2205,7 @@ self.onmessage = function(e){
     };
     if(beats({cov:covBound,ts:tsBound},top[top.length-1])) return false;
     if(beats({cov:covBound,ts:tsBound},top_ext[top_ext.length-1])) return false;
+    if(beats({cov:covBound,ts:tsBound},topCoverageFallback[topCoverageFallback.length-1])) return false;
 
     if(minStats.length>0){
       var unmetCount=0, critBound=0;
@@ -2227,11 +2242,20 @@ self.onmessage = function(e){
     var sc=rawScore();
     if(passes){
       var ts=tierScores(),cv=coverage();
-      // A checked stat with zero benefit isn't a usable result even if it scores well
-      // overall - discard the leaf entirely (same as failing the hard cap) rather than
-      // let a partial-coverage build win purely on raw score.
+      // A checked stat with zero benefit isn't a usable "top" result even if it scores well
+      // overall - it's excluded from top/topMinFallback (same as failing the hard cap) rather
+      // than letting a partial-coverage build win purely on raw score. It's still tracked in
+      // topCoverageFallback though, as the UI's last-resort "closest we can get" fallback for
+      // when no build achieves full coverage at all.
       if(cv!==targetStats.length){
         failedCoverageOnly=true;
+        if(topCoverageFallback.length!==TOP_N||beats({cov:cv,ts:ts},topCoverageFallback[topCoverageFallback.length-1])){
+          var entryCF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
+          var ci=topCoverageFallback.length;
+          topCoverageFallback.push(entryCF);
+          while(ci>0&&beats(entryCF,topCoverageFallback[ci-1])){topCoverageFallback[ci]=topCoverageFallback[ci-1];topCoverageFallback[ci-1]=entryCF;ci--;}
+          if(topCoverageFallback.length>TOP_N) topCoverageFallback.length=TOP_N;
+        }
       } else if(minsOk){
         if(top.length===TOP_N&&!beats({cov:cv,ts:ts},top[top.length-1])) return;
         var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
@@ -2304,13 +2328,18 @@ self.onmessage = function(e){
     }
   }
   recurse(0,d.slots-(d.lockedSlots||0));
-  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback,failedCoverageOnly:failedCoverageOnly});
+  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback,top_coverage_fallback:topCoverageFallback,failedCoverageOnly:failedCoverageOnly});
 };
 `;
 
 /* ---------- Search ---------- */
 // Hard caps: effective value must stay at or below these to avoid damage.
 // Frost ignores backpack protection and has a different cap (1 instead of 0.5).
+// Mirrors the worker's own COVERAGE_EPS (defined inside WORKER_SRC, which runs in an isolated
+// blob context so the constant can't be shared directly) - a stat only reads as having a real
+// benefit once it clears this, matching fmt()'s toFixed(2) display rounding. Used here to mark
+// target pills that got no real benefit in a coverage-fallback build (see renderResultCard).
+const COVERAGE_EPS = 0.006;
 const THRESH_CAP     = 0.5;  // non-Frost hard cap
 const THRESH_CAP_FROST = 1; // Frost hard cap
 const THRESH_EXT     = 0.55;  // non-Frost extended zone (consumable range)
@@ -2478,7 +2507,12 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const meetsMin = (t.min !== null && t.min !== undefined) && (sum[STAT_IDX[name]] * dir >= t.min - 1e-6);
     const star = meetsMin ? '<span class="min-star">★</span>' : '';
     const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
-    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}">${star}${name}: ${valStr}</span>`;
+    // Same check the search itself uses for coverage (artefact/pinned total, not the display-
+    // merged container bonus) - only reachable on coverage-fallback builds, since `top` never
+    // contains a stat below this. Flags exactly what the fallback banner promises to mark.
+    const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
+    const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
+    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}${noBenefit ? ' no-benefit' : ''}">${warnBadge}${star}${name}: ${valStr}</span>`;
   });
   html += '</div>';
 
@@ -2588,8 +2622,8 @@ function equalizeGridCardChips(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
-function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly){
-  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly};
+function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults){
+  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults};
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
 
   // Backfill with min-stat fallback builds when fewer than RESULTS_DISPLAY_CAP results
@@ -2600,9 +2634,16 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   if (hasMin && metCount < RESULTS_DISPLAY_CAP && minFallbackResults && minFallbackResults.length){
     displayResults = results.concat(minFallbackResults.slice(0, RESULTS_DISPLAY_CAP - metCount));
   }
+  // Last resort: no build gives every selected stat a real (non-rounding-to-zero) value, and
+  // there's no min-fallback to backfill with either. Show the closest we can get instead of a
+  // bare error - renderResultCard marks whichever stat pill(s) got no real benefit in each card.
+  const showCoverageFallback = displayResults.length === 0 && coverageFallbackResults && coverageFallbackResults.length > 0;
+  if (showCoverageFallback){
+    displayResults = coverageFallbackResults.slice(0, RESULTS_DISPLAY_CAP);
+  }
   const minLabel = hasMin ? minCriteriaLabel(targetStats) : '';
   const showPartialLabels = hasMin && metCount > 0 && metCount < RESULTS_DISPLAY_CAP && displayResults.length > metCount;
-  const showZeroBanner = hasMin && metCount === 0 && displayResults.length > 0;
+  const showZeroBanner = hasMin && metCount === 0 && displayResults.length > 0 && !showCoverageFallback;
   lastRenderArgs.displayResults = displayResults;
 
   highlightUsedArtifacts(usedArtifactIndices(displayResults));
@@ -2637,8 +2678,11 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   const partialBannerHtml = showPartialLabels
     ? `<div class="min-warning-banner">The next builds do not fill ${minLabel} but are the highest you can get with the stats and priority you selected:</div>`
     : '';
+  const coverageFallbackBannerHtml = showCoverageFallback
+    ? `<div class="min-warning-banner">No combination gives a beneficial value to every stat you selected at once. Here's the closest you can get - stat pills marked ⚠ got no real benefit in that build:</div>`
+    : '';
 
-  let cardsHtml = zeroBannerHtml;
+  let cardsHtml = zeroBannerHtml + coverageFallbackBannerHtml;
   displayResults.forEach((r,i)=>{
     if (showPartialLabels && i === metCount) cardsHtml += partialBannerHtml;
     const minStatus = showPartialLabels && i < metCount ? 'met' : null;
@@ -2657,14 +2701,14 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
     });
   });
   el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
       else topStatHighlightOn = !topStatHighlightOn;
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
     });
   });
 
@@ -3220,7 +3264,8 @@ document.getElementById('calcBtn').onclick = ()=>{
       const results = data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly);
+      const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
       // build while sweeping one enabler's level -- that doesn't hold for a bounded,
