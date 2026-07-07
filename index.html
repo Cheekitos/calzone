@@ -671,21 +671,29 @@ const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effective
 
 // "Avoid builds with these debuffs" toggle buttons (Extra Options, Valuable Stats panel).
 // Each pairs a button id + display label with a stat whose net post-effMult sum must stay
-// >= 0 for a build to be considered at all (checked at the search leaf, same idea as the
-// original Vitality-only filter). All five stats here are "higher is better"
-// (STAT_META[...].good === true), so a negative sum is unambiguously a debuff - no
-// dir-flipping needed. defaultOn controls both the button's initial toggled state and what
-// Reset restores it to. The row is rendered from this array (see renderDebuffToggles below).
-// Layout is a fixed 2-column grid: Vitality/Movespeed share the top row, and the 3 longer
-// labels are each pinned fullWidth (spans both columns) so their box always matches the
-// combined width of the row above - explicit placement instead of relying on flex-wrap,
-// which would wrap at different points depending on which monospace font the browser has.
+// on its beneficial side for a build to be considered at all (checked at the search leaf,
+// same idea as the original Vitality-only filter). Vitality/Movespeed/Bleeding
+// Protection/Healing Effectiveness/Bullet Resistance are all "higher is better"
+// (STAT_META[...].good === true) - a negative sum is unambiguously a debuff. Recoil is the
+// one exception (STAT_META['Recoil'].good === false, "lower is better" - see STAT_META /
+// polarity rules): a positive Recoil sum is the debuff there, e.g. Dark Viburnum's +6.46 to
+// +7.6 main roll. The worker direction-adjusts each filter's running sum (val*dir, dir=-1
+// for Recoil) before comparing against zero, so this table is the only place a stat's
+// polarity has to be looked up for this feature. defaultOn controls both the button's
+// initial toggled state and what Reset restores it to. The row is rendered from this array
+// (see renderDebuffToggles below).
+// Layout is a fixed 2-column grid: Vitality/Movespeed share the top row, and the 4 longer/
+// default-off labels are each pinned fullWidth (spans both columns) so their box always
+// matches the combined width of the row above - explicit placement instead of relying on
+// flex-wrap, which would wrap at different points depending on which monospace font the
+// browser has.
 const NO_DEBUFF_FILTERS = [
   {btn:'noVitalityDebuffBtn',             stat:'Vitality',              label:'Vitality',              defaultOn:true},
   {btn:'noMovementSpeedDebuffBtn',        stat:'Movement speed',        label:'Movespeed',             defaultOn:true},
   {btn:'noBleedingProtectionDebuffBtn',   stat:'Bleeding protection',   label:'Bleeding Protection',   defaultOn:false, fullWidth:true},
   {btn:'noHealingEffectivenessDebuffBtn', stat:'Healing effectiveness', label:'Healing Effectiveness', defaultOn:false, fullWidth:true},
   {btn:'noBulletResistanceDebuffBtn',     stat:'Bullet resistance',     label:'Bullet Resistance',     defaultOn:false, fullWidth:true},
+  {btn:'noRecoilDebuffBtn',               stat:'Recoil',                label:'Recoil',                defaultOn:false, fullWidth:true},
 ];
 
 // Returns true if this (stat, value) pair uses Formula B (fixed debuff - no level/quality scale).
@@ -943,7 +951,7 @@ renderDebuffToggles();
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
   if (lastRenderArgs){
-    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
   }
   if (lastTipsArgs){
     renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
@@ -1576,7 +1584,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   lvlNote.textContent = 'Additional stats excluded';
   lvlNote.className = 'lvl-note';
   // No-debuff filters (Vitality, Movespeed, Bleeding Protection, Healing
-  // Effectiveness, Bullet Resistance) → each restored to its own default
+  // Effectiveness, Bullet Resistance, Recoil) → each restored to its own default
   NO_DEBUFF_FILTERS.forEach(f=>{ document.getElementById(f.btn).classList.toggle('active', f.defaultOn); });
   // Stats: uncheck all, reset tiers to M
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
@@ -1958,6 +1966,7 @@ self.onmessage = function(e){
   var ns = d.ns;
   var protection = d.protection;
   var total = d.total;
+  var noDebuffIdx = d.noDebuffIdx || [];
 
   function passesThreshold(){
     for(var i=0;i<thresholds.length;i++){
@@ -2045,15 +2054,170 @@ self.onmessage = function(e){
   var TOP_EXT = 10;
   var top_ext = [];
   var topMinFallback = [];
+  // Set when a leaf clears the damage threshold (and any explicit min) but still fails to
+  // give every checked stat a beneficial contribution - lets the UI report the real reason
+  // for an empty result set instead of always blaming the damage threshold.
+  var failedCoverageOnly = false;
+
+  // ---- Optimization_02 section 1: branch-and-bound precomputation (once per search) ----
+
+  // Ported verbatim from the main-thread combinationCount/boundedCombinationCount (used
+  // there to compute the exact "total" combinations count) - needed here too so a pruned
+  // subtree's exact leaf count can be added to checked in one shot (section 4b).
+  function combinationCount(nn, k){
+    if (nn === 0 || k === 0) return 0;
+    let r = 1;
+    for (let ci = 0; ci < k; ci++) r = r * (nn + k - 1 - ci) / (ci + 1);
+    return Math.round(r);
+  }
+  function boundedCombinationCount(maxCountsArr, slots){
+    const nn = maxCountsArr.length;
+    if (nn === 0) return slots === 0 ? 1 : 0;
+    const memo = new Map();
+    function rec(idx, remaining){
+      if (remaining === 0) return 1;
+      if (idx === nn) return 0;
+      const key = idx + ',' + remaining;
+      if (memo.has(key)) return memo.get(key);
+      let total = 0;
+      const cap = Math.min(maxCountsArr[idx], remaining);
+      for (let c = 0; c <= cap; c++) total += rec(idx + 1, remaining - c);
+      memo.set(key, total);
+      return total;
+    }
+    return rec(0, slots);
+  }
+  var isBoundedPool = false;
+  for(var bi=0; bi<maxCounts.length; bi++){ if(maxCounts[bi]!==Infinity){ isBoundedPool=true; break; } }
+
+  var nT = targetStats.length, nThr = thresholds.length, nND = noDebuffIdx.length;
+
+  // Per-item (pool position j) solo contributions, direction-adjusted where relevant.
+  var soloScore = new Float64Array(n);
+  var soloH = new Float64Array(n), soloM = new Float64Array(n), soloL = new Float64Array(n);
+  var soloDirAdj = []; for(var ti0=0; ti0<nT; ti0++) soloDirAdj.push(new Float64Array(n));
+  var soloThreshRaw = []; for(var hi0=0; hi0<nThr; hi0++) soloThreshRaw.push(new Float64Array(n));
+  var soloNDRaw = []; for(var ndi0=0; ndi0<nND; ndi0++) soloNDRaw.push(new Float64Array(n));
+  for(var j=0;j<n;j++){
+    var vec=VECS[j], sc0=0;
+    for(var ti=0; ti<nT; ti++){
+      var t=targetStats[ti];
+      var val=vec[t.idx]*t.dir;
+      soloDirAdj[ti][j]=val;
+      sc0+=val*t.weight;
+      var normed=t.statMax>1e-12?val/t.statMax:0;
+      if(t.tier==='high') soloH[j]+=normed;
+      else if(t.tier==='low') soloL[j]+=normed;
+      else soloM[j]+=normed;
+    }
+    soloScore[j]=sc0;
+    for(var hi=0; hi<nThr; hi++) soloThreshRaw[hi][j]=vec[thresholds[hi].idx];
+    for(var ndi=0; ndi<nND; ndi++) soloNDRaw[ndi][j]=vec[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir;
+  }
+
+  // Suffix-max/min arrays, indexed by pool position: suffixX[k] = best single item among
+  // indices k..n-1 (n+1 entries; index n = no items left, seeded with the identity value
+  // that correctly makes every reachability check downstream report "unreachable").
+  var suffixMaxScore = new Float64Array(n+1); suffixMaxScore[n]=-Infinity;
+  var suffixMaxH = new Float64Array(n+1), suffixMaxM = new Float64Array(n+1), suffixMaxL = new Float64Array(n+1);
+  suffixMaxH[n]=suffixMaxM[n]=suffixMaxL[n]=-Infinity;
+  var suffixMaxDirAdj = []; for(var ti1=0; ti1<nT; ti1++){ var a1=new Float64Array(n+1); a1[n]=-Infinity; suffixMaxDirAdj.push(a1); }
+  var suffixMinThresh = []; for(var hi1=0; hi1<nThr; hi1++){ var a2=new Float64Array(n+1); a2[n]=Infinity; suffixMinThresh.push(a2); }
+  var suffixMinND = []; for(var ndi1=0; ndi1<nND; ndi1++){ var a3=new Float64Array(n+1); a3[n]=Infinity; suffixMinND.push(a3); }
+  for(var k=n-1;k>=0;k--){
+    suffixMaxScore[k]=Math.max(soloScore[k],suffixMaxScore[k+1]);
+    suffixMaxH[k]=Math.max(soloH[k],suffixMaxH[k+1]);
+    suffixMaxM[k]=Math.max(soloM[k],suffixMaxM[k+1]);
+    suffixMaxL[k]=Math.max(soloL[k],suffixMaxL[k+1]);
+    for(var ti2=0; ti2<nT; ti2++) suffixMaxDirAdj[ti2][k]=Math.max(soloDirAdj[ti2][k],suffixMaxDirAdj[ti2][k+1]);
+    for(var hi2=0; hi2<nThr; hi2++) suffixMinThresh[hi2][k]=Math.min(soloThreshRaw[hi2][k],suffixMinThresh[hi2][k+1]);
+    for(var ndi2=0; ndi2<nND; ndi2++) suffixMinND[ndi2][k]=Math.min(soloNDRaw[ndi2][k],suffixMinND[ndi2][k+1]);
+  }
+
+  // minStats is always a filtered subset of targetStats (same idx/dir) - map each minStat
+  // to its position in targetStats so the coverage-bound suffix arrays can be reused (1d).
+  var minStatTargetPos = minStats.map(function(m){
+    for(var mti=0; mti<nT; mti++){ if(targetStats[mti].idx===m.idx) return mti; }
+    return -1;
+  });
+
+  // Per-node bound check (1c/1d/1e). Returns true only if every applicable bucket
+  // (top, top_ext, top_miss, and topMinFallback when minStats is in use) is proven
+  // unable to be helped by anything left in this subtree.
+  function shouldPrune(start, remaining){
+    // 1c/1e: threshold + no-debuff-filter reachability - structural, always checked.
+    var hardReachable=true, extReachable=true;
+    for(var hi=0; hi<nThr; hi++){
+      var t=thresholds[hi];
+      var bestRaw=sum[t.idx]+remaining*suffixMinThresh[hi][start];
+      var artOnly=bestRaw-t.bonus;
+      var effArt=(artOnly>0&&!t.isFrost)?artOnly*(1-protection/100):artOnly;
+      var eff=effArt+t.bonus;
+      if(eff>t.cap+1e-6) hardReachable=false;
+      if(eff>t.extCap+1e-6) extReachable=false;
+    }
+    var noDebuffDead=false;
+    for(var ndi=0; ndi<nND; ndi++){
+      var bestRawND=sum[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir+remaining*suffixMinND[ndi][start];
+      if(bestRawND<-1e-6){ noDebuffDead=true; break; }
+    }
+    if(!((!hardReachable&&!extReachable)||noDebuffDead)) return false;
+
+    // Bullets 2-5 only prove anything once their list is full - before that, any leaf
+    // could still be inserted, so don't prune on their account yet.
+    if(top.length!==TOP_N) return false;
+    if(top_ext.length!==TOP_EXT) return false;
+    if(minStats.length>0 && topMinFallback.length!==TOP_N) return false;
+    if(top_miss.length!==TOP_MISS) return false;
+
+    // Bullet: raw-score reachability vs. top_miss's current worst.
+    var bestScore=rawScore()+remaining*suffixMaxScore[start];
+    if(bestScore>top_miss[top_miss.length-1].score) return false;
+
+    // Bullets vs top/top_ext/topMinFallback share the same optimistic (cov,H,M,L) bound.
+    var curCov=coverage(), curTs=tierScores();
+    var covBound=curCov;
+    for(var ti=0; ti<nT; ti++){
+      var t2=targetStats[ti];
+      if(sum[t2.idx]*t2.dir<=1e-6){
+        var best=sum[t2.idx]*t2.dir+remaining*suffixMaxDirAdj[ti][start];
+        if(best>1e-6) covBound++;
+      }
+    }
+    var tsBound={
+      h: curTs.h+remaining*suffixMaxH[start],
+      m: curTs.m+remaining*suffixMaxM[start],
+      l: curTs.l+remaining*suffixMaxL[start]
+    };
+    if(beats({cov:covBound,ts:tsBound},top[top.length-1])) return false;
+    if(beats({cov:covBound,ts:tsBound},top_ext[top_ext.length-1])) return false;
+
+    if(minStats.length>0){
+      var unmetCount=0, critBound=0;
+      for(var mi=0; mi<minStats.length; mi++){
+        var m=minStats[mi];
+        var tpos=minStatTargetPos[mi];
+        var bestCase=sum[m.idx]*m.dir+remaining*suffixMaxDirAdj[tpos][start];
+        if(bestCase<m.min-1e-6){
+          unmetCount++;
+          critBound+=m.statMax>1e-12?bestCase/m.statMax:0;
+        }
+      }
+      var fbound={unmetCount:unmetCount,crit:critBound,cov:covBound,ts:tsBound};
+      if(beatsFallback(fbound,topMinFallback[topMinFallback.length-1])) return false;
+    }
+
+    return true;
+  }
+
   function considerLeaf(){
     checked++;
     if(checked>=nextReport){
       self.postMessage({type:'progress',done:checked,total:total});
       nextReport+=REPORT_EVERY;
     }
-    var noDebuffIdx=d.noDebuffIdx||[];
     for(var ndi=0;ndi<noDebuffIdx.length;ndi++){
-      if(sum[noDebuffIdx[ndi]] < -1e-6) return;
+      if(sum[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir < -1e-6) return;
     }
     var passes=passesThreshold();
     var minsOk=passesMinStats();
@@ -2063,17 +2227,22 @@ self.onmessage = function(e){
     var sc=rawScore();
     if(passes){
       var ts=tierScores(),cv=coverage();
-      if(minsOk){
+      // A checked stat with zero benefit isn't a usable result even if it scores well
+      // overall - discard the leaf entirely (same as failing the hard cap) rather than
+      // let a partial-coverage build win purely on raw score.
+      if(cv!==targetStats.length){
+        failedCoverageOnly=true;
+      } else if(minsOk){
+        if(top.length===TOP_N&&!beats({cov:cv,ts:ts},top[top.length-1])) return;
         var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
-        if(top.length===TOP_N&&!beats(entry,top[top.length-1])) return;
         var i=top.length;
         top.push(entry);
         while(i>0&&beats(entry,top[i-1])){top[i]=top[i-1];top[i-1]=entry;i--;}
         if(top.length>TOP_N) top.length=TOP_N;
       } else {
         var mi=unmetMinInfo();
+        if(topMinFallback.length===TOP_N&&!beatsFallback({unmetCount:mi.count,crit:mi.crit,cov:cv,ts:ts},topMinFallback[topMinFallback.length-1])) return;
         var entryF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum),unmetCount:mi.count,crit:mi.crit};
-        if(topMinFallback.length===TOP_N&&!beatsFallback(entryF,topMinFallback[topMinFallback.length-1])) return;
         var fi=topMinFallback.length;
         topMinFallback.push(entryF);
         while(fi>0&&beatsFallback(entryF,topMinFallback[fi-1])){topMinFallback[fi]=topMinFallback[fi-1];topMinFallback[fi-1]=entryF;fi--;}
@@ -2082,14 +2251,16 @@ self.onmessage = function(e){
     } else if(passesExtended()){
       // Extended zone: over hard cap but within consumable range
       var ts2=tierScores(),cv2=coverage();
-      var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:Array.from(sum)};
-      if(top_ext.length===TOP_EXT&&!beats(entry_e,top_ext[top_ext.length-1])) {
-        // still track for upgrade analysis
-      } else {
-        var ie=top_ext.length;
-        top_ext.push(entry_e);
-        while(ie>0&&beats(entry_e,top_ext[ie-1])){top_ext[ie]=top_ext[ie-1];top_ext[ie-1]=entry_e;ie--;}
-        if(top_ext.length>TOP_EXT) top_ext.length=TOP_EXT;
+      if(cv2===targetStats.length){
+        if(top_ext.length===TOP_EXT&&!beats({cov:cv2,ts:ts2},top_ext[top_ext.length-1])) {
+          // still track for upgrade analysis
+        } else {
+          var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:Array.from(sum)};
+          var ie=top_ext.length;
+          top_ext.push(entry_e);
+          while(ie>0&&beats(entry_e,top_ext[ie-1])){top_ext[ie]=top_ext[ie-1];top_ext[ie-1]=entry_e;ie--;}
+          if(top_ext.length>TOP_EXT) top_ext.length=TOP_EXT;
+        }
       }
       // Also track as near-miss for upgrade analysis
       if(top_miss.length<TOP_MISS || sc>top_miss[top_miss.length-1].score){
@@ -2111,6 +2282,17 @@ self.onmessage = function(e){
   }
   function recurse(start,remaining){
     if(remaining===0){considerLeaf();return;}
+    if(shouldPrune(start,remaining)){
+      // Section 4b: account for the whole skipped subtree's exact leaf count in one shot,
+      // instead of just returning silently, so checked/total stays an honest percentage.
+      var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start),remaining):combinationCount(n-start,remaining);
+      checked+=skipped;
+      if(checked>=nextReport){
+        self.postMessage({type:'progress',done:checked,total:total});
+        while(checked>=nextReport) nextReport+=REPORT_EVERY;
+      }
+      return;
+    }
     for(var i=start;i<n;i++){
       if(counts[i]>=maxCounts[i]) continue;
       var vec=VECS[i];
@@ -2122,7 +2304,7 @@ self.onmessage = function(e){
     }
   }
   recurse(0,d.slots-(d.lockedSlots||0));
-  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback});
+  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback,failedCoverageOnly:failedCoverageOnly});
 };
 `;
 
@@ -2406,8 +2588,8 @@ function equalizeGridCardChips(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
-function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus){
-  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus};
+function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly){
+  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly};
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
 
   // Backfill with min-stat fallback builds when fewer than RESULTS_DISPLAY_CAP results
@@ -2426,7 +2608,10 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   highlightUsedArtifacts(usedArtifactIndices(displayResults));
   const el = document.getElementById('results');
   if (!displayResults || displayResults.length === 0){
-    el.innerHTML = `<h2>Result</h2><div class="msg-error">No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.</div>`;
+    const msg = failedCoverageOnly
+      ? `No combination gives a beneficial value to every stat you selected at once. Try unchecking a stat, increasing slots, or including different artefacts.`
+      : `No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.`;
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${msg}</div>`;
     renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
     return;
   }
@@ -2472,14 +2657,14 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
     });
   });
   el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
       else topStatHighlightOn = !topStatHighlightOn;
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly);
     });
   });
 
@@ -2755,11 +2940,12 @@ document.getElementById('calcBtn').onclick = ()=>{
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
   const includeAdditional = document.getElementById('includeAdditionalChk').checked;
-  // Stat indices for every currently-toggled-on "avoid debuff" button; the worker rejects
-  // any leaf where one of these stats sums negative.
+  // Stat index + direction for every currently-toggled-on "avoid debuff" button; the worker
+  // rejects any leaf where one of these stats' direction-adjusted sum goes negative (i.e.
+  // its raw sum lands on the debuff side of that stat's own polarity - see NO_DEBUFF_FILTERS).
   const noDebuffIdx = NO_DEBUFF_FILTERS
     .filter(f=>document.getElementById(f.btn).classList.contains('active'))
-    .map(f=>STAT_IDX[f.stat]);
+    .map(f=>({idx: STAT_IDX[f.stat], dir: STAT_META[f.stat].good ? 1 : -1}));
   const useLoadout = document.getElementById('useLoadoutChk').checked;
   showOwnedHighlight = !useLoadout;
 
@@ -2870,6 +3056,22 @@ document.getElementById('calcBtn').onclick = ()=>{
     poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
   }
 
+  // Optimization_02 1b: sort the pool by descending solo raw score before the search
+  // starts. Pure reindexing - poolMeta still maps back to real artefacts for display,
+  // no combo is dropped or merged. Filling top/top_ext/top_miss with strong candidates
+  // early is what lets the worker's B&B bounds actually cut branches instead of staying
+  // loose for most of the run.
+  {
+    const soloScore = v => targetStats.reduce((s,t) => {
+      const dir = STAT_META[t.name].good ? 1 : -1;
+      return s + v[STAT_IDX[t.name]] * dir * t.weight;
+    }, 0);
+    const order = poolVecs.map((_,i)=>i).sort((a,b) => soloScore(poolVecs[b]) - soloScore(poolVecs[a]));
+    poolVecs = order.map(i=>poolVecs[i]);
+    poolMax  = order.map(i=>poolMax[i]);
+    poolMeta = order.map(i=>poolMeta[i]);
+  }
+
   // Best single-artefact beneficial value per target stat, used to normalize tier scores.
   const statMaxMap = {};
   for (const t of targetStats) {
@@ -2928,11 +3130,16 @@ document.getElementById('calcBtn').onclick = ()=>{
   activeWorker = new Worker(workerUrl);
 
   const startTime = Date.now();
+  const FAKE_FILL_MIN_MS = 3000; // 5+ slot searches: keep the bar visible at least this long
+  let lastShownPct = 0;
+  let lastShownDone = 0;
 
   activeWorker.onmessage = e=>{
     if (e.data.type === 'progress'){
       const done = e.data.done;
       const pct = Math.min(99, Math.round(done / total * 100)); // hold at 99% until truly done
+      lastShownPct = pct;
+      lastShownDone = done;
       const elapsed = (Date.now() - startTime) / 1000;
       const rate = elapsed > 0 ? done / elapsed : 0;
       const remaining = rate > 0 ? (total - done) / rate : 0;
@@ -2949,6 +3156,45 @@ document.getElementById('calcBtn').onclick = ()=>{
       document.getElementById('progStatus').textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
 
     } else if (e.data.type === 'done'){
+      // B&B pruning means 5+ slot searches now often finish in well under a second,
+      // which reads as broken/suspicious after the bar used to crawl for minutes. Purely
+      // cosmetic: stretch the visible completion out to a believable minimum duration by
+      // smoothly filling the bar from wherever it left off. No search work is delayed -
+      // the real result is already sitting in e.data, waiting to be shown.
+      const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
+      if (remainingMs > 0){
+        animateFakeCompletion(remainingMs, () => finishSearch(e.data));
+      } else {
+        finishSearch(e.data);
+      }
+    }
+  };
+
+  function animateFakeCompletion(durationMs, onComplete){
+    const startPct = lastShownPct;
+    const startDone = lastShownDone;
+    const animStart = Date.now();
+    const fillEl = document.getElementById('progFill');
+    const pctEl = document.getElementById('progPct');
+    const countEl = document.getElementById('progCount');
+    const statusEl = document.getElementById('progStatus');
+    statusEl.textContent = 'Finishing up\u2026';
+    const timer = setInterval(()=>{
+      if (!activeWorker){ clearInterval(timer); return; } // cancelled via Stop button
+      const t = Math.min(1, (Date.now() - animStart) / durationMs);
+      const pct = Math.round(startPct + (100 - startPct) * t);
+      const shownDone = Math.round(startDone + (total - startDone) * t);
+      fillEl.style.width = pct + '%';
+      pctEl.textContent = pct + '%';
+      countEl.textContent = shownDone.toLocaleString() + ' / ' + totalFmt;
+      if (t >= 1){
+        clearInterval(timer);
+        onComplete();
+      }
+    }, 50);
+  }
+
+  function finishSearch(data){
       URL.revokeObjectURL(workerUrl);
       activeWorker = null;
       btn.disabled = false;
@@ -2971,10 +3217,10 @@ document.getElementById('calcBtn').onclick = ()=>{
         });
         return chosen;
       }
-      const results = e.data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      const extResults = (e.data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      const minFallbackResults = (e.data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap);
+      const results = data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
       // build while sweeping one enabler's level -- that doesn't hold for a bounded,
@@ -2982,7 +3228,7 @@ document.getElementById('calcBtn').onclick = ()=>{
       document.getElementById('upgradeTips').innerHTML = '';
       lastTipsArgs = null;
       if (!useLoadout){
-        const misses = e.data.top_miss || [];
+        const misses = data.top_miss || [];
         if (misses.length > 0 && results.length > 0){
           const tips = analyzeUpgrades(
             misses, includedIdx, targetStats, protection,
@@ -2992,8 +3238,7 @@ document.getElementById('calcBtn').onclick = ()=>{
           lastTipsArgs = {tips, targetStats, protection, validResults: results, containerBonus: containerBonusMap};
         }
       }
-    }
-  };
+  }
 
   activeWorker.onerror = err=>{
     URL.revokeObjectURL(workerUrl);
