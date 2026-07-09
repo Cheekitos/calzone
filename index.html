@@ -93,6 +93,30 @@
   select:focus{outline:1px solid var(--accent-dim);}
   select option{background:var(--panel-2);}
 
+  /* Backpack/Container + Compare dropdowns: custom trigger+panel wrapping the native
+     <select> (kept, hidden, as the source of truth for .value/'change' - see
+     enhanceContainerSelect). Needed because native <option> elements can't reliably show
+     a rich hover tooltip like the artefact popover. */
+  .container-dd{position:relative;}
+  .container-dd-trigger{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--mono);font-size:13px;
+    cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:left;
+  }
+  .container-dd-trigger:focus{outline:1px solid var(--accent-dim);}
+  .container-dd-caret{color:#8a8f97;font-size:10px;margin-left:8px;}
+  .container-dd-panel{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+    background:var(--panel);border:1px solid var(--border);border-radius:4px;
+    max-height:280px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  }
+  .container-dd-panel.open{display:block;}
+  .container-dd-group-label{
+    padding:6px 10px 2px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;
+  }
+  .container-dd-item{padding:7px 10px;font-size:13px;cursor:pointer;}
+  .container-dd-item:hover{background:rgba(201,137,63,0.1);}
+
   .row-inline{display:flex;gap:10px;}
   .row-inline label.field{flex:1;}
   /* The backpack row now has 4 fields of uneven label length (Slots / Protection % /
@@ -160,6 +184,7 @@
     transition:opacity 0.15s ease,transform 0.15s ease;pointer-events:none;
   }
   .artchip-popover.open{opacity:1;transform:translateY(0);pointer-events:auto;}
+  .artchip-popover.container-popover{min-width:150px;}
   .popover-btn{
     display:block;width:100%;text-align:left;background:var(--panel-2);border:1px solid var(--border);
     color:var(--text);padding:7px 10px;border-radius:4px;font-size:12.5px;cursor:pointer;margin-bottom:6px;
@@ -318,6 +343,20 @@
     100%{left:100%;opacity:0;}
   }
 
+  /* Compare-containers mode: stacked per-container progress bars (one block per container,
+     kept on screen after it finishes instead of being overwritten by the next). Colors cycle
+     through 3 hues by column position so the bars are visually distinguishable while
+     searching. */
+  .compare-prog-block{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+  .compare-prog-block:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+  .compare-prog-block.done .prog-scan{display:none;}
+  .compare-prog-block.done .prog-status{color:var(--good);}
+  .compare-prog-block.errored .prog-scan{display:none;}
+  .compare-prog-block.errored .prog-status{color:var(--bad);}
+  .compare-prog-color-0 .prog-fill{background:linear-gradient(90deg,var(--accent-dim),var(--accent));box-shadow:0 0 14px rgba(201,137,63,0.45);}
+  .compare-prog-color-1 .prog-fill{background:linear-gradient(90deg,#2c6e5c,#4fc9a4);box-shadow:0 0 14px rgba(79,201,164,0.45);}
+  .compare-prog-color-2 .prog-fill{background:linear-gradient(90deg,#5a3c8a,#9a6fd6);box-shadow:0 0 14px rgba(154,111,214,0.45);}
+
   .art-heart{
     background:none;border:none;cursor:pointer;padding:0 2px;
     font-size:13px;line-height:1;flex-shrink:0;color:var(--muted);
@@ -419,11 +458,29 @@
   .results-grid-view .loadout-chip>span{overflow:hidden;text-overflow:ellipsis;min-width:0;}
   /* align-content:flex-start keeps chips packed together at the top of the equalised
      section; without this the default 'stretch' spreads rows apart to fill minHeight. */
-  .results-grid-view .loadout-list{align-content:flex-start;}
+  .results-grid-view .loadout-list,
+  .compare-grid .loadout-list{align-content:flex-start;}
   /* Faint separator between chips and stats; sits at a consistent level across cards
      because the chip section height is already equalised. */
-  .results-grid-view .target-line{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;}
+  .results-grid-view .target-line,
+  .compare-grid .target-line{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;}
+
+  /* Gauges/stats breakdown inside <details>: two independent column stacks side by side
+     by default (see renderResultCard for why they're not paired into shared grid rows). */
+  .details-cols{display:flex;gap:0 28px;margin-top:8px;}
+  .details-col{flex:1;display:flex;flex-direction:column;}
+
+  /* Compare-containers mode: fixed 3-column layout, distinct from the rank-list grid above */
+  .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;}
+  @media(max-width:1080px){.compare-grid{grid-template-columns:1fr;}}
+  /* Compare columns are too narrow for gauges/stats side by side - stack them instead. */
+  .compare-grid .details-cols{flex-direction:column;}
+  .compare-grid .details-col + .details-col{margin-top:12px;}
+  .compare-column{display:flex;flex-direction:column;gap:10px;min-width:0;}
+  .compare-col-header{font-family:var(--mono);font-size:13px;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--border);}
+  .compare-col-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:400;margin-top:2px;}
 </style>
+
 </head>
 <body>
 <div class="wrap">
@@ -460,11 +517,21 @@
             <input type="number" id="bonusCarryInput" value="48">
           </label>
         </div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:6px;margin-bottom:10px;">
+          <input type="checkbox" id="compareModeChk">
+          <span class="lbl" style="margin:0;">Compare containers</span>
+        </label>
         <label class="field" style="margin-bottom:6px;">
           <span class="lbl">Backpack / Container</span>
           <select id="backpackSelect"><option value="custom" selected style="color:var(--text);">Custom (manual entry)</option></select>
         </label>
         <div class="note" id="backpackBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
+        <div class="field" id="compareContainersBlock" style="display:none;margin-bottom:14px;">
+          <span class="lbl">Compare (2–3 containers)</span>
+          <select id="compareSelect0" style="margin-bottom:6px;"><option value="none" selected style="color:var(--text);">-- None --</option></select>
+          <select id="compareSelect1" style="margin-bottom:6px;"><option value="none" selected style="color:var(--text);">-- None --</option></select>
+          <select id="compareSelect2"><option value="none" selected style="color:var(--text);">-- None --</option></select>
+        </div>
         <label class="field" style="margin-bottom:4px;">
           <span class="lbl">Armor</span>
           <select id="armorSelect"><option value="none" selected style="color:var(--text);">None</option></select>
@@ -513,7 +580,7 @@
           <span class="name">Include additional stats</span>
         </label>
         <label class="check-item" style="margin-bottom:4px;">
-          <input type="checkbox" id="includeContainerBuffsChk">
+          <input type="checkbox" id="includeContainerBuffsChk" checked>
           <span class="name">Add containers bonus stats in results</span>
         </label>
         <div class="debuff-toggle-label">Avoid builds with these debuffs:</div>
@@ -949,9 +1016,16 @@ renderDebuffToggles();
 
 // "Add containers bonus stats in results" - purely a display concern (see
 // includeContainerBuffs above), so toggling it just re-renders whatever's already cached
-// instead of re-running the search.
+// instead of re-running the search. Branches on compareModeActive so it updates whichever
+// mode is actually on screen - Compare Containers mode's grid, or Normal mode's results/tips.
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
+  if (compareModeActive){
+    if (lastComparisonRenderArgs){
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats);
+    }
+    return;
+  }
   if (lastRenderArgs){
     renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
   }
@@ -1561,14 +1635,24 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
   });
 })();
 document.getElementById('resetAllBtn').onclick = ()=>{
-  // Cancel any running search
+  // Cancel any running search (including a compare-mode search mid-container - resolve its
+  // pending runOneWorker() promise so it doesn't fire into a page state that just got reset)
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
   // Backpack inputs → defaults
   document.getElementById('slotsInput').value = 4;
   document.getElementById('protInput').value = 60;
   document.getElementById('effInput').value = 83.5;
   document.getElementById('bonusCarryInput').value = 48;
   clearBackpackSelection();
+  // Compare-containers mode → off, selects back to "None", Backpack fields shown again
+  document.getElementById('compareModeChk').checked = false;
+  document.getElementById('compareContainersBlock').style.display = 'none';
+  document.getElementById('bpFieldsRow').style.display = '';
+  backpackSelectEl.closest('label.field').style.display = '';
+  compareSelectEls.forEach(sel=>{ sel.value = 'none'; sel.style.color = ''; sel.dispatchEvent(new Event('change')); });
+  compareModeActive = false;
+  lastComparisonRenderArgs = null;
   // Armor → None
   armorSelectEl.value = 'none';
   armorSelectEl.style.color = '';
@@ -1577,9 +1661,9 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   document.getElementById('qualityInput').value = 100;
   // Include additional stats → default off (driven by level toggle)
   document.getElementById('includeAdditionalChk').checked = false;
-  // Add containers bonus stats in results → default off
-  document.getElementById('includeContainerBuffsChk').checked = false;
-  includeContainerBuffs = false;
+  // Add containers bonus stats in results → default on
+  document.getElementById('includeContainerBuffsChk').checked = true;
+  includeContainerBuffs = true;
   // Level toggle → reset to LVL 0
   document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.lvl==='0'));
   const lvlNote = document.getElementById('lvlNote');
@@ -1644,12 +1728,17 @@ document.querySelectorAll('.lvl-btn').forEach(btn=>{
    unscaled, fixed addition - no Level/Quality/Effectiveness formulas applied to it,
    exactly like the game's own tooltip number). See activeContainerBonus below. ---------- */
 const CONTAINER_TIER_META = {
+  legendary: { label: "Legendary", qClass: "q-175", color: "var(--q-legendary)" },
   exclusive: { label: "Exclusive", qClass: "q-160", color: "var(--q-exclusive)" },
   rare:      { label: "Rare",      qClass: "q-145", color: "var(--q-rare)" },
   special:   { label: "Special",   qClass: "q-130", color: "var(--q-special)" },
   uncommon:  { label: "Uncommon",  qClass: "q-115", color: "var(--q-uncommon)" },
 };
 const CONTAINERS = [
+  // Yellow - Legendary
+  { name:"Apiary Container",            tier:"legendary", slots:5, protection:89.5, effectiveness:120,  bonus:{} },
+  { name:"Berloga-6U Container",        tier:"legendary", slots:6, protection:78.5, effectiveness:114,  bonus:{} },
+  { name:"Chitin Backpack",             tier:"legendary", slots:6, protection:60,   effectiveness:115,  bonus:{"Carry weight":47} },
   // Red - Exclusive
   { name:"Freezer Container",           tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Temperature":-2.5, "Biological infection":0.5} },
   { name:"ZIVCAS ArcticSafe-6",         tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Psyonics":0.5, "Frost":-2.5} },
@@ -1657,8 +1746,12 @@ const CONTAINERS = [
   { name:"CRAW-6 Container",            tier:"exclusive", slots:6, protection:60,   effectiveness:97,   bonus:{"Bullet resistance":23, "Laceration protection":46} },
   { name:"Berloga-6 Container",         tier:"exclusive", slots:6, protection:78.5, effectiveness:100,  bonus:{} },
   { name:"Overton Container",           tier:"exclusive", slots:6, protection:60,   effectiveness:100,  bonus:{"Healing effectiveness":28.3} },
+  { name:"Coffin Backpack",             tier:"exclusive", slots:5, protection:78.5, effectiveness:110,  bonus:{"Carry weight":40} },
   { name:"Hive Container",              tier:"exclusive", slots:5, protection:89.5, effectiveness:105,  bonus:{} },
   { name:"Utility Vest ADR-WRBT",       tier:"exclusive", slots:4, protection:89.5, effectiveness:105,  bonus:{"Movement speed":6.2, "Carry weight":40} },
+  { name:"Secret Valley 35 Backpack",   tier:"exclusive", slots:6, protection:60,   effectiveness:92.5, bonus:{"Carry weight":81} },
+  { name:"SMC Container",               tier:"exclusive", slots:4, protection:95,   effectiveness:120,  bonus:{} },
+  { name:"Barrel Container",            tier:"exclusive", slots:7, protection:60,   effectiveness:92.5, bonus:{} },
   // Purple - Rare
   { name:"Marathon Bag",                tier:"rare", slots:3, protection:78.5, effectiveness:113,   bonus:{"Movement speed":5.7, "Carry weight":37, "Biological infection":-1.62} },
   { name:"Utility Vest Black Eagle Y-73", tier:"rare", slots:3, protection:89.5, effectiveness:110, bonus:{"Movement speed":5.7, "Carry weight":37} },
@@ -1667,35 +1760,241 @@ const CONTAINERS = [
   { name:"Shiver Container",            tier:"rare", slots:5, protection:75,   effectiveness:102.5, bonus:{"Temperature":-1.88, "Biological infection":0.5} },
   { name:"Saddlebag",                   tier:"rare", slots:3, protection:78.5, effectiveness:113,   bonus:{"Movement speed":5.7, "Carry weight":37, "Biological infection":-1.62} },
   { name:"Soviet Travel Backpack",      tier:"rare", slots:5, protection:60,   effectiveness:90,    bonus:{"Carry weight":73} },
+  { name:"IU-2 Container",              tier:"rare", slots:3, protection:95,   effectiveness:139,   bonus:{} },
+  { name:"Kega-RS Container",           tier:"rare", slots:6, protection:60,   effectiveness:90,    bonus:{} },
+  { name:"KZS-MU Container",            tier:"rare", slots:3, protection:95,   effectiveness:132.5, bonus:{} },
+  { name:"Cell-U Container",            tier:"rare", slots:4, protection:89.5, effectiveness:110,   bonus:{} },
+  { name:"Berloga-5u Container",        tier:"rare", slots:5, protection:78.5, effectiveness:100,   bonus:{} },
+  { name:"Jagdtasche",                  tier:"rare", slots:4, protection:78.5, effectiveness:112.5, bonus:{"Carry weight":37} },
   // Blue - Special
   { name:"MBSS Backpack",               tier:"special", slots:4, protection:60,   effectiveness:83.5, bonus:{"Carry weight":48} },
   { name:"Pouch Black Eagle B-33",      tier:"special", slots:3, protection:89.5, effectiveness:95,   bonus:{"Movement speed":4.3, "Carry weight":28} },
   { name:"PROTECT 3B Waist Bag",        tier:"special", slots:2, protection:89.5, effectiveness:110,  bonus:{"Movement speed":3.7, "Carry weight":24} },
   { name:"Cool Container",              tier:"special", slots:5, protection:75,   effectiveness:92.5, bonus:{"Temperature":-1.88, "Biological infection":0.5} },
   { name:"Tri-Zip Assault Backpack",    tier:"special", slots:5, protection:60,   effectiveness:78.5, bonus:{"Carry weight":56} },
+  { name:"NPA Backpack",                tier:"special", slots:4, protection:78.5, effectiveness:101.5, bonus:{"Carry weight":28} },
+  { name:"Hellboy-U Backpack",          tier:"special", slots:3, protection:78.5, effectiveness:116.5, bonus:{"Carry weight":24} },
+  { name:"Berloga-5 Container",         tier:"special", slots:5, protection:78.5, effectiveness:90,   bonus:{} },
+  { name:"Canister-U Container",        tier:"special", slots:5, protection:60,   effectiveness:83.5, bonus:{} },
+  { name:"Cocoon-U Container",          tier:"special", slots:3, protection:89.5, effectiveness:110,  bonus:{} },
+  { name:"Kega Container",              tier:"special", slots:6, protection:60,   effectiveness:78.5, bonus:{} },
+  { name:"Berloga-4U Container",        tier:"special", slots:4, protection:78.5, effectiveness:100,  bonus:{} },
+  { name:"KZS-2U Container",            tier:"special", slots:2, protection:95,   effectiveness:145,  bonus:{} },
+  { name:"KZS-M Container",             tier:"special", slots:3, protection:95,   effectiveness:115,  bonus:{} },
+  { name:"Cell Container",              tier:"special", slots:4, protection:89.5, effectiveness:95,   bonus:{} },
   // Green - Uncommon
   { name:"Sports Bag",                  tier:"uncommon", slots:2, protection:89.5, effectiveness:100, bonus:{"Movement speed":2.7, "Carry weight":18} },
 ];
 
+// Populates a <select> with CONTAINERS grouped into rarity optgroups (alphabetical within
+// each tier; CONTAINERS array order/indices untouched - only the rendered option order is
+// sorted). Shared by the main Backpack/Container select and the 3 Compare-mode selects, so
+// there's only one place that needs to agree with CONTAINERS about tiers/colors.
+function populateContainerSelect(selectEl){
+  ['legendary','exclusive','rare','special','uncommon'].forEach(tier=>{
+    const meta = CONTAINER_TIER_META[tier];
+    const group = document.createElement('optgroup');
+    group.label = meta.label;
+    group.style.color = meta.color;
+    CONTAINERS
+      .map((c,i)=>({c,i}))
+      .filter(o => o.c.tier === tier)
+      .sort((a,b) => a.c.name.localeCompare(b.c.name))
+      .forEach(({c,i})=>{
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = c.name;
+        opt.style.color = meta.color;
+        group.appendChild(opt);
+      });
+    selectEl.appendChild(group);
+  });
+}
+
 const backpackSelectEl = document.getElementById('backpackSelect');
-['exclusive','rare','special','uncommon'].forEach(tier=>{
-  const meta = CONTAINER_TIER_META[tier];
-  const group = document.createElement('optgroup');
-  group.label = meta.label;
-  group.style.color = meta.color;
-  CONTAINERS
-    .map((c,i)=>({c,i}))
-    .filter(o => o.c.tier === tier)
-    .sort((a,b) => a.c.name.localeCompare(b.c.name)) // alphabetical within each tier; CONTAINERS array order/indices untouched
-    .forEach(({c,i})=>{
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = c.name;
-      opt.style.color = meta.color;
-      group.appendChild(opt);
-    });
-  backpackSelectEl.appendChild(group);
+populateContainerSelect(backpackSelectEl);
+
+// Compare-mode selects: same options, "\u2014 None \u2014" (hardcoded in the HTML) is
+// their only non-container value, same role as "custom" on backpackSelectEl.
+const compareSelectEls = ['compareSelect0','compareSelect1','compareSelect2'].map(id=>document.getElementById(id));
+compareSelectEls.forEach(sel=>{
+  populateContainerSelect(sel);
+  sel.addEventListener('change', ()=>{
+    if (sel.value === 'none'){ sel.style.color = ''; return; }
+    sel.style.color = CONTAINER_TIER_META[CONTAINERS[parseInt(sel.value)].tier].color;
+  });
 });
+
+/* ---------- Custom hoverable dropdown for Backpack/Container + Compare selects ----------
+   Replaces the native <select>'s visible option list with a custom trigger+panel, because
+   native <option> elements can't reliably show a rich hover tooltip. The <select> itself is
+   kept fully intact (just hidden) as the single source of truth: this widget only reads the
+   <optgroup>/<option> structure populateContainerSelect already built, and writes back
+   through .value + a dispatched 'change' event, so every existing listener/reader elsewhere
+   (backpackSelectEl's 'change' handler, compareSelectEls' 'change' handler above,
+   runComparisonSearch's .value reads, Reset, clearBackpackSelection) keeps working
+   unmodified. Hovering a container row shows a small stats popover (Slots, Protection,
+   Effectiveness, bonus stats via formatBonusStat - same coloring as the bonus note) reusing
+   .artchip-popover styling and the same 200ms hover-close-delay pattern as the Available
+   artefacts panel's tooltip - via a separate containerPopoverEl/state, since chipPopoverEl's
+   click handling is tightly coupled to artefact-specific actions. */
+const containerPopoverEl = document.createElement('div');
+containerPopoverEl.className = 'artchip-popover container-popover';
+document.body.appendChild(containerPopoverEl);
+let containerHoverCloseTimer = null;
+let containerPopoverOpenIdx = null;
+function cancelContainerHoverClose(){
+  if (containerHoverCloseTimer){ clearTimeout(containerHoverCloseTimer); containerHoverCloseTimer = null; }
+}
+function closeContainerPopover(){
+  containerPopoverEl.classList.remove('open');
+  containerPopoverOpenIdx = null;
+}
+function scheduleContainerHoverClose(){
+  containerHoverCloseTimer = setTimeout(()=>{ containerHoverCloseTimer = null; closeContainerPopover(); }, 200);
+}
+containerPopoverEl.addEventListener('mouseover', cancelContainerHoverClose);
+containerPopoverEl.addEventListener('mouseout', e=>{
+  if (e.relatedTarget && containerPopoverEl.contains(e.relatedTarget)) return;
+  scheduleContainerHoverClose();
+});
+function renderContainerPopover(idx){
+  const c = CONTAINERS[idx];
+  const meta = CONTAINER_TIER_META[c.tier];
+  const baseRow = (label, val) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:11.5px;">
+    <span style="color:var(--muted);">${label}</span>
+    <span style="font-family:var(--mono);color:var(--text);">${val}</span>
+  </div>`;
+  const bonusEntries = Object.entries(c.bonus);
+  const bonusHtml = bonusEntries.length
+    ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11.5px;">
+        ${bonusEntries.map(([n,v])=>`<div style="padding:2px 0;">${formatBonusStat(n,v)}</div>`).join('')}
+      </div>`
+    : '';
+  containerPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:${meta.color};font-weight:700;margin-bottom:6px;">${c.name}</div>
+    <div>${baseRow('Slots', c.slots)}${baseRow('Protection', c.protection + '%')}${baseRow('Effectiveness', c.effectiveness + '%')}</div>
+    ${bonusHtml}
+  `;
+}
+// Pins the popup just outside the dropdown panel's right edge (falling back to the left
+// edge, then to hugging the viewport), top-aligned to the hovered row - same idea as
+// positionPopoverBesidePanel above, generalized to take the panel as a parameter since
+// there are 4 of these dropdowns (main + 3 compare).
+function positionContainerPopover(anchorEl, panelEl){
+  const panelRect = panelEl.getBoundingClientRect();
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const popRect = containerPopoverEl.getBoundingClientRect();
+  const popW = Math.max(popRect.width, 150);
+  const popH = popRect.height;
+  let left = panelRect.right + 10;
+  if (left + popW > window.innerWidth - 8) left = panelRect.left - popW - 10; // no room to the right - try the left side instead
+  left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
+  const top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - popH - 8));
+  containerPopoverEl.style.left = left + 'px';
+  containerPopoverEl.style.top = top + 'px';
+}
+// Wraps a populated container <select> with a custom trigger+panel for click-to-select and
+// hover-to-preview-stats - see block comment above for why the <select> itself stays intact.
+function enhanceContainerSelect(selectEl){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'container-dd';
+  wrapper.setAttribute('style', selectEl.getAttribute('style') || ''); // preserve e.g. margin-bottom from the original <select>
+  selectEl.removeAttribute('style');
+  selectEl.parentNode.insertBefore(wrapper, selectEl);
+  wrapper.appendChild(selectEl);
+  selectEl.style.display = 'none';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'container-dd-trigger';
+  const triggerLabel = document.createElement('span');
+  trigger.appendChild(triggerLabel);
+  const caret = document.createElement('span');
+  caret.className = 'container-dd-caret';
+  caret.textContent = '\u25BE';
+  trigger.appendChild(caret);
+  wrapper.appendChild(trigger);
+
+  const panel = document.createElement('div');
+  panel.className = 'container-dd-panel';
+  wrapper.appendChild(panel);
+
+  function makeRow(opt){
+    const row = document.createElement('div');
+    row.className = 'container-dd-item';
+    row.textContent = opt.textContent;
+    row.style.color = opt.style.color || '';
+    row.dataset.value = opt.value;
+    return row;
+  }
+  // Built once from the <select>'s existing optgroup/option structure (single source of
+  // truth - same one populateContainerSelect built) - CONTAINERS doesn't change at runtime.
+  Array.from(selectEl.children).forEach(child=>{
+    if (child.tagName === 'OPTGROUP'){
+      const hdr = document.createElement('div');
+      hdr.className = 'container-dd-group-label';
+      hdr.textContent = child.label;
+      hdr.style.color = child.style.color;
+      panel.appendChild(hdr);
+      Array.from(child.children).forEach(opt => panel.appendChild(makeRow(opt)));
+    } else if (child.tagName === 'OPTION'){
+      panel.appendChild(makeRow(child));
+    }
+  });
+
+  function syncTrigger(){
+    const opt = selectEl.options[selectEl.selectedIndex];
+    triggerLabel.textContent = opt ? opt.textContent : '';
+    trigger.style.color = (opt && opt.style.color) || '';
+  }
+  function closePanel(){
+    panel.classList.remove('open');
+    document.removeEventListener('mousedown', onDocClick);
+    closeContainerPopover();
+  }
+  function openPanel(){
+    panel.classList.add('open');
+    document.addEventListener('mousedown', onDocClick);
+  }
+  function onDocClick(e){
+    if (!wrapper.contains(e.target)) closePanel();
+  }
+
+  syncTrigger();
+  selectEl.addEventListener('change', syncTrigger);
+
+  trigger.addEventListener('click', ()=>{
+    if (panel.classList.contains('open')) closePanel(); else openPanel();
+  });
+  panel.addEventListener('click', e=>{
+    const row = e.target.closest('.container-dd-item');
+    if (!row) return;
+    selectEl.value = row.dataset.value;
+    selectEl.dispatchEvent(new Event('change'));
+    closePanel();
+  });
+  panel.addEventListener('mouseover', e=>{
+    const row = e.target.closest('.container-dd-item');
+    if (!row) return;
+    const idx = parseInt(row.dataset.value);
+    if (isNaN(idx)) return; // "Custom (manual entry)" / "\u2014 None \u2014" rows have no stats to show
+    cancelContainerHoverClose();
+    if (containerPopoverOpenIdx === idx && containerPopoverEl.classList.contains('open')) return;
+    renderContainerPopover(idx);
+    positionContainerPopover(row, panel);
+    containerPopoverEl.classList.add('open');
+    containerPopoverOpenIdx = idx;
+  });
+  panel.addEventListener('mouseout', e=>{
+    const row = e.target.closest('.container-dd-item');
+    if (!row) return;
+    if (e.relatedTarget && (row.contains(e.relatedTarget) || containerPopoverEl.contains(e.relatedTarget))) return;
+    scheduleContainerHoverClose();
+  });
+}
+enhanceContainerSelect(backpackSelectEl);
+compareSelectEls.forEach(enhanceContainerSelect);
 
 // The currently selected container's own EXTRA flat bonus stats - i.e. everything other
 // than Carry weight, which has its own always-editable "Bonus Carry weight" field since
@@ -1757,9 +2056,24 @@ function clearBackpackSelection(){
   backpackSelectEl.style.color = '';
   activeContainerBonus = {};
   updateBackpackBonusNote();
+  backpackSelectEl.dispatchEvent(new Event('change'));
 }
 ['slotsInput','protInput','effInput','bonusCarryInput'].forEach(id=>{
   document.getElementById(id).addEventListener('input', clearBackpackSelection);
+});
+
+/* ---------- Compare-containers mode toggle ----------
+   Switches the Backpack panel between single-container manual entry and picking 2-3 named
+   containers to search side by side. Doesn't touch activeContainerBonus/getEffectiveContainerBonus
+   - those stay exactly as they are for single-container mode; compare mode reads bonuses
+   straight off CONTAINERS[i].bonus instead (see buildContainerSearchPayload/runComparisonSearch). */
+document.getElementById('compareModeChk').addEventListener('change', e=>{
+  const on = e.target.checked;
+  document.getElementById('bpFieldsRow').style.display = on ? 'none' : '';
+  backpackSelectEl.closest('label.field').style.display = on ? 'none' : '';
+  if (on) document.getElementById('backpackBonusNote').style.display = 'none';
+  else updateBackpackBonusNote(); // restore note to whatever it should show for the current selection
+  document.getElementById('compareContainersBlock').style.display = on ? '' : 'none';
 });
 
 /* ---------- Armor: Bullet Resistance -> Effective Health ----------
@@ -1945,6 +2259,153 @@ function buildPoolModeB(includeAdditional, effectiveness, level){
   });
 
   return {poolVecs, poolMax, poolMeta};
+}
+
+/* ---------- Per-container search payload builder ----------
+   Everything a single search needs to build the worker payload, parameterized by
+   containerCfg = {name, slots, protection, effectiveness, bonus} instead of reading
+   Slots/Protection/Effectiveness straight off the DOM. Shared by the normal single-search
+   flow (calcBtn.onclick builds containerCfg from the current DOM fields, name:null so
+   error text matches exactly what it always has) and Compare-containers mode (one call per
+   named CONTAINERS entry, name set so per-container errors can name the container).
+
+   sharedCtx = everything that does NOT vary per container: targetStats, includedIdx,
+   includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx (OWNED/PINNED are
+   read directly, same as today).
+
+   Returns either {error} or {payload, meta}: payload is exactly what gets posted to the
+   worker; meta carries what finishSearch/rendering need afterward. Global validation
+   (targetStats.length===0, empty pool, empty loadout) happens once in the caller, before
+   this is ever called - see calcBtn.onclick and runComparisonSearch. */
+function buildContainerSearchPayload(containerCfg, sharedCtx){
+  const { slots, protection, effectiveness, bonus } = containerCfg;
+  const { targetStats, includedIdx, includeAdditional, level, quality,
+          noDebuffIdx, useLoadout, pinnedIdx } = sharedCtx;
+
+  if (pinnedIdx.length >= slots){
+    const msg = containerCfg.name
+      ? `${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
+      : `${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} available. Unpin some or increase the slot count.`;
+    return { error: msg };
+  }
+
+  rebuildVecs(includeAdditional, effectiveness, level, quality);
+
+  // See "Backpack / container bonus stats" in the Project Summary: only the 5 threshold
+  // stats get baked into containerBaseVec (the actual calculation baseline). Every other
+  // bonus stat is display-only and never enters the search - that's what containerBonusMap
+  // (kept in full, unaggregated) is for, in meta below.
+  const containerBonusMap = { ...bonus };
+  const containerBaseVec = new Float64Array(NS);
+  Object.entries(containerBonusMap).forEach(([name, val]) => {
+    const si = STAT_IDX[name];
+    if (si !== undefined && STAT_META[name].threshold) containerBaseVec[si] += val;
+  });
+
+  const lockedSum = new Float64Array(NS);
+  for (let k=0;k<NS;k++) lockedSum[k] = containerBaseVec[k];
+  if (!useLoadout) {
+    pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
+  }
+
+  const pinnedQuality = {};
+  let poolVecs, poolMax, poolMeta;
+  if (useLoadout){
+    const built = buildPoolModeB(includeAdditional, effectiveness, level);
+    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
+    const totalUnits = poolMax.reduce((s,m)=>s+m, 0);
+    if (totalUnits < slots){
+      const msg = containerCfg.name
+        ? `Only ${totalUnits} favorited unit${totalUnits===1?'':'s'} \u2014 not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
+        : `You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.`;
+      return { error: msg };
+    }
+    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum. See §10
+    // in the Compare Containers guide: this check is "global" in outcome (OWNED/pin
+    // availability doesn't depend on the container) but doesn't need special-casing - it
+    // naturally falls out of building the pool per container.
+    if (pinnedIdx.length > 0) {
+      for (const pi of pinnedIdx) {
+        if (!OWNED[pi] || OWNED[pi].length === 0) {
+          return { error: `Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Favorite it first, or unpin it.` };
+        }
+      }
+      for (const pi of pinnedIdx) {
+        let bestLocalIdx = -1, bestQ = -1;
+        for (let i = 0; i < poolMeta.length; i++) {
+          if (poolMeta[i].artifactIdx === pi && poolMax[i] > 0 && poolMeta[i].quality > bestQ) {
+            bestQ = poolMeta[i].quality; bestLocalIdx = i;
+          }
+        }
+        if (bestLocalIdx === -1) {
+          return { error: `Not enough owned units of \u201c${ARTIFACTS[pi].name}\u201d to satisfy the pin. Favorite another copy, or unpin.` };
+        }
+        for (let k = 0; k < NS; k++) lockedSum[k] += poolVecs[bestLocalIdx][k];
+        poolMax[bestLocalIdx]--;
+        pinnedQuality[pi] = bestQ;
+      }
+    }
+  } else {
+    const built = buildPoolModeA(includedIdx);
+    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
+  }
+
+  // Optimization_02: pre-sort by descending solo raw score before the search starts (see
+  // ALGORITHM in the Project Summary) - pure reindexing, poolMeta still maps back correctly.
+  {
+    const soloScore = v => targetStats.reduce((s,t) => {
+      const dir = STAT_META[t.name].good ? 1 : -1;
+      return s + v[STAT_IDX[t.name]] * dir * t.weight;
+    }, 0);
+    const order = poolVecs.map((_,i)=>i).sort((a,b) => soloScore(poolVecs[b]) - soloScore(poolVecs[a]));
+    poolVecs = order.map(i=>poolVecs[i]);
+    poolMax  = order.map(i=>poolMax[i]);
+    poolMeta = order.map(i=>poolMeta[i]);
+  }
+
+  const statMaxMap = {};
+  for (const t of targetStats) {
+    const si = STAT_IDX[t.name];
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    let mx = 0;
+    for (const v of poolVecs) { const val = v[si] * dir; if (val > mx) mx = val; }
+    statMaxMap[t.name] = mx;
+  }
+
+  const freeSlots = slots - pinnedIdx.length;
+  const total = useLoadout ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
+  const totalFmt = total.toLocaleString();
+
+  const workerTargetStats = targetStats.map(t=>({
+    idx: STAT_IDX[t.name],
+    dir: STAT_META[t.name].good ? 1 : -1,
+    weight: t.weight,
+    tier: t.tier,
+    statMax: statMaxMap[t.name]
+  }));
+  const workerMinStats = targetStats
+    .filter(t=>t.min !== null)
+    .map(t=>({idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, min: t.min, statMax: statMaxMap[t.name]}));
+  const workerThresholds = THRESHOLD_STATS.map(s=>({
+    idx: STAT_IDX[s],
+    isFrost: s === 'Frost',
+    cap: thresholdCap(s),
+    extCap: thresholdExtCap(s),
+    bonus: containerBaseVec[STAT_IDX[s]]
+  }));
+
+  return {
+    payload: {
+      vecs: poolVecs.map(v=>Array.from(v)), maxCounts: poolMax, slots,
+      protection, targetStats: workerTargetStats, thresholds: workerThresholds,
+      minStats: workerMinStats, ns: NS, total, noDebuffIdx,
+      lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length
+    },
+    meta: {
+      poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
+      protection, total, totalFmt, containerCfg
+    }
+  };
 }
 
 /* ---------- Worker source (runs search off the main thread) ---------- */
@@ -2565,9 +3026,9 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   // their own column (rather than pairing into shared grid rows) keeps each column's
   // internal spacing/border-rhythm consistent instead of rows stretching to fit
   // whichever column happens to be taller at that index.
-  let gridHtml = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
-  gridHtml += '<div style="flex:1;display:flex;flex-direction:column;">' + gaugeCells.join('') + '</div>';
-  gridHtml += '<div style="flex:1;display:flex;flex-direction:column;">' + statCells.join('') + '</div>';
+  let gridHtml = '<div class="details-cols">';
+  gridHtml += '<div class="details-col">' + gaugeCells.join('') + '</div>';
+  gridHtml += '<div class="details-col">' + statCells.join('') + '</div>';
   gridHtml += '</div>';
   html += gridHtml;
 
@@ -2616,6 +3077,41 @@ function equalizeGridCardChips(resultsEl){
     const chipDivs = group.map(c => c.querySelector('.loadout-list'));
     const maxH = Math.max(...chipDivs.map(d => d ? d.getBoundingClientRect().height : 0));
     chipDivs.forEach(d => { if (d) d.style.minHeight = maxH + 'px'; });
+  }
+}
+
+// Compare mode's analogue of equalizeGridCardChips. Cards live in .compare-grid in
+// column-major DOM order (all of column A's cards, then B's, then C's), so alignment
+// has to be grouped by rank-across-columns instead of by contiguous DOM slices.
+// Also equalizes .target-line, since that row isn't touched by equalizeGridCardChips.
+function equalizeCompareCardChips(resultsEl){
+  const gridEl = resultsEl.querySelector('.compare-grid');
+  if (!gridEl) return;
+  const columns = Array.from(gridEl.querySelectorAll('.compare-column'));
+  if (columns.length < 2) return;
+
+  // Step 1: pin every chip to the same height, globally across all columns.
+  const allChips = Array.from(gridEl.querySelectorAll('.loadout-chip'));
+  if (allChips.length === 0) return;
+  const chipH = Math.max(...allChips.map(c => c.getBoundingClientRect().height));
+  allChips.forEach(c => { c.style.height = chipH + 'px'; });
+
+  // Step 2: group by rank across columns (column A's card #i with B's and C's card #i),
+  // not by DOM position. Columns can have fewer than 5 cards (or zero), so skip any
+  // column that has no card at a given rank rather than assuming a full row.
+  const columnCards = columns.map(col => Array.from(col.querySelectorAll('.result-card')));
+  const maxRank = Math.max(...columnCards.map(cards => cards.length));
+  for (let rank = 0; rank < maxRank; rank++){
+    const cardsAtRank = columnCards.map(cards => cards[rank]).filter(Boolean);
+    if (cardsAtRank.length < 2) continue;
+
+    const chipDivs = cardsAtRank.map(c => c.querySelector('.loadout-list')).filter(Boolean);
+    const maxChipH = Math.max(...chipDivs.map(d => d.getBoundingClientRect().height));
+    chipDivs.forEach(d => { d.style.minHeight = maxChipH + 'px'; });
+
+    const targetLines = cardsAtRank.map(c => c.querySelector('.target-line')).filter(Boolean);
+    const maxTargetH = Math.max(...targetLines.map(d => d.getBoundingClientRect().height));
+    targetLines.forEach(d => { d.style.minHeight = maxTargetH + 'px'; });
   }
 }
 
@@ -2923,7 +3419,7 @@ let showOwnedHighlight = false; // false in Mode B: every chip is from the loado
 let gridView = false;           // true = 3-column grid layout for results
 let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (still gated by showOwnedHighlight/Mode B above)
 let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
-let includeContainerBuffs = false; // user toggle (Valuable Stats > Extra Options): merge non-threshold
+let includeContainerBuffs = true; // user toggle (Valuable Stats > Extra Options): merge non-threshold
                                     // backpack/container bonus buffs (Carry weight, Bullet resistance,
                                     // etc.) into the displayed total instead of hiding them. Read
                                     // directly by fmtWithBonus and the stat-breakdown filters below -
@@ -2931,6 +3427,10 @@ let includeContainerBuffs = false; // user toggle (Valuable Stats > Extra Option
                                     // re-renders cached results/tips without re-running the search.
 let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
 let lastTipsArgs = null;        // cached upgrade-tips render args, same purpose
+let lastComparisonRenderArgs = null; // {columnResults, flatResults, targetStats} - columnResults lets
+                                      // the container-bonus toggle live-redraw the compare grid; flatResults
+                                      // is for the copy button in compare mode
+let compareModeActive = false;       // which render mode #results currently shows: true = compare-grid, false = normal
 
 function formatResultForDiscord(result, rank, targetStats){
   const {chosen, sum} = result;
@@ -2945,11 +3445,13 @@ function formatResultForDiscord(result, rank, targetStats){
 }
 document.getElementById('results').addEventListener('click', e=>{
   const btn = e.target.closest('.copy-result-btn');
-  if (!btn || !lastRenderArgs) return;
+  if (!btn) return;
   const idx = parseInt(btn.dataset.resultIdx);
-  const result = lastRenderArgs.displayResults[idx];
+  const source = compareModeActive ? lastComparisonRenderArgs : lastRenderArgs;
+  if (!source) return;
+  const result = compareModeActive ? source.flatResults[idx] : source.displayResults[idx];
   if (!result) return;
-  const text = formatResultForDiscord(result, idx + 1, lastRenderArgs.targetStats);
+  const text = formatResultForDiscord(result, idx + 1, source.targetStats);
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent = '\u2713 copied';
     btn.classList.add('copied');
@@ -2961,12 +3463,22 @@ document.getElementById('calcBtn').onclick = ()=>{
   if (activeWorker){
     activeWorker.terminate();
     activeWorker = null;
+    // If a compare-mode search is mid-container, its runOneWorker() promise is awaiting
+    // this resolve - fire it with null so runComparisonSearch's loop aborts the whole
+    // comparison instead of hanging forever (terminate() doesn't fire onmessage/onerror).
+    if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
     const btn = document.getElementById('calcBtn');
     btn.classList.remove('stop-mode');
     btn.textContent = 'Find best combination';
     document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Search stopped.</div>';
     return;
   }
+
+  if (document.getElementById('compareModeChk').checked){
+    runComparisonSearch();
+    return;
+  }
+
   const slots = Math.max(1, Math.min(7, parseInt(document.getElementById('slotsInput').value) || 1));
   const protection = Math.max(0, Math.min(100, parseFloat(document.getElementById('protInput').value) || 0));
   const effectiveness = Math.max(-100, Math.min(200, parseFloat(document.getElementById('effInput').value) || 0));
@@ -3003,6 +3515,8 @@ document.getElementById('calcBtn').onclick = ()=>{
   const el = document.getElementById('results');
   const btn = document.getElementById('calcBtn');
 
+  // Global validation - unchanged from before the refactor (see §10 of the Compare
+  // Containers guide: these three don't depend on which container is being searched).
   if (targetStats.length === 0){
     el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to optimize.</div>';
     return;
@@ -3011,124 +3525,34 @@ document.getElementById('calcBtn').onclick = ()=>{
     el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
     return;
   }
-  if (pinnedIdx.length >= slots){
-    el.innerHTML = `<h2>Result</h2><div class="msg-error">${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} available. Unpin some or increase the slot count.</div>`;
-    return;
-  }
-
-  // Cancel any previous search
-  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
-  document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
-  lastTipsArgs = null;
-
-  rebuildVecs(includeAdditional, effectiveness, level, quality);
-
-  // The selected container's own flat bonus stats (if any), plus the manually-entered
-  // Bonus Carry weight - used exactly as listed/typed, with no Level/Quality/
-  // Effectiveness formulas applied. containerBonusMap is kept around in full
-  // (unaggregated) so result cards can show either the artefact-only total or the
-  // artefact+bonus merged total, per the "Add containers bonus stats" toggle.
-  //
-  // Only the 5 threshold/gauge stats get baked into containerBaseVec (the actual
-  // calculation baseline fed to the worker): those bonuses can push a build over or
-  // under the damage cap, so they legitimately enable or rule out builds - they need
-  // to be part of the search. Every other bonus stat (Carry weight, Movement speed,
-  // Bullet resistance, etc.) is display-only: it's added on top for the result cards
-  // but never enters containerBaseVec, so it can't let the backpack itself satisfy a
-  // stat the search should be finding artefacts for.
-  const containerBonusMap = getEffectiveContainerBonus();
-  const containerBaseVec = new Float64Array(NS);
-  Object.entries(containerBonusMap).forEach(([name, val]) => {
-    const si = STAT_IDX[name];
-    if (si !== undefined && STAT_META[name].threshold) containerBaseVec[si] += val;
-  });
-
-  // Pre-compute the stat sum for locked artefacts; the worker starts from this non-zero
-  // base and only searches the remaining (slots − lockedSlots) free slots.
-  const lockedSum = new Float64Array(NS);
-  for (let k=0;k<NS;k++) lockedSum[k] = containerBaseVec[k];
-  if (!useLoadout) {
-    pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
-  }
-
-  // Build the search pool: Mode A is the regular ticked list (unbounded, global quality);
-  // Mode B (My Loadout) is bounded by owned count and scaled per-unit quality.
-  const pinnedQuality = {}; // Mode B: records which quality unit was consumed for each pin
-  let poolVecs, poolMax, poolMeta;
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
       el.innerHTML = '<h2>Result</h2><div class="msg-error">Favorite at least one artefact first (click a chip on a result card \u2192 Favorite), or untick "Use My Loadout".</div>';
       return;
     }
-    const built = buildPoolModeB(includeAdditional, effectiveness, level);
-    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
-    const totalUnits = poolMax.reduce((s,m)=>s+m, 0);
-    if (totalUnits < slots){
-      el.innerHTML = `<h2>Result</h2><div class="msg-error">You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.</div>`;
-      return;
-    }
-    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum.
-    if (pinnedIdx.length > 0) {
-      // First pass: validate every pin is actually favourited.
-      for (const pi of pinnedIdx) {
-        if (!OWNED[pi] || OWNED[pi].length === 0) {
-          el.innerHTML = `<h2>Result</h2><div class="msg-error">Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Favorite it first, or unpin it.</div>`;
-          return;
-        }
-      }
-      // Second pass: consume the highest-quality available unit of each pin.
-      for (const pi of pinnedIdx) {
-        let bestLocalIdx = -1, bestQ = -1;
-        for (let i = 0; i < poolMeta.length; i++) {
-          if (poolMeta[i].artifactIdx === pi && poolMax[i] > 0 && poolMeta[i].quality > bestQ) {
-            bestQ = poolMeta[i].quality; bestLocalIdx = i;
-          }
-        }
-        if (bestLocalIdx === -1) {
-          el.innerHTML = `<h2>Result</h2><div class="msg-error">Not enough owned units of \u201c${ARTIFACTS[pi].name}\u201d to satisfy the pin. Favorite another copy, or unpin.</div>`;
-          return;
-        }
-        for (let k = 0; k < NS; k++) lockedSum[k] += poolVecs[bestLocalIdx][k];
-        poolMax[bestLocalIdx]--;
-        pinnedQuality[pi] = bestQ;
-      }
-    }
-  } else {
-    const built = buildPoolModeA(includedIdx);
-    poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
   }
 
-  // Optimization_02 1b: sort the pool by descending solo raw score before the search
-  // starts. Pure reindexing - poolMeta still maps back to real artefacts for display,
-  // no combo is dropped or merged. Filling top/top_ext/top_miss with strong candidates
-  // early is what lets the worker's B&B bounds actually cut branches instead of staying
-  // loose for most of the run.
-  {
-    const soloScore = v => targetStats.reduce((s,t) => {
-      const dir = STAT_META[t.name].good ? 1 : -1;
-      return s + v[STAT_IDX[t.name]] * dir * t.weight;
-    }, 0);
-    const order = poolVecs.map((_,i)=>i).sort((a,b) => soloScore(poolVecs[b]) - soloScore(poolVecs[a]));
-    poolVecs = order.map(i=>poolVecs[i]);
-    poolMax  = order.map(i=>poolMax[i]);
-    poolMeta = order.map(i=>poolMeta[i]);
+  // Everything below is now built from a single containerCfg + sharedCtx pair and handed
+  // to buildContainerSearchPayload - the same function Compare-containers mode calls once
+  // per container (see §5 of the Compare Containers guide). name:null keeps the pin/loadout
+  // error text identical to what it always was here - only Compare mode's per-container
+  // errors name the container.
+  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx };
+  const containerCfg = { name: null, slots, protection, effectiveness, bonus: getEffectiveContainerBonus() };
+  const built = buildContainerSearchPayload(containerCfg, sharedCtx);
+  if (built.error){
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${built.error}</div>`;
+    return;
   }
+  const { payload, meta } = built;
+  const { poolMeta, pinnedQuality, containerBonusMap, containerBaseVec, total, totalFmt } = meta;
 
-  // Best single-artefact beneficial value per target stat, used to normalize tier scores.
-  const statMaxMap = {};
-  for (const t of targetStats) {
-    const si = STAT_IDX[t.name];
-    const dir = STAT_META[t.name].good ? 1 : -1;
-    let mx = 0;
-    for (const v of poolVecs) { const val = v[si] * dir; if (val > mx) mx = val; }
-    statMaxMap[t.name] = mx;
-  }
-
-  const freeSlots = slots - pinnedIdx.length;
-  const total = useLoadout ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
-  const totalFmt = total.toLocaleString();
+  // Cancel any previous search
+  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+  lastTipsArgs = null;
 
   // Show progress UI
   btn.classList.add('stop-mode');
@@ -3147,27 +3571,6 @@ document.getElementById('calcBtn').onclick = ()=>{
     </div>
     <div class="prog-status" id="progStatus">Initializing\u2026</div>
   `;
-
-  // Pre-compute per-stat index+direction for the worker (avoids string lookups inside tight loop)
-  const workerTargetStats = targetStats.map(t=>({
-    idx: STAT_IDX[t.name],
-    dir: STAT_META[t.name].good ? 1 : -1,
-    weight: t.weight,
-    tier: t.tier,
-    statMax: statMaxMap[t.name]
-  }));
-  // Direction-aware: dir already flips bad-stats so "min" always means "at least this
-  // much benefit", e.g. min 5 on Recoil requires Recoil <= -5.
-  const workerMinStats = targetStats
-    .filter(t=>t.min !== null)
-    .map(t=>({idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, min: t.min, statMax: statMaxMap[t.name]}));
-  const workerThresholds = THRESHOLD_STATS.map(s=>({
-    idx: STAT_IDX[s],
-    isFrost: s === 'Frost',
-    cap: thresholdCap(s),
-    extCap: thresholdExtCap(s),
-    bonus: containerBaseVec[STAT_IDX[s]]
-  }));
 
   const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
   const workerUrl = URL.createObjectURL(blob);
@@ -3239,6 +3642,7 @@ document.getElementById('calcBtn').onclick = ()=>{
   }
 
   function finishSearch(data){
+      compareModeActive = false; // this render mode always overwrites whatever #results last showed
       URL.revokeObjectURL(workerUrl);
       activeWorker = null;
       btn.disabled = false;
@@ -3294,22 +3698,328 @@ document.getElementById('calcBtn').onclick = ()=>{
     el.innerHTML = '<h2>Result</h2><div class="msg-error">Search error: ' + (err.message || 'unknown error') + '</div>';
   };
 
-  // Serialize pool vecs as plain arrays (structured-clone safe)
-  activeWorker.postMessage({
-    vecs: poolVecs.map(v=>Array.from(v)),
-    maxCounts: poolMax,
-    slots,
-    protection,
-    targetStats: workerTargetStats,
-    thresholds: workerThresholds,
-    minStats: workerMinStats,
-    ns: NS,
-    total,
-    noDebuffIdx,
-    lockedSum: Array.from(lockedSum),
-    lockedSlots: pinnedIdx.length
-  });
+  activeWorker.postMessage(payload);
 };
+
+/* ---------- Compare-containers mode: sequential orchestration + rendering ----------
+   See §6/§7 of the Compare Containers guide. Containers are searched one at a time
+   (not in parallel) - see §0's locked-in decision: keeps memory bounded to one pool/worker
+   at a time. Each container still gets its own stacked progress block (built in
+   runComparisonSearch, updated via runOneWorker's idx param) so earlier containers' bars
+   stay visible - "stacked" is a rendering choice only, the underlying search is still one
+   worker at a time, not three racing in parallel. */
+
+// Set by runOneWorker while a compare-mode search is in flight; lets the Stop button (in
+// calcBtn.onclick above) resolve the pending promise with null instead of leaving it hanging.
+let pendingWorkerResolve = null;
+
+// Promise-wrapped version of the same Worker/Blob/postMessage/onmessage pattern
+// calcBtn.onclick uses for a normal search - one call per container. `idx` is the
+// container's position in the comparison (0/1/2) and selects which stacked progress
+// block (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx}, built by
+// runComparisonSearch) this call updates - each container keeps its own block on
+// screen instead of the next container overwriting it. Resolves with the worker's
+// 'done' payload, {__workerError} if the worker threw, or null if the user pressed Stop.
+function runOneWorker(payload, slots, idx){
+  return new Promise(resolve=>{
+    pendingWorkerResolve = resolve;
+    const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+    const workerUrl = URL.createObjectURL(blob);
+    activeWorker = new Worker(workerUrl);
+
+    const total = payload.total;
+    const totalFmt = total.toLocaleString();
+    const startTime = Date.now();
+    const FAKE_FILL_MIN_MS = 3000; // 5+ slot searches: keep the bar visible at least this long
+    let lastShownPct = 0;
+    let lastShownDone = 0;
+
+    function animateFakeCompletion(durationMs, onComplete){
+      const startPct = lastShownPct;
+      const startDone = lastShownDone;
+      const animStart = Date.now();
+      const fillEl = document.getElementById('progFill'+idx);
+      const pctEl = document.getElementById('progPct'+idx);
+      const countEl = document.getElementById('progCount'+idx);
+      const statusEl = document.getElementById('progStatus'+idx);
+      if (statusEl) statusEl.textContent = 'Finishing up\u2026';
+      const timer = setInterval(()=>{
+        if (!activeWorker){ clearInterval(timer); return; } // cancelled via Stop button
+        const t = Math.min(1, (Date.now() - animStart) / durationMs);
+        const pct = Math.round(startPct + (100 - startPct) * t);
+        const shownDone = Math.round(startDone + (total - startDone) * t);
+        if (fillEl) fillEl.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (countEl) countEl.textContent = shownDone.toLocaleString() + ' / ' + totalFmt;
+        if (t >= 1){
+          clearInterval(timer);
+          onComplete();
+        }
+      }, 50);
+    }
+
+    function finish(data){
+      URL.revokeObjectURL(workerUrl);
+      activeWorker = null;
+      pendingWorkerResolve = null;
+      // Freeze this container's block at 100% and mark it done so it stays on screen,
+      // visually complete, while the next container's block appears below it.
+      const blockEl = document.getElementById('progBlock'+idx);
+      const fillEl = document.getElementById('progFill'+idx);
+      const pctEl = document.getElementById('progPct'+idx);
+      const countEl = document.getElementById('progCount'+idx);
+      const statusEl = document.getElementById('progStatus'+idx);
+      if (blockEl) blockEl.classList.add('done');
+      if (fillEl) fillEl.style.width = '100%';
+      if (pctEl) pctEl.textContent = '100%';
+      if (countEl) countEl.textContent = totalFmt + ' / ' + totalFmt;
+      if (statusEl) statusEl.textContent = '\u2714 DONE';
+      resolve(data);
+    }
+
+    activeWorker.onmessage = e=>{
+      if (e.data.type === 'progress'){
+        const done = e.data.done;
+        const pct = Math.min(99, Math.round(done / total * 100));
+        lastShownPct = pct;
+        lastShownDone = done;
+        const elapsed = (Date.now() - startTime) / 1000;
+        const rate = elapsed > 0 ? done / elapsed : 0;
+        const remaining = rate > 0 ? (total - done) / rate : 0;
+        const etaStr = remaining > 60
+          ? Math.round(remaining / 60) + ' min remaining'
+          : Math.round(remaining) + 's remaining';
+        const rateStr = rate > 0
+          ? (rate >= 1e6 ? (rate/1e6).toFixed(1)+'M' : Math.round(rate/1e3)+'K') + ' combinations/sec'
+          : '';
+        const fillEl = document.getElementById('progFill'+idx);
+        const pctEl = document.getElementById('progPct'+idx);
+        const countEl = document.getElementById('progCount'+idx);
+        const statusEl = document.getElementById('progStatus'+idx);
+        if (fillEl) fillEl.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (countEl) countEl.textContent = done.toLocaleString() + ' / ' + totalFmt;
+        if (statusEl) statusEl.textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
+      } else if (e.data.type === 'done'){
+        const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
+        if (remainingMs > 0) animateFakeCompletion(remainingMs, () => finish(e.data));
+        else finish(e.data);
+      }
+    };
+    activeWorker.onerror = err=>{
+      URL.revokeObjectURL(workerUrl);
+      activeWorker = null;
+      pendingWorkerResolve = null;
+      resolve({ __workerError: err.message || 'unknown error' });
+    };
+    activeWorker.postMessage(payload);
+  });
+}
+
+// Reads the 2-3 chosen containers + all the shared search fields, then searches them one
+// at a time via buildContainerSearchPayload + runOneWorker, collecting the top 5 builds per
+// container. Mirrors calcBtn.onclick's normal-mode field-reading exactly, since both modes
+// need the same sharedCtx shape - see buildContainerSearchPayload's doc comment.
+async function runComparisonSearch(){
+  const selects = ['compareSelect0','compareSelect1','compareSelect2']
+    .map(id => document.getElementById(id).value)
+    .filter(v => v !== 'none')
+    .map(v => CONTAINERS[parseInt(v)]);
+
+  const el = document.getElementById('results');
+  const btn = document.getElementById('calcBtn');
+
+  if (selects.length < 2){
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Pick at least 2 containers to compare.</div>';
+    return;
+  }
+
+  const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
+  const quality = parseInt(document.getElementById('qualityInput').value) || 100;
+  const targetStats = Array.from(statListEl.querySelectorAll('input[data-stat]:checked')).map(chk=>{
+    const item = chk.closest('.check-item');
+    const activeBtn = item.querySelector('.tier-btn.active');
+    const tier = activeBtn ? activeBtn.dataset.tier : 'med';
+    const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
+    const minInput = item.querySelector('.stat-min-input');
+    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value) : null;
+    return {name: chk.dataset.stat, weight, tier, min: (min !== null && !isNaN(min)) ? min : null};
+  });
+  const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
+  const includeAdditional = document.getElementById('includeAdditionalChk').checked;
+  const noDebuffIdx = NO_DEBUFF_FILTERS
+    .filter(f=>document.getElementById(f.btn).classList.contains('active'))
+    .map(f=>({idx: STAT_IDX[f.stat], dir: STAT_META[f.stat].good ? 1 : -1}));
+  const useLoadout = document.getElementById('useLoadoutChk').checked;
+  showOwnedHighlight = !useLoadout;
+
+  const pinnedIdx = Array.from(PINNED);
+  if (!useLoadout) {
+    pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
+  }
+
+  // Global validation, once - not per container (§10 of the guide: these three don't
+  // depend on which container is being searched, unlike the pin/loadout-capacity checks
+  // inside buildContainerSearchPayload).
+  if (targetStats.length === 0){
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to optimize.</div>';
+    return;
+  }
+  if (!useLoadout && includedIdx.length === 0){
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
+    return;
+  }
+  if (useLoadout){
+    const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
+    if (totalOwnedUnits === 0){
+      el.innerHTML = '<h2>Result</h2><div class="msg-error">Favorite at least one artefact first (click a chip on a result card \u2192 Favorite), or untick "Use My Loadout".</div>';
+      return;
+    }
+  }
+
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+  lastTipsArgs = null;
+
+  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx };
+
+  btn.classList.add('stop-mode');
+  btn.textContent = 'STOP';
+
+  const columnResults = [];
+
+  el.innerHTML = '<h2>Scanning</h2><div id="compareProgWrap"></div>';
+  const progWrap = document.getElementById('compareProgWrap');
+
+  for (let i = 0; i < selects.length; i++){
+    const containerCfg = selects[i];
+    const built = buildContainerSearchPayload(containerCfg, sharedCtx);
+
+    if (built.error){
+      columnResults.push({ containerCfg, error: built.error });
+      continue;
+    }
+
+    // Append this container's own block below any earlier ones instead of overwriting
+    // them, so each container's progress bar stays on screen (frozen at 100%/DONE by
+    // runOneWorker's finish()) once it completes. Color cycles by column position.
+    progWrap.insertAdjacentHTML('beforeend', `
+      <div class="compare-prog-block compare-prog-color-${i % 3}" id="progBlock${i}">
+        <p class="prog-tagline">Container ${i+1} of ${selects.length} \u2014 ${containerCfg.name}: checking <b>${built.meta.totalFmt}</b> possible combinations</p>
+        <div class="prog-row">
+          <span class="prog-row-label">Progress</span>
+          <span class="prog-count" id="progCount${i}">0 / ${built.meta.totalFmt}</span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill" id="progFill${i}" style="width:0%"></div>
+          <div class="prog-scan"></div>
+          <span class="prog-pct" id="progPct${i}">0%</span>
+        </div>
+        <div class="prog-status" id="progStatus${i}">Initializing\u2026</div>
+      </div>
+    `);
+
+    const data = await runOneWorker(built.payload, containerCfg.slots, i);
+
+    if (data === null){
+      // Stop pressed - calcBtn.onclick's Stop branch already reset the button and showed
+      // "Search stopped."; abort the whole comparison without rendering anything further.
+      return;
+    }
+    if (data.__workerError){
+      const blockEl = document.getElementById('progBlock'+i);
+      const statusEl = document.getElementById('progStatus'+i);
+      if (blockEl) blockEl.classList.add('errored');
+      if (statusEl) statusEl.textContent = '\u2716 Search error';
+      columnResults.push({ containerCfg, error: 'Search error: ' + data.__workerError });
+      continue;
+    }
+
+    const pinnedMerge = [];
+    {
+      const pc = {};
+      built.meta.pinnedIdx.forEach(pi => { pc[pi] = (pc[pi]||0) + 1; });
+      Object.entries(pc).forEach(([pi,cnt]) => pinnedMerge.push({idx:+pi, count:cnt, quality: useLoadout ? (built.meta.pinnedQuality[+pi] ?? null) : null}));
+    }
+    const mergeChosen = (best) => {
+      const chosen = [];
+      best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: built.meta.poolMeta[localI].artifactIdx, count: c, quality: built.meta.poolMeta[localI].quality}); });
+      pinnedMerge.forEach(pc => {
+        const ex = chosen.find(c => c.idx === pc.idx);
+        if (ex) ex.count += pc.count; else chosen.push({idx:pc.idx, count:pc.count, quality:pc.quality});
+      });
+      return chosen;
+    };
+    // Compare mode always shows the plain top-5, no Extended/min-fallback/coverage-fallback
+    // variants - see §0 of the guide.
+    const top5 = (data.top || []).slice(0, 5).map(best => ({
+      chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts
+    }));
+    columnResults.push({ containerCfg, results: top5, meta: built.meta });
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('stop-mode');
+  btn.textContent = 'Find best combination';
+
+  compareModeActive = true;
+  renderComparisonResults(columnResults, targetStats);
+}
+
+// Renders the 2-3 column comparison grid. No Extended-results toggle, no per-column
+// Upgrade tips (both explicitly out of scope for compare mode - §0/§9). The "Add
+// containers bonus stats" toggle IS wired here (see includeContainerBuffsChk listener
+// above) - it re-renders all columns in place via the cached columnResults.
+function renderComparisonResults(columnResults, targetStats){
+  const flatResults = [];
+  let flatIdx = 0;
+
+  const columnsHtml = columnResults.map(col => {
+    const tierColor = CONTAINER_TIER_META[col.containerCfg.tier].color;
+    if (col.error){
+      return `<div class="compare-column">
+        <div class="compare-col-header" style="color:${tierColor};">${col.containerCfg.name}</div>
+        <div class="msg-error">${col.error}</div>
+      </div>`;
+    }
+    if (col.results.length === 0){
+      return `<div class="compare-column">
+        <div class="compare-col-header" style="color:${tierColor};">${col.containerCfg.name}</div>
+        <div class="empty-state">No valid combination for this container. The container's bonus stats do NOT count towards required stats minimums.</div>
+      </div>`;
+    }
+    let cardsHtml = '';
+    col.results.forEach((r, i) => {
+      cardsHtml += renderResultCard(
+        r, targetStats, col.meta.protection, i + 1, false,
+        null, flatIdx, false, null, null, col.meta.containerBonusMap
+      );
+      flatResults.push(r);
+      flatIdx++;
+    });
+    return `<div class="compare-column">
+      <div class="compare-col-header" style="color:${tierColor};">
+        ${col.containerCfg.name}
+        <span class="compare-col-sub">${col.containerCfg.slots} slots \u00b7 ${col.containerCfg.protection}% prot \u00b7 ${col.containerCfg.effectiveness}% eff</span>
+      </div>
+      ${cardsHtml}
+    </div>`;
+  }).join('');
+
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML =
+    `<h2>Container comparison</h2><div class="compare-grid">${columnsHtml}</div>`;
+  equalizeCompareCardChips(resultsEl);
+
+  lastComparisonRenderArgs = { columnResults, flatResults, targetStats };
+
+  const allUsedIdx = usedArtifactIndices(columnResults.flatMap(c => c.results || []));
+  highlightUsedArtifacts(allUsedIdx);
+
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+}
+
 </script>
 </body>
 </html>
