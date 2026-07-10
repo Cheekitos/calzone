@@ -268,6 +268,16 @@
   }
   .lvl-btn:last-child{border-right:none;}
   .lvl-btn.active{background:var(--accent-dim);color:var(--text);}
+  /* Build form's own LVL 0/15 toggle - deliberately NOT .lvl-btn (see build module comment):
+     document.querySelectorAll('.lvl-btn') below runs at page load and would otherwise pick up
+     these buttons since they're static markup, cross-writing into #levelInput/#includeAdditionalChk. */
+  .build-lvl-btn{
+    flex:1;background:none;border:none;border-right:1px solid var(--border);
+    color:var(--muted);font-size:13px;padding:8px 6px;cursor:pointer;
+    font-family:var(--mono);letter-spacing:0.06em;
+  }
+  .build-lvl-btn:last-child{border-right:none;}
+  .build-lvl-btn.active{background:var(--accent-dim);color:var(--text);}
   .lvl-note{font-size:11px;margin-top:6px;letter-spacing:0.02em;color:var(--muted);}
   .lvl-note.on{color:var(--good);}
 
@@ -429,6 +439,8 @@
   }
   .copy-result-btn:hover{color:var(--accent);border-color:var(--accent-dim);}
   .copy-result-btn.copied{color:var(--good);border-color:var(--good);}
+  .copy-result-btn.save-build-btn{margin-left:6px;}
+  .save-build-btn.saved{color:var(--good);border-color:var(--good);}
 
   /* Owned / Top-stat highlight toggles - same shape as view-btn, but each is an
      independent on/off rather than a mutually-exclusive pair, and its "on" color
@@ -521,7 +533,7 @@
         </label>
         <div class="note" id="backpackBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
         <div class="field" id="compareContainersBlock" style="display:none;margin-bottom:14px;">
-          <span class="lbl">Compare (2–3 containers)</span>
+          <span class="lbl">Compare containers</span>
           <select id="compareSelect0" style="margin-bottom:6px;"><option value="none" selected style="color:var(--text);">-- None --</option></select>
           <select id="compareSelect1" style="margin-bottom:6px;"><option value="none" selected style="color:var(--text);">-- None --</option></select>
           <select id="compareSelect2"><option value="none" selected style="color:var(--text);">-- None --</option></select>
@@ -614,6 +626,65 @@
           <input type="checkbox" id="useLoadoutChk">
           <span class="name">Only use my loadout for next search</span>
         </label>
+
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-top:3px;margin-bottom:6px;">
+          <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">My Builds</span>
+          <span style="display:flex;gap:10px;">
+            <!-- Builds export/import share the My Loadout export/import buttons above (one combined file) - only "clear all" stays build-specific. -->
+            <button type="button" id="clearBuildsBtn" class="loadout-action-btn" style="color:var(--bad);">clear all</button>
+          </span>
+        </div>
+        <div class="check-list" id="buildsList" style="max-height:160px;"></div>
+        <button type="button" id="newBuildBtn" class="loadout-action-btn" style="color:var(--accent);margin-top:8px;">+ new build</button>
+
+        <div id="buildForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="field">
+            <span class="lbl">Name</span>
+            <input type="text" id="buildNameInput" placeholder="Build name…" autocomplete="off">
+          </label>
+          <label class="field">
+            <span class="lbl">Container</span>
+            <select id="buildContainerSelect"><option value="none" selected style="color:var(--text);">-- Select container --</option></select>
+          </label>
+          <div class="note" id="buildTruncNote" style="display:none;margin-top:-2px;margin-bottom:10px;color:var(--accent);"></div>
+
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span class="lbl">Level</span>
+            <div class="lvl-toggle" id="buildLevelToggle" style="width:140px;">
+              <button type="button" class="build-lvl-btn active" data-lvl="0">LVL 0</button>
+              <button type="button" class="build-lvl-btn" data-lvl="15">LVL 15</button>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span class="lbl">Artefacts</span>
+            <span style="color:var(--muted);font-size:11.5px;" id="buildSlotCountLabel">0/0</span>
+          </div>
+          <div class="check-list" id="buildSlotsList" style="max-height:160px;"></div>
+
+          <div id="buildAddWrap" style="position:relative;margin-top:8px;margin-bottom:8px;">
+            <input type="text" id="buildSearchInput" placeholder="Type artefact name…" autocomplete="off">
+            <div id="buildSearchDd" class="loadout-search-dd"></div>
+          </div>
+          <div id="buildAddRow" class="row-inline" style="display:none;">
+            <select id="buildQualitySelect" style="flex:1;">
+              <option value="100">Common - 100%</option>
+              <option value="115">Uncommon - 115%</option>
+              <option value="130">Special - 130%</option>
+              <option value="145">Rare - 145%</option>
+              <option value="160">Exclusive - 160%</option>
+              <option value="175">Legendary - 175%</option>
+            </select>
+            <button type="button" id="buildAddArtBtn" class="primary" style="width:auto;margin:0;padding:8px 16px;flex-shrink:0;">Add</button>
+          </div>
+          <div class="note" id="buildCapNote" style="display:none;color:var(--accent);"></div>
+
+          <div class="msg-error" id="buildErrorEl" style="display:none;margin-top:8px;"></div>
+          <div style="display:flex;gap:10px;margin-top:12px;">
+            <button type="button" id="buildCancelBtn" class="loadout-action-btn" style="color:var(--accent);flex:1;padding:8px;">Cancel</button>
+            <button type="button" id="buildSaveBtn" class="primary" style="flex:1;margin:0;">Save build</button>
+          </div>
+        </div>
 
       </div>
 
@@ -1016,12 +1087,12 @@ document.getElementById('includeContainerBuffsChk').addEventListener('change', e
   includeContainerBuffs = e.target.checked;
   if (compareModeActive){
     if (lastComparisonRenderArgs){
-      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats);
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
     }
     return;
   }
   if (lastRenderArgs){
-    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
   }
   if (lastTipsArgs){
     renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
@@ -1038,6 +1109,7 @@ const DEFAULT_OFF = new Set([
 // exclusion list and the My Loadout favorites are saved to localStorage) ---
 const LS_EXCLUDED = 'artiCalc_excluded';
 const LS_OWNED = 'artiCalc_owned';
+const LS_BUILDS = 'artiCalc_builds';
 
 function loadExcludedNames(){
   try {
@@ -1065,8 +1137,53 @@ function loadOwned(){
 function saveOwned(){
   try { localStorage.setItem(LS_OWNED, JSON.stringify(OWNED)); } catch(e){}
 }
+// Migrates a build saved under the old per-slot shape ({ name, container, slots: fixed-
+// length array of {artifact,level,quality}|null }) to the current shape ({ name, container,
+// level, slots: dense array of {artifact,quality} }). A build already in the new shape has a
+// top-level `level` of 0 or 15 and passes through untouched (filled/slice below are no-ops
+// on an already-dense array with no nulls).
+function migrateBuildEntry(entry){
+  const rawSlots = Array.isArray(entry.slots) ? entry.slots : [];
+  const filled = rawSlots.filter(s => s);
+  let level = entry.level;
+  if (level !== 0 && level !== 15){
+    // No build-wide level stored (old per-slot format) - best-effort default: this build's
+    // first filled slot's own level, or 0 if none. Individual per-slot level/quality mixes
+    // from before this pass can't be losslessly represented by one build-wide value.
+    level = (filled.length && filled[0].level === 15) ? 15 : 0;
+  }
+  return {
+    name: entry.name,
+    container: entry.container,
+    level,
+    slots: filled.map(s => ({ artifact: s.artifact, quality: s.quality }))
+  };
+}
+function loadBuilds(){
+  try {
+    const raw = localStorage.getItem(LS_BUILDS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(b => b && typeof b.name === 'string' && typeof b.container === 'string').map(migrateBuildEntry);
+  } catch(e){ return []; }
+}
+function saveBuilds(){
+  try { localStorage.setItem(LS_BUILDS, JSON.stringify(BUILDS)); } catch(e){}
+}
 // { [artifactIdx]: [quality, quality, ...] } -- one entry per physically owned unit.
 let OWNED = loadOwned();
+// Plain array of saved builds - see "My Builds" block below for shape/behavior.
+let BUILDS = loadBuilds();
+// Populated by the "My Builds" block below - lets the shared My Loadout export/import
+// handlers (same file, see that section) close an in-progress build form and import
+// build data without the two features needing to know about each other's internals.
+let buildsCloseForm = null;
+let buildsImportData = null;
+// Populated by the "My Builds" block below - lets the save-to-build button on a result
+// card (same file, see the copy-result-btn / save-build-btn click handler) push a build
+// through the same validate/push/persist/re-render path the My Builds form itself uses.
+let buildsSaveFromResult = null;
 let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
 
 const artifactListEl = document.getElementById('artifactList');
@@ -1205,7 +1322,7 @@ const ownedListEl = document.getElementById('ownedList');
 function renderOwnedList(){
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
   if (indices.length === 0){
-    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts favorited yet - click an artefact chip on a result card and choose "Favorite".</div>';
+    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts favorited yet</div>';
     return;
   }
   indices.sort((a,b) => ARTIFACTS[a].name.localeCompare(ARTIFACTS[b].name));
@@ -1525,7 +1642,13 @@ document.getElementById('exportLoadoutBtn').onclick = ()=>{
   const data = {
     type: 'artiCalc-loadout',
     version: 1,
-    artifacts: indices.map(i => ({ name: ARTIFACTS[i].name, qualities: OWNED[i].slice() }))
+    artifacts: indices.map(i => ({ name: ARTIFACTS[i].name, qualities: OWNED[i].slice() })),
+    builds: BUILDS.map(b => ({
+      name: b.name,
+      container: b.container,
+      level: b.level,
+      slots: b.slots.map(s => ({ artifact: s.artifact, quality: s.quality }))
+    }))
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1547,27 +1670,44 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
     let data;
     try { data = JSON.parse(reader.result); }
     catch(err){ alert('Import failed: not valid JSON.'); return; }
-    if (!data || !Array.isArray(data.artifacts)){
+    const hasArtifacts = data && Array.isArray(data.artifacts);
+    const hasBuilds = data && Array.isArray(data.builds);
+    if (!hasArtifacts && !hasBuilds){
       alert('Import failed: file is not a recognized loadout export.');
       return;
     }
-    if (Object.keys(OWNED).length > 0 && !confirm('This will replace your current loadout. Continue?')) return;
-    const nameToIdx = {};
-    ARTIFACTS.forEach((a,i)=>{ nameToIdx[a.name] = i; });
-    const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
-    const newOwned = {};
-    let skipped = 0;
-    data.artifacts.forEach(entry=>{
-      const idx = nameToIdx[entry && entry.name];
-      const qualities = (entry && Array.isArray(entry.qualities)) ? entry.qualities.filter(q=>validQ.has(q)) : [];
-      if (idx === undefined || qualities.length === 0){ skipped++; return; }
-      newOwned[idx] = qualities;
-    });
-    OWNED = newOwned;
-    saveOwned();
-    renderOwnedList();
-    updateAllHeartStates();
-    alert('Loadout imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (unrecognized artefact or quality).' : ''));
+    const willReplaceOwned = hasArtifacts && Object.keys(OWNED).length > 0;
+    const willReplaceBuilds = hasBuilds && BUILDS.length > 0;
+    let confirmMsg = null;
+    if (willReplaceOwned && willReplaceBuilds) confirmMsg = 'This will replace your current loadout and saved builds. Continue?';
+    else if (willReplaceOwned) confirmMsg = 'This will replace your current loadout. Continue?';
+    else if (willReplaceBuilds) confirmMsg = 'This will replace your saved builds. Continue?';
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    if (buildsCloseForm) buildsCloseForm(); // force-close/discard any in-progress build create/edit form first - it replaces BUILDS wholesale
+    let msg = '';
+    if (hasArtifacts){
+      const nameToIdx = {};
+      ARTIFACTS.forEach((a,i)=>{ nameToIdx[a.name] = i; });
+      const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
+      const newOwned = {};
+      let skipped = 0;
+      data.artifacts.forEach(entry=>{
+        const idx = nameToIdx[entry && entry.name];
+        const qualities = (entry && Array.isArray(entry.qualities)) ? entry.qualities.filter(q=>validQ.has(q)) : [];
+        if (idx === undefined || qualities.length === 0){ skipped++; return; }
+        newOwned[idx] = qualities;
+      });
+      OWNED = newOwned;
+      saveOwned();
+      renderOwnedList();
+      updateAllHeartStates();
+      msg += 'Loadout imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (unrecognized artefact or quality).' : '');
+    }
+    if (hasBuilds && buildsImportData){
+      const skipped = buildsImportData(data.builds);
+      msg += (msg ? ' ' : '') + 'Builds imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (missing name or unrecognized container).' : '');
+    }
+    alert(msg);
   };
   reader.onerror = ()=>{ alert('Import failed: could not read file.'); };
   reader.readAsText(file);
@@ -1808,7 +1948,7 @@ function populateContainerSelect(selectEl){
 const backpackSelectEl = document.getElementById('backpackSelect');
 populateContainerSelect(backpackSelectEl);
 
-// Compare-mode selects: same options, "\u2014 None \u2014" (hardcoded in the HTML) is
+// Compare-mode selects: same options, "-- None --" (hardcoded in the HTML) is
 // their only non-container value, same role as "custom" on backpackSelectEl.
 const compareSelectEls = ['compareSelect0','compareSelect1','compareSelect2'].map(id=>document.getElementById(id));
 compareSelectEls.forEach(sel=>{
@@ -1972,7 +2112,7 @@ function enhanceContainerSelect(selectEl){
     const row = e.target.closest('.container-dd-item');
     if (!row) return;
     const idx = parseInt(row.dataset.value);
-    if (isNaN(idx)) return; // "Custom (manual entry)" / "\u2014 None \u2014" rows have no stats to show
+    if (isNaN(idx)) return; // "Custom (manual entry)" / "-- None --" rows have no stats to show
     cancelContainerHoverClose();
     if (containerPopoverOpenIdx === idx && containerPopoverEl.classList.contains('open')) return;
     renderContainerPopover(idx);
@@ -1989,6 +2129,377 @@ function enhanceContainerSelect(selectEl){
 }
 enhanceContainerSelect(backpackSelectEl);
 compareSelectEls.forEach(enhanceContainerSelect);
+
+/* ---------- My Builds: create / save / list / edit / delete + export / import ----------
+   BUILDS is a plain array of { name, container, level, slots } (see LS_BUILDS above) -
+   container and each slots[i].artifact are stored as NAMES (survive CONTAINERS/ARTIFACTS
+   reordering), not indices. `level` is a single build-wide LVL 0/15 value (CHANGED this
+   pass - was per-slot). `slots` is now a dense array of {artifact,quality} entries only
+   (no null placeholders / no fixed positional length) - one entry per artefact added, up
+   to the container's capacity; the same artefact can appear more than once (fills multiple
+   slots). Comparing a build against search results is out of scope this session. */
+(function(){
+  const buildsListEl = document.getElementById('buildsList');
+  const buildFormEl = document.getElementById('buildForm');
+  const buildNameInput = document.getElementById('buildNameInput');
+  const buildContainerSelect = document.getElementById('buildContainerSelect');
+  const buildTruncNote = document.getElementById('buildTruncNote');
+  const buildLevelToggleEl = document.getElementById('buildLevelToggle');
+  const buildSlotsListEl = document.getElementById('buildSlotsList');
+  const buildSlotCountLabel = document.getElementById('buildSlotCountLabel');
+  const buildAddWrap = document.getElementById('buildAddWrap');
+  const buildAddRow = document.getElementById('buildAddRow');
+  const buildCapNote = document.getElementById('buildCapNote');
+  const buildErrorEl = document.getElementById('buildErrorEl');
+
+  // populateContainerSelect's option.value is the CONTAINERS array INDEX, not the name (same
+  // as backpackSelectEl/compareSelectEls) - Save/Edit-prefill below convert explicitly.
+  populateContainerSelect(buildContainerSelect);
+  enhanceContainerSelect(buildContainerSelect);
+
+  let editingBuildRef = null; // direct reference to the build object being edited, or null when creating
+  let formSlots = [];         // array of {artifact,quality}, length <= current container's capacity, duplicates allowed
+  let formLevel = 0;          // single build-wide LVL 0/15 value
+
+  function currentCap(){
+    const val = buildContainerSelect.value;
+    if (val === 'none') return 0;
+    const c = CONTAINERS[parseInt(val)];
+    return c ? c.slots : 0;
+  }
+
+  function renderBuildsList(){
+    if (BUILDS.length === 0){
+      buildsListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No builds saved yet</div>';
+      return;
+    }
+    let html = '';
+    BUILDS.forEach((b, i)=>{
+      const containerObj = CONTAINERS.find(c => c.name === b.container);
+      const color = containerObj ? CONTAINER_TIER_META[containerObj.tier].color : 'var(--muted)';
+      const cap = containerObj ? containerObj.slots : b.slots.length;
+      html += `<div class="check-item build-row" data-idx="${i}" style="cursor:pointer;">
+        <span class="name">${b.name}</span>
+        <span style="color:${color};font-size:12px;">${b.container}</span>
+        <span style="color:var(--muted);font-size:11.5px;">${b.slots.length}/${cap} slots \u00b7 LVL ${b.level}</span>
+      </div>`;
+    });
+    buildsListEl.innerHTML = html;
+  }
+  renderBuildsList();
+
+  /* ---- Artefact list (single add point, like My Loadout's Add Artefact) ----
+     One search box + quality select + Add button (own ids - #loadoutSearchInput etc. stay
+     the Favorited list's own, untouched) appends {artifact,quality} to formSlots. Each row
+     in the list shows the artefact name as a quality-colored pill with a red \u2715 to remove
+     it directly - no popover, no per-row level/quality editing (level is build-wide, see
+     buildLevelToggleEl above; quality is fixed at add time - re-add at a different quality
+     to change it). Capped at the selected container's capacity; the same artefact can be
+     added more than once to fill multiple slots. */
+  function renderFormSlotsList(){
+    const cap = currentCap();
+    buildSlotCountLabel.textContent = formSlots.length + '/' + cap;
+    if (formSlots.length === 0){
+      buildSlotsListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts added yet.</div>';
+    } else {
+      buildSlotsListEl.innerHTML = formSlots.map((s,i)=>`<div class="check-item" data-i="${i}">
+        <span class="quality-pill ${QUALITY_CLASS[s.quality]}">${s.artifact}</span>
+        <button type="button" class="build-art-remove loadout-action-btn" style="color:var(--bad);flex:0 0 auto;" data-i="${i}">\u2715</button>
+      </div>`).join('');
+    }
+    const atCap = cap > 0 && formSlots.length >= cap;
+    const noContainer = cap === 0;
+    buildAddWrap.style.display = (atCap || noContainer) ? 'none' : '';
+    if (atCap || noContainer) buildAddRow.style.display = 'none';
+    if (noContainer){
+      buildCapNote.textContent = 'Select a container first.';
+      buildCapNote.style.display = '';
+    } else if (atCap){
+      buildCapNote.textContent = 'Container full (' + cap + '/' + cap + ' slots) - remove an artefact to add another.';
+      buildCapNote.style.display = '';
+    } else {
+      buildCapNote.style.display = 'none';
+      buildCapNote.textContent = '';
+    }
+  }
+
+  buildSlotsListEl.addEventListener('click', e=>{
+    const btn = e.target.closest('.build-art-remove');
+    if (!btn) return;
+    formSlots.splice(parseInt(btn.dataset.i), 1);
+    renderFormSlotsList();
+  });
+
+  const buildSearchInput = document.getElementById('buildSearchInput');
+  const buildSearchDd = document.getElementById('buildSearchDd');
+  const buildQualitySelect = document.getElementById('buildQualitySelect');
+  let buildSelectedIdx = null;
+
+  function showBuildDd(matches){
+    buildSearchDd.innerHTML = matches.map(m => `<div class="loadout-search-item" data-idx="${m.idx}">${m.name}</div>`).join('');
+    buildSearchDd.classList.add('open');
+  }
+  function hideBuildDd(){ buildSearchDd.classList.remove('open'); }
+
+  buildSearchInput.addEventListener('input', ()=>{
+    const q = buildSearchInput.value.trim().toLowerCase();
+    if (!q){ hideBuildDd(); buildAddRow.style.display = 'none'; buildSelectedIdx = null; return; }
+    const matches = ARTIFACTS
+      .map((a, i) => ({name: a.name, idx: i}))
+      .filter(a => a.name.toLowerCase().includes(q))
+      .slice(0, 12);
+    if (matches.length) showBuildDd(matches); else hideBuildDd();
+  });
+  buildSearchDd.addEventListener('click', e=>{
+    const item = e.target.closest('.loadout-search-item');
+    if (!item) return;
+    buildSelectedIdx = parseInt(item.dataset.idx);
+    buildSearchInput.value = ARTIFACTS[buildSelectedIdx].name;
+    hideBuildDd();
+    buildAddRow.style.display = ''; // row-inline class provides display:flex
+  });
+  document.addEventListener('click', e=>{
+    if (!buildSearchDd.classList.contains('open')) return;
+    if (buildSearchInput.contains(e.target) || buildSearchDd.contains(e.target)) return;
+    hideBuildDd();
+  });
+  document.getElementById('buildAddArtBtn').addEventListener('click', ()=>{
+    if (buildSelectedIdx === null) return;
+    const cap = currentCap();
+    if (cap > 0 && formSlots.length >= cap) return; // guard - add row should already be hidden at cap
+    const q = parseInt(buildQualitySelect.value) || 100;
+    formSlots.push({artifact: ARTIFACTS[buildSelectedIdx].name, quality: q});
+    renderFormSlotsList();
+    buildSearchInput.value = '';
+    buildAddRow.style.display = 'none';
+    buildSelectedIdx = null;
+  });
+
+  /* ---- Build-wide LVL 0/15 toggle - .build-lvl-btn, NOT .lvl-btn (see CSS comment) so the
+     page's global document.querySelectorAll('.lvl-btn') handler (which writes into the
+     singleton #levelInput/#includeAdditionalChk/#lvlNote) never touches it. ---- */
+  buildLevelToggleEl.addEventListener('click', e=>{
+    const btn = e.target.closest('.build-lvl-btn');
+    if (!btn) return;
+    buildLevelToggleEl.querySelectorAll('.build-lvl-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    formLevel = parseInt(btn.dataset.lvl);
+  });
+
+  /* ---- Container select: cap formSlots to the new capacity, warn on truncation ---- */
+  function onBuildContainerChange(){
+    const cap = currentCap();
+    if (formSlots.length > cap){
+      const dropped = formSlots.length - cap;
+      formSlots = formSlots.slice(0, cap);
+      buildTruncNote.textContent = dropped + ' artefact' + (dropped===1?'':'s') + ' removed - new container only holds ' + cap + '.';
+      buildTruncNote.style.display = '';
+    } else {
+      buildTruncNote.style.display = 'none';
+      buildTruncNote.textContent = '';
+    }
+    renderFormSlotsList();
+  }
+  buildContainerSelect.addEventListener('change', onBuildContainerChange);
+
+  /* ---- Create / edit form open/close ---- */
+  function showBuildError(msg){
+    buildErrorEl.textContent = msg;
+    buildErrorEl.style.display = '';
+  }
+  function setFormLevel(lvl){
+    formLevel = lvl;
+    buildLevelToggleEl.querySelectorAll('.build-lvl-btn').forEach(b=>b.classList.toggle('active', parseInt(b.dataset.lvl) === lvl));
+  }
+  function openBuildForm(build){
+    editingBuildRef = build; // null = create; a real BUILDS entry ref = edit (REVIEW FIX: identity is the object reference itself, not a name or captured index)
+    buildErrorEl.style.display = 'none';
+    buildErrorEl.textContent = '';
+    buildNameInput.value = build ? build.name : '';
+    if (build){
+      formSlots = build.slots.map(s => ({artifact:s.artifact, quality:s.quality}));
+      setFormLevel(build.level === 15 ? 15 : 0);
+      const idx = CONTAINERS.findIndex(c => c.name === build.container);
+      buildContainerSelect.value = String(idx);
+    } else {
+      formSlots = [];
+      setFormLevel(0);
+      buildContainerSelect.value = 'none';
+    }
+    buildSearchInput.value = '';
+    hideBuildDd();
+    buildAddRow.style.display = 'none';
+    buildSelectedIdx = null;
+    buildContainerSelect.dispatchEvent(new Event('change')); // syncs custom dropdown label/color + re-renders the artefact list
+    buildFormEl.style.display = '';
+  }
+  function closeBuildForm(){
+    buildFormEl.style.display = 'none';
+    editingBuildRef = null;
+    formSlots = [];
+  }
+  document.getElementById('newBuildBtn').addEventListener('click', ()=> openBuildForm(null));
+  document.getElementById('buildCancelBtn').addEventListener('click', closeBuildForm);
+  document.getElementById('buildSaveBtn').addEventListener('click', ()=>{
+    const name = buildNameInput.value.trim();
+    if (!name){ showBuildError('Name is required.'); return; }
+    if (BUILDS.some(b => b.name === name && b !== editingBuildRef)){ showBuildError('A build with that name already exists.'); return; }
+    const containerVal = buildContainerSelect.value;
+    if (containerVal === 'none'){ showBuildError('Select a container.'); return; }
+    if (formSlots.length === 0){ showBuildError('Add at least one artefact before saving.'); return; }
+    const containerObj = CONTAINERS[parseInt(containerVal)];
+    const newData = {
+      name,
+      container: containerObj.name,
+      level: formLevel,
+      slots: formSlots.map(s => ({artifact:s.artifact, quality:s.quality}))
+    };
+    // REVIEW FIX: identity for the edit-save write-back is the captured object reference
+    // itself (immune to renames and to reordering from a delete/import elsewhere), not a
+    // re-match by name or a captured array index.
+    if (editingBuildRef) Object.assign(editingBuildRef, newData);
+    else BUILDS.push(newData);
+    saveBuilds();
+    renderBuildsList();
+    closeBuildForm();
+  });
+
+  /* ---- Row popover: own element/state, click-triggered (outside click / Escape / re-click
+     to close - NOT containerPopoverEl's hover/mouseout-timer pattern, since this isn't
+     hover-triggered), with its own positioning function since positionPopover() is
+     hardcoded to move chipPopoverEl specifically. ---- */
+  const buildPopoverEl = document.createElement('div');
+  buildPopoverEl.className = 'artchip-popover';
+  document.body.appendChild(buildPopoverEl);
+  let buildPopoverOpenRef = null;
+
+  function closeBuildPopover(){
+    buildPopoverEl.classList.remove('open');
+    buildPopoverOpenRef = null;
+  }
+  function positionBuildPopover(anchorEl){
+    const r = anchorEl.getBoundingClientRect();
+    const popRect = buildPopoverEl.getBoundingClientRect();
+    const popW = Math.max(popRect.width, 230);
+    const popH = popRect.height;
+    let left = Math.min(r.left, window.innerWidth - popW - 10);
+    left = Math.max(8, left);
+    let top = r.bottom + 6;
+    if (top + popH > window.innerHeight - 8) top = r.top - popH - 6;
+    top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+    buildPopoverEl.style.left = left + 'px';
+    buildPopoverEl.style.top = top + 'px';
+  }
+  function openBuildPopover(anchorEl, build){
+    buildPopoverOpenRef = build;
+    const containerObj = CONTAINERS.find(c => c.name === build.container);
+    const color = containerObj ? CONTAINER_TIER_META[containerObj.tier].color : 'var(--muted)';
+    const cap = containerObj ? containerObj.slots : build.slots.length;
+    const artListHtml = build.slots.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;max-width:260px;">${build.slots.map(s=>`<span class="quality-pill ${QUALITY_CLASS[s.quality]}" style="font-size:11px;">${s.artifact}</span>`).join('')}</div>`
+      : `<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">No artefacts.</div>`;
+    buildPopoverEl.innerHTML = `
+      <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:4px;">${build.name}</div>
+      <div style="font-size:12px;color:${color};margin-bottom:8px;">${build.container} - ${build.slots.length}/${cap} slots \u00b7 LVL ${build.level}</div>
+      ${artListHtml}
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="buildPopoverEdit" class="loadout-action-btn" style="color:var(--accent);">Edit</button>
+        <button type="button" id="buildPopoverDelete" class="loadout-action-btn" style="color:var(--bad);">Delete</button>
+      </div>`;
+    positionBuildPopover(anchorEl);
+    buildPopoverEl.classList.add('open');
+    document.getElementById('buildPopoverEdit').addEventListener('click', ()=>{
+      const b = buildPopoverOpenRef;
+      closeBuildPopover();
+      openBuildForm(b);
+    });
+    document.getElementById('buildPopoverDelete').addEventListener('click', ()=>{
+      const b = buildPopoverOpenRef;
+      if (!confirm('Delete build "' + b.name + '"? This cannot be undone.')) return;
+      const idx = BUILDS.indexOf(b);
+      if (idx !== -1) BUILDS.splice(idx, 1);
+      saveBuilds();
+      renderBuildsList();
+      closeBuildPopover();
+    });
+  }
+  buildsListEl.addEventListener('click', e=>{
+    const row = e.target.closest('.build-row');
+    if (!row) return;
+    const build = BUILDS[parseInt(row.dataset.idx)];
+    if (!build) return;
+    if (buildPopoverOpenRef === build && buildPopoverEl.classList.contains('open')){ closeBuildPopover(); return; }
+    openBuildPopover(row, build);
+  });
+  document.addEventListener('click', e=>{
+    if (!buildPopoverEl.classList.contains('open')) return;
+    if (buildPopoverEl.contains(e.target)) return;
+    if (e.target.closest('.build-row')) return;
+    closeBuildPopover();
+  });
+  document.addEventListener('keydown', e=>{ if (e.key === 'Escape') closeBuildPopover(); });
+
+  /* ---- Import (shared file with My Loadout - see exportLoadoutBtn/importLoadoutFile above)
+     and clear all. Export needs no separate wiring here: exportLoadoutBtn already reads
+     BUILDS directly since it's a plain top-level array. ---- */
+  function importBuildsData(buildsArr){
+    const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
+    const artNames = new Set(ARTIFACTS.map(a => a.name));
+    const byName = {}; // later duplicate name wins, per file order
+    let skipped = 0;
+    buildsArr.forEach(entry=>{
+      const name = entry && typeof entry.name === 'string' ? entry.name.trim() : '';
+      const containerObj = entry ? CONTAINERS.find(c => c.name === entry.container) : null;
+      if (!name || !containerObj){ skipped++; return; }
+      const cap = containerObj.slots;
+      // migrateBuildEntry handles files exported before this pass (per-slot level/quality,
+      // null-padded fixed-length slots, no build-level `level`) the same way loadBuilds()
+      // does for existing localStorage data - see its comment above.
+      const migrated = migrateBuildEntry(entry);
+      const slots = migrated.slots
+        .filter(s => artNames.has(s.artifact) && validQ.has(s.quality))
+        .slice(0, cap);
+      byName[name] = { name, container: containerObj.name, level: migrated.level, slots };
+    });
+    BUILDS = Object.values(byName);
+    saveBuilds();
+    renderBuildsList();
+    return skipped;
+  }
+  // Save-to-build from a result card (see the save-build-btn click handler further down):
+  // same push/persist/re-render path as the form's own Save button above, but auto-suffixes
+  // on a name collision ("Name (2)") instead of rejecting, since there's no form here to show
+  // an inline error in - the result card just needs a name up front. containerName/slots are
+  // expected already resolved to real names (see caller) - an unrecognized container name is
+  // the only failure mode, signaled by returning null instead of the final saved name.
+  function saveBuildFromResult(name, containerName, level, slots){
+    const containerObj = CONTAINERS.find(c => c.name === containerName);
+    if (!containerObj) return null;
+    let finalName = name;
+    let n = 2;
+    while (BUILDS.some(b => b.name === finalName)){
+      finalName = `${name} (${n})`;
+      n++;
+    }
+    BUILDS.push({ name: finalName, container: containerObj.name, level, slots: slots.slice(0, containerObj.slots) });
+    saveBuilds();
+    renderBuildsList();
+    return finalName;
+  }
+
+  // REVIEW FIX (carried over from builds-only import): force-close/discard any in-progress
+  // create/edit form before either of these run, since both replace BUILDS wholesale.
+  buildsCloseForm = closeBuildForm;
+  buildsImportData = importBuildsData;
+  buildsSaveFromResult = saveBuildFromResult;
+
+  document.getElementById('clearBuildsBtn').onclick = ()=>{
+    closeBuildForm();
+    BUILDS = [];
+    saveBuilds();
+    renderBuildsList();
+  };
+})();
 
 // The currently selected container's own EXTRA flat bonus stats - i.e. everything other
 // than Carry weight, which has its own always-editable "Bonus Carry weight" field since
@@ -2316,7 +2827,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     const totalUnits = poolMax.reduce((s,m)=>s+m, 0);
     if (totalUnits < slots){
       const msg = containerCfg.name
-        ? `Only ${totalUnits} favorited unit${totalUnits===1?'':'s'} \u2014 not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
+        ? `Only ${totalUnits} favorited unit${totalUnits===1?'':'s'} - not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
         : `You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.`;
       return { error: msg };
     }
@@ -2910,14 +3421,9 @@ function computeTopStatSets(results, targetStats){
 }
 
 function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus){
-  const {chosen, sum, score, ts} = result;
+  const {chosen, sum} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
   let html = `<div class="result-card" style="${borderStyle}">`;
-  const tierParts = [];
-  if (targetStats.some(t=>t.tier==='high')) tierParts.push(`H: ${ts.h.toFixed(2)}`);
-  if (targetStats.some(t=>t.tier==='med'))  tierParts.push(`M: ${ts.m.toFixed(2)}`);
-  if (targetStats.some(t=>t.tier==='low'))  tierParts.push(`L: ${ts.l.toFixed(2)}`);
-  const scoreText = tierParts.length ? tierParts.join(' · ') : `score ${score.toFixed(3)}`;
 
   // For consumable-zone cards, build small over-threshold badges for the header
   let overBadges = '';
@@ -2939,10 +3445,13 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const copyBtn = (!isExtended && resultIndex >= 0)
     ? `<button type="button" class="copy-result-btn" data-result-idx="${resultIndex}" title="Copy to clipboard for Discord">📋 copy</button>`
     : '';
+  const saveBuildBtn = (!isExtended && resultIndex >= 0)
+    ? `<button type="button" class="copy-result-btn save-build-btn" data-result-idx="${resultIndex}" title="Save to My Builds">💾 save</button>`
+    : '';
   const minStatusNote = minStatus === 'met'
     ? '<span class="min-status-note met">(Meet thresholds)</span>'
     : '';
-  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span>${minStatusNote}<span class="score-line" style="margin:0;" title="Normalized per-tier sums - ranked by H first, then M, then L as tiebreakers">${scoreText}</span>${overBadges}${wouldBeNote}${copyBtn}</div>`;
+  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span>${minStatusNote}${overBadges}${wouldBeNote}${copyBtn}${saveBuildBtn}</div>`;
 
   // Effective Health: display-only, computed from this build's Bullet resistance +
   // Vitality (respecting the "Add containers bonus stats" toggle, so it always matches
@@ -3118,8 +3627,8 @@ function equalizeCompareCardChips(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
-function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults){
-  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults};
+function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel){
+  lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel};
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
 
   // Backfill with min-stat fallback builds when fewer than RESULTS_DISPLAY_CAP results
@@ -3197,14 +3706,14 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
     });
   });
   el.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
       else topStatHighlightOn = !topStatHighlightOn;
-      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
     });
   });
 
@@ -3444,7 +3953,9 @@ function formatResultForDiscord(result, rank, targetStats){
   return `${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
 }
 document.getElementById('results').addEventListener('click', e=>{
-  const btn = e.target.closest('.copy-result-btn');
+  // save-build-btn also carries the copy-result-btn class for shared styling (see CSS) -
+  // exclude it here so it doesn't double-fire this handler; it has its own below.
+  const btn = e.target.closest('.copy-result-btn:not(.save-build-btn)');
   if (!btn) return;
   const idx = parseInt(btn.dataset.resultIdx);
   const source = compareModeActive ? lastComparisonRenderArgs : lastRenderArgs;
@@ -3457,6 +3968,62 @@ document.getElementById('results').addEventListener('click', e=>{
     btn.classList.add('copied');
     setTimeout(()=>{ btn.textContent = '\ud83d\udccb copy'; btn.classList.remove('copied'); }, 1500);
   }).catch(()=>{});
+});
+
+// Save-to-build: prompts for a name, then pushes the result's container/level/artefact+
+// quality-per-slot into BUILDS via buildsSaveFromResult (same save path the My Builds form
+// uses - see the "My Builds" block above). Normal-mode results carry a single global level/
+// quality (cached on lastRenderArgs at search time); compare-mode results share level/quality
+// across all columns too, but each column has its own real container name (found by walking
+// columnResults to locate which column the flat index falls in).
+document.getElementById('results').addEventListener('click', e=>{
+  const btn = e.target.closest('.save-build-btn');
+  if (!btn) return;
+  const idx = parseInt(btn.dataset.resultIdx);
+  let result, level, quality, containerName;
+  if (compareModeActive){
+    const source = lastComparisonRenderArgs;
+    if (!source) return;
+    result = source.flatResults[idx];
+    level = source.level;
+    quality = source.quality;
+    let remaining = idx;
+    for (const col of source.columnResults){
+      if (col.error) continue;
+      if (remaining < col.results.length){ containerName = col.containerCfg.name; break; }
+      remaining -= col.results.length;
+    }
+  } else {
+    const source = lastRenderArgs;
+    if (!source) return;
+    result = source.displayResults[idx];
+    level = source.level;
+    quality = source.quality;
+    // "Custom (manual entry)" has no real CONTAINERS entry to save a build under.
+    if (source.containerSel === 'custom'){
+      alert('This search used a Custom container, which has no saved name. Pick a preset container and re-run the search to save this as a build.');
+      return;
+    }
+    const containerObj = CONTAINERS[parseInt(source.containerSel)];
+    containerName = containerObj ? containerObj.name : null;
+  }
+  if (!result || !containerName || !buildsSaveFromResult) return;
+  const name = prompt('Build name:');
+  if (!name || !name.trim()) return;
+  // Expand chosen {idx,count,quality} entries into a dense per-slot list, same shape as
+  // the My Builds form's formSlots - each entry's own quality if set, else the search's
+  // global quality (mirrors the fallback renderResultCard uses to display each chip).
+  const slots = [];
+  result.chosen.forEach(c=>{
+    const q = c.quality != null ? c.quality : quality;
+    for (let i = 0; i < c.count; i++) slots.push({artifact: ARTIFACTS[c.idx].name, quality: q});
+  });
+  const savedName = buildsSaveFromResult(name.trim(), containerName, level, slots);
+  if (savedName){
+    btn.textContent = '\u2713 saved';
+    btn.classList.add('saved');
+    setTimeout(()=>{ btn.textContent = '\ud83d\udcbe save'; btn.classList.remove('saved'); }, 1500);
+  }
 });
 
 document.getElementById('calcBtn').onclick = ()=>{
@@ -3669,7 +4236,7 @@ document.getElementById('calcBtn').onclick = ()=>{
       const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults);
+      renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults, level, quality, backpackSelectEl.value);
 
       // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
       // build while sweeping one enabler's level -- that doesn't hold for a bounded,
@@ -3905,7 +4472,7 @@ async function runComparisonSearch(){
     // runOneWorker's finish()) once it completes. Color cycles by column position.
     progWrap.insertAdjacentHTML('beforeend', `
       <div class="compare-prog-block compare-prog-color-${i % 3}" id="progBlock${i}">
-        <p class="prog-tagline">Container ${i+1} of ${selects.length} \u2014 ${containerCfg.name}: checking <b>${built.meta.totalFmt}</b> possible combinations</p>
+        <p class="prog-tagline">Container ${i+1} of ${selects.length} - ${containerCfg.name}: checking <b>${built.meta.totalFmt}</b> possible combinations</p>
         <div class="prog-row">
           <span class="prog-row-label">Progress</span>
           <span class="prog-count" id="progCount${i}">0 / ${built.meta.totalFmt}</span>
@@ -3963,15 +4530,20 @@ async function runComparisonSearch(){
   btn.textContent = 'Find best combination';
 
   compareModeActive = true;
-  renderComparisonResults(columnResults, targetStats);
+  renderComparisonResults(columnResults, targetStats, level, quality);
 }
 
 // Renders the 2-3 column comparison grid. No Extended-results toggle, no per-column
 // Upgrade tips (both explicitly out of scope for compare mode - §0/§9). The "Add
 // containers bonus stats" toggle IS wired here (see includeContainerBuffsChk listener
 // above) - it re-renders all columns in place via the cached columnResults.
-function renderComparisonResults(columnResults, targetStats){
-  const flatResults = [];
+function renderComparisonResults(columnResults, targetStats, level, quality){
+  // Flattened up front (rather than accumulated during the render loop below) so topSets
+  // can be computed from the complete cross-column list before any card is rendered -
+  // "Top stats" here highlights the top-2 per stat across ALL columns combined, not
+  // per-column, so a card needs its global flatIdx position resolved against this list.
+  const flatResults = columnResults.flatMap(col => col.results || []);
+  const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats) : null;
   let flatIdx = 0;
 
   const columnsHtml = columnResults.map(col => {
@@ -3992,9 +4564,8 @@ function renderComparisonResults(columnResults, targetStats){
     col.results.forEach((r, i) => {
       cardsHtml += renderResultCard(
         r, targetStats, col.meta.protection, i + 1, false,
-        null, flatIdx, false, null, null, col.meta.containerBonusMap
+        topSets, flatIdx, false, null, null, col.meta.containerBonusMap
       );
-      flatResults.push(r);
       flatIdx++;
     });
     return `<div class="compare-column">
@@ -4006,15 +4577,28 @@ function renderComparisonResults(columnResults, targetStats){
     </div>`;
   }).join('');
 
+  const hlToggleHtml = `<div class="hl-toggle-group">
+        <button type="button" class="hl-toggle-btn toggle-owned${ownedHighlightOn ? ' active' : ''}" data-hl="owned" title="Highlight chips you already own">Owned</button>
+        <button type="button" class="hl-toggle-btn toggle-topstat${topStatHighlightOn ? ' active' : ''}" data-hl="topstat" title="Highlight the top-2 result for each target stat, across all columns">Top stats</button>
+      </div>`;
+
   const resultsEl = document.getElementById('results');
   resultsEl.innerHTML =
-    `<h2>Container comparison</h2><div class="compare-grid">${columnsHtml}</div>`;
+    `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${hlToggleHtml}</div></div><div class="compare-grid">${columnsHtml}</div>`;
   equalizeCompareCardChips(resultsEl);
 
-  lastComparisonRenderArgs = { columnResults, flatResults, targetStats };
+  lastComparisonRenderArgs = { columnResults, flatResults, targetStats, level, quality };
 
   const allUsedIdx = usedArtifactIndices(columnResults.flatMap(c => c.results || []));
   highlightUsedArtifacts(allUsedIdx);
+
+  resultsEl.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if (btn.dataset.hl === 'owned') ownedHighlightOn = !ownedHighlightOn;
+      else topStatHighlightOn = !topStatHighlightOn;
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+    });
+  });
 
   document.getElementById('consumableZone').innerHTML = '';
   document.getElementById('upgradeTips').innerHTML = '';
