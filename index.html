@@ -477,7 +477,7 @@
 <div class="wrap">
   <header>
     <h1>ARTEFACT <span>LOADOUT</span> CALCULATOR</h1>
-    <p>This is a work in progress. Please contact me if you spot any bugs or wrong data <a href="mailto:cheekitos@proton.me">here</a>.</p>
+    <p>This is a work in progress. Please contact me if you spot any bugs or wrong data <a href="#" id="revealEmailLink">here</a><span id="revealedEmail"></span>.</p>
     <p>Always double check your build results on the official <a href="https://stalzone.wiki/en/builds-calculator" target="_blank" rel="noopener">Builds Calculator</a>.</p>
   </header>
 
@@ -4469,6 +4469,19 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   document.getElementById('upgradeTips').innerHTML = '';
 }
 
+(function(){
+  var link = document.getElementById('revealEmailLink');
+  var target = document.getElementById('revealedEmail');
+  if (link && target) {
+    link.addEventListener('click', function(e){
+      e.preventDefault();
+      target.textContent = ' cheekitos@proton.me';
+      target.style.color = 'var(--accent)';
+      target.style.fontWeight = '700';
+      link.remove();
+    });
+  }
+})();
 </script>
 </body>
 </html>
