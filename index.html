@@ -120,6 +120,7 @@
   .row-inline label.field{flex:1;}
 
   .check-list{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:6px;background:var(--panel-2);}
+  #ownedList{transition:max-height 0.3s ease;}
   #artifactList{max-height:600px;}
   #statList{max-height:375px;}
   .check-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:3px;cursor:pointer;font-size:13px;}
@@ -584,7 +585,7 @@
       </div>
 
 
-      <div class="panel">
+      <div class="panel" id="myLoadoutPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h2 style="margin:0;">My Loadout</h2>
           <span style="display:flex;gap:10px;">
@@ -600,6 +601,7 @@
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Favorited</span>
           <span style="display:flex;gap:10px;">
+            <button type="button" id="expandLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">expand</button>
             <button type="button" id="clearLoadoutBtn" class="loadout-action-btn" style="color:var(--bad);">clear</button>
           </span>
         </div>
@@ -1286,11 +1288,26 @@ function highlightUsedArtifacts(indices){
 
 /* ---------- My Loadout: owned-artefacts list + chip popover ---------- */
 const ownedListEl = document.getElementById('ownedList');
+const expandLoadoutBtnEl = document.getElementById('expandLoadoutBtn');
+let ownedListExpanded = false;
+
+// Explicit pixel max-heights on both ends (not 'auto') so the CSS transition above always has
+// a real start/end value to animate between - collapsing back to the fixed 160px, expanding to
+// this render's actual scrollHeight so it settles fully open with no clipping or leftover scroll.
+function applyOwnedListHeight(){
+  ownedListEl.style.maxHeight = ownedListExpanded ? ownedListEl.scrollHeight + 'px' : '160px';
+}
+expandLoadoutBtnEl.addEventListener('click', ()=>{
+  ownedListExpanded = !ownedListExpanded;
+  expandLoadoutBtnEl.textContent = ownedListExpanded ? 'collapse' : 'expand';
+  applyOwnedListHeight();
+});
 
 function renderOwnedList(){
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
   if (indices.length === 0){
     ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts favorited yet</div>';
+    applyOwnedListHeight();
     return;
   }
   indices.sort((a,b) => ARTIFACTS[a].name.localeCompare(ARTIFACTS[b].name));
@@ -1306,6 +1323,7 @@ function renderOwnedList(){
     </div>`;
   });
   ownedListEl.innerHTML = html;
+  applyOwnedListHeight();
 }
 renderOwnedList();
 ownedListEl.addEventListener('click', e=>{
@@ -2292,31 +2310,51 @@ compareSelectEls.forEach(enhanceContainerSelect);
     closeBuildForm();
   });
 
-  /* ---- Row popover: own element/state, click-triggered (not containerPopoverEl's hover
-     pattern), with its own positioning fn since positionPopover() is hardcoded to
-     chipPopoverEl. ---- */
+  /* ---- Row popover: own element/state, hover-triggered (mirrors artifactListEl's hover
+     pattern for the Available artefacts tooltip), positioned beside myLoadoutPanel the same
+     way that tooltip is positioned beside availableArtefactsPanel. ---- */
   const buildPopoverEl = document.createElement('div');
   buildPopoverEl.className = 'artchip-popover';
   document.body.appendChild(buildPopoverEl);
   let buildPopoverOpenRef = null;
+  const myLoadoutPanelEl = document.getElementById('myLoadoutPanel');
 
   function closeBuildPopover(){
     buildPopoverEl.classList.remove('open');
     buildPopoverOpenRef = null;
   }
+  // Pins the popup outside myLoadoutPanel's right edge at a fixed x, tracking only the row's
+  // y - see positionPopoverBesidePanel (Available artefacts) for the identical approach.
   function positionBuildPopover(anchorEl){
-    const r = anchorEl.getBoundingClientRect();
+    const panelRect = myLoadoutPanelEl.getBoundingClientRect();
+    const anchorRect = anchorEl.getBoundingClientRect();
     const popRect = buildPopoverEl.getBoundingClientRect();
     const popW = Math.max(popRect.width, 230);
     const popH = popRect.height;
-    let left = Math.min(r.left, window.innerWidth - popW - 10);
+    let left = panelRect.right + 10;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
     left = Math.max(8, left);
-    let top = r.bottom + 6;
-    if (top + popH > window.innerHeight - 8) top = r.top - popH - 6;
-    top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+    let top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - popH - 8));
     buildPopoverEl.style.left = left + 'px';
     buildPopoverEl.style.top = top + 'px';
   }
+  // Hover-close delay, same 200ms pattern as artifactListEl's hoverCloseTimer - keeps the
+  // popover open long enough for the cursor to travel into it (e.g. to click Edit/Delete).
+  let buildHoverCloseTimer = null;
+  function cancelBuildHoverClose(){
+    if (buildHoverCloseTimer){ clearTimeout(buildHoverCloseTimer); buildHoverCloseTimer = null; }
+  }
+  function scheduleBuildHoverClose(){
+    buildHoverCloseTimer = setTimeout(()=>{
+      buildHoverCloseTimer = null;
+      closeBuildPopover();
+    }, 200);
+  }
+  buildPopoverEl.addEventListener('mouseover', cancelBuildHoverClose);
+  buildPopoverEl.addEventListener('mouseout', e=>{
+    if (e.relatedTarget && buildPopoverEl.contains(e.relatedTarget)) return;
+    scheduleBuildHoverClose();
+  });
   function openBuildPopover(anchorEl, build){
     buildPopoverOpenRef = build;
     const containerObj = CONTAINERS.find(c => c.name === build.container);
@@ -2350,13 +2388,21 @@ compareSelectEls.forEach(enhanceContainerSelect);
       closeBuildPopover();
     });
   }
-  buildsListEl.addEventListener('click', e=>{
+  buildsListEl.addEventListener('mouseover', e=>{
     const row = e.target.closest('.build-row');
     if (!row) return;
+    if (e.relatedTarget && row.contains(e.relatedTarget)) return; // moving within the same row
+    cancelBuildHoverClose();
     const build = BUILDS[parseInt(row.dataset.idx)];
     if (!build) return;
-    if (buildPopoverOpenRef === build && buildPopoverEl.classList.contains('open')){ closeBuildPopover(); return; }
+    if (buildPopoverOpenRef === build && buildPopoverEl.classList.contains('open')) return; // already open, e.g. re-entering
     openBuildPopover(row, build);
+  });
+  buildsListEl.addEventListener('mouseout', e=>{
+    const row = e.target.closest('.build-row');
+    if (!row) return;
+    if (e.relatedTarget && (row.contains(e.relatedTarget) || buildPopoverEl.contains(e.relatedTarget))) return;
+    scheduleBuildHoverClose();
   });
   document.addEventListener('click', e=>{
     if (!buildPopoverEl.classList.contains('open')) return;
@@ -4587,7 +4633,7 @@ function computeRowStatList(rowResults){
   const ehWinners = pickRowWinners(ehVals);
 
   const stats = [];
-  // Follow Valuable Stats order (Utility then Combat only — Misc excluded from compare view).
+  // Follow Valuable Stats order (Utility then Combat only - Misc excluded from compare view).
   STAT_CATEGORIES.slice(0, 2).flatMap(c => c.names).forEach(name=>{
     const idx = STAT_IDX[name];
     const present = rowResults.some(rb => Math.abs(rb.result.sum[idx]) >= 1e-6);
@@ -4626,7 +4672,7 @@ function renderBuildComparePanel(rb, i, statList, containerName){
   statList.stats.forEach(s=>{
     const val = sum[STAT_IDX[s.name]];
     if (Math.abs(val) < 1e-6){
-      html += `<span class="target-pill" style="color:var(--muted);">${s.name}: \u2014</span>`;
+      html += `<span class="target-pill" style="color:var(--muted);">${s.name}: -</span>`;
     } else {
       const win = s.winners.has(i);
       const good = displayGoodValue(s.name, val, containerBonus, protection);
@@ -4654,7 +4700,7 @@ function rerenderBuildsRow(containerName){
 //   outer-left 25%  → insert before (gap bar on left edge)
 //   center 50%      → swap positions (panel highlight + scale)
 //   outer-right 25% → insert after  (gap bar on right edge)
-// Cross-row dragging is silently ignored — a build's backpack is fixed data.
+// Cross-row dragging is silently ignored - a build's backpack is fixed data.
 let buildsDragSource = null; // {containerName, buildName}
 let buildsDragTarget = null; // {buildName, mode: 'before'|'on'|'after'}
 
@@ -4702,7 +4748,7 @@ function wireBuildsCompareDragRow(scopeEl){
     });
     panel.addEventListener('dragover', e=>{
       if (!buildsDragSource || buildsDragSource.containerName !== panel.dataset.container) return;
-      if (panel.dataset.buildName === buildsDragSource.buildName) return; // own panel — no indicator
+      if (panel.dataset.buildName === buildsDragSource.buildName) return; // own panel - no indicator
       e.preventDefault();
       const rect = panel.getBoundingClientRect();
       const frac = (e.clientX - rect.left) / rect.width;
