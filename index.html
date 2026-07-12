@@ -470,6 +470,25 @@
   .compare-column{display:flex;flex-direction:column;gap:10px;min-width:0;}
   .compare-col-header{font-family:var(--mono);font-size:13px;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--border);}
   .compare-col-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:400;margin-top:2px;}
+
+  /* Compare My Builds: one row per backpack, builds within a row side by side in a
+     horizontally-scrollable strip - see compare-builds-plan.md. */
+  .compare-builds-row + .compare-builds-row{margin-top:22px;}
+  .build-compare-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;}
+  .build-compare-panel{margin-bottom:0;position:relative;transition:transform 0.15s ease,opacity 0.15s ease,box-shadow 0.15s ease;}
+  .build-compare-close{position:absolute;top:6px;right:6px;width:18px;height:18px;line-height:16px;text-align:center;
+    border:1px solid var(--border);border-radius:50%;background:var(--panel-2);color:var(--bad);font-size:13px;
+    cursor:pointer;padding:0;z-index:3;}
+  .build-compare-close:hover{background:var(--bad);color:#fff;border-color:var(--bad);}
+  .build-compare-panel[draggable="true"]{cursor:grab;}
+  .build-compare-panel.dragging{opacity:0.45;filter:grayscale(0.4);}
+  /* Center zone: swap highlight (scale + amber bg). */
+  .build-compare-panel.drag-over{border-color:var(--accent);background:rgba(201,137,63,0.1);outline:2px solid var(--accent);outline-offset:-1px;transform:scale(1.03);box-shadow:0 6px 20px rgba(0,0,0,0.45);z-index:1;}
+  /* Edge zones: gap bars appear between panels (outer 25% of panel width each side). */
+  .build-compare-panel.drop-before::before,
+  .build-compare-panel.drop-after::after{content:'';position:absolute;top:0;bottom:0;width:3px;background:var(--accent);border-radius:2px;box-shadow:0 0 8px rgba(201,137,63,0.7);z-index:2;}
+  .build-compare-panel.drop-before::before{left:-8px;}
+  .build-compare-panel.drop-after::after{right:-8px;}
 </style>
 
 </head>
@@ -506,7 +525,7 @@
           <select id="compareSelect2"><option value="none" selected style="color:var(--text);">-- None --</option></select>
         </div>
         <label class="field" style="margin-bottom:4px;">
-          <span class="lbl">Armor</span>
+          <span class="lbl">Armor (Optional)</span>
           <select id="armorSelect"><option value="none" selected style="color:var(--text);">None</option></select>
         </label>
         <div class="note" id="armorBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
@@ -566,7 +585,14 @@
 
 
       <div class="panel">
-        <h2>My Loadout</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h2 style="margin:0;">My Loadout</h2>
+          <span style="display:flex;gap:10px;">
+            <button type="button" id="exportLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">export</button>
+            <button type="button" id="importLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">import</button>
+            <input type="file" id="importLoadoutFile" accept="application/json" style="display:none;">
+          </span>
+        </div>
         <label class="check-item" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
           <input type="checkbox" id="useLoadoutChk">
           <span class="name">Only use my loadout for next search</span>
@@ -574,10 +600,7 @@
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Favorited</span>
           <span style="display:flex;gap:10px;">
-            <button type="button" id="exportLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">export</button>
-            <button type="button" id="importLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">import</button>
-            <input type="file" id="importLoadoutFile" accept="application/json" style="display:none;">
-            <button type="button" id="clearLoadoutBtn" class="loadout-action-btn" style="color:var(--bad);">clear all</button>
+            <button type="button" id="clearLoadoutBtn" class="loadout-action-btn" style="color:var(--bad);">clear</button>
           </span>
         </div>
         <div class="check-list" id="ownedList" style="max-height:160px;"></div>
@@ -601,12 +624,13 @@
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">My Builds</span>
           <span style="display:flex;gap:10px;">
-            <!-- Builds export/import share the My Loadout export/import buttons above (one combined file) - only "clear all" stays build-specific. -->
+            <!-- Builds export/import share the My Loadout export/import buttons above (one combined file) - only "clear" stays build-specific. -->
             <button type="button" id="newBuildBtn" class="loadout-action-btn" style="color:var(--accent);">+ new build</button>
-            <button type="button" id="clearBuildsBtn" class="loadout-action-btn" style="color:var(--bad);">clear all</button>
+            <button type="button" id="clearBuildsBtn" class="loadout-action-btn" style="color:var(--bad);">clear</button>
           </span>
         </div>
         <div class="check-list" id="buildsList" style="max-height:160px;"></div>
+        <button type="button" id="compareBuildsBtn" class="primary" style="width:100%;margin:8px 0 0;" disabled>Compare my saved builds</button>
 
         <div id="buildForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           <label class="field">
@@ -1027,6 +1051,7 @@ renderDebuffToggles();
 // compareModeActive to update whichever mode is on screen.
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
+  if (compareBuildsActive){ renderBuildsCompare(); return; }
   if (compareModeActive){
     if (lastComparisonRenderArgs){
       renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
@@ -1044,6 +1069,7 @@ document.getElementById('includeContainerBuffsChk').addEventListener('change', e
 // Same display-only treatment as includeContainerBuffsChk above, separate toggle/state.
 document.getElementById('includeArmorBuffsChk').addEventListener('change', e=>{
   includeArmorBuffs = e.target.checked;
+  if (compareBuildsActive){ renderBuildsCompare(); return; }
   if (compareModeActive){
     if (lastComparisonRenderArgs){
       renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
@@ -1717,6 +1743,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   backpackSelectEl.closest('label.field').style.display = '';
   compareSelectEls.forEach(sel=>{ sel.value = 'none'; sel.style.color = ''; sel.dispatchEvent(new Event('change')); });
   compareModeActive = false;
+  compareBuildsActive = false;
   lastComparisonRenderArgs = null;
   armorSelectEl.value = 'none';
   armorSelectEl.style.color = '';
@@ -2059,6 +2086,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
   const buildAddRow = document.getElementById('buildAddRow');
   const buildCapNote = document.getElementById('buildCapNote');
   const buildErrorEl = document.getElementById('buildErrorEl');
+  const compareBuildsBtnEl = document.getElementById('compareBuildsBtn');
 
   // option.value is the CONTAINERS array INDEX, not the name - Save/Edit-prefill below convert explicitly.
   populateContainerSelect(buildContainerSelect);
@@ -2076,6 +2104,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
   }
 
   function renderBuildsList(){
+    compareBuildsBtnEl.disabled = BUILDS.length < 2;
     if (BUILDS.length === 0){
       buildsListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No builds saved yet</div>';
       return;
@@ -3818,6 +3847,8 @@ let lastComparisonRenderArgs = null; // {columnResults, flatResults, targetStats
                                       // the container-bonus toggle live-redraw the compare grid; flatResults
                                       // is for the copy button in compare mode
 let compareModeActive = false;       // which render mode #results currently shows: true = compare-grid, false = normal
+let compareBuildsActive = false;     // true = #results currently shows the Compare My Builds view
+let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory drag order - never persisted (see compare-builds-plan.md)
 
 function formatResultForDiscord(result, rank, targetStats){
   const {chosen, sum} = result;
@@ -4077,6 +4108,7 @@ document.getElementById('calcBtn').onclick = ()=>{
 
   function finishSearch(data){
       compareModeActive = false; // this render mode always overwrites whatever #results last showed
+      compareBuildsActive = false;
       URL.revokeObjectURL(workerUrl);
       activeWorker = null;
       btn.disabled = false;
@@ -4395,6 +4427,7 @@ async function runComparisonSearch(){
   btn.textContent = 'Find best combination';
 
   compareModeActive = true;
+  compareBuildsActive = false;
   renderComparisonResults(columnResults, targetStats, level, quality);
 }
 
@@ -4468,6 +4501,312 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   document.getElementById('consumableZone').innerHTML = '';
   document.getElementById('upgradeTips').innerHTML = '';
 }
+
+/* ---------- Compare My Builds ----------
+   Row = one CONTAINERS entry (backpack); builds within a row shown side by side, best value
+   per stat highlighted per row, drag-reorderable but never persisted (reopening via the
+   button always recomputes fresh from BUILDS save-order). Reuses the existing global toggles
+   (includeContainerBuffs/includeArmorBuffs/selectedArmor/ownedHighlightOn) and the existing
+   render helpers (fmtWithBonus, displayGoodValue, computeEffectiveHealth) so a saved build
+   renders identically to how it would as a live search result. See compare-builds-plan.md. */
+
+// Turns a saved My Builds entry into the {chosen, sum, containerBonus, protection} shape
+// renderResultCard/computeEffectiveHealth already consume - the pure per-artefact scaling
+// (scaleArtifactVec) needs no search/worker and doesn't depend on any globally-selected
+// container, so this reproduces a build's numbers directly from its own saved fields.
+// Mirrors buildContainerSearchPayload's threshold-only container-bonus seeding (lines ~2696-
+// 2701) - verified during implementation that this reproduces a "save"-originated result's
+// sum exactly.
+function computeBuildResult(build){
+  const containerObj = CONTAINERS.find(c => c.name === build.container);
+  if (!containerObj) return { error: `container "${build.container}" no longer exists` };
+
+  const sum = new Float64Array(NS);
+  Object.entries(containerObj.bonus).forEach(([name, val])=>{
+    const si = STAT_IDX[name];
+    if (si !== undefined && STAT_META[name].threshold) sum[si] += val;
+  });
+
+  const includeAdditional = build.level === 15;
+  const chosen = []; // {idx, quality, count}
+  let skippedSlots = 0;
+  build.slots.forEach(slot=>{
+    const idx = ARTIFACTS.findIndex(a => a.name === slot.artifact);
+    if (idx === -1){ skippedSlots++; return; } // since-removed artefact: skip just this slot
+    const vec = scaleArtifactVec(idx, slot.quality, includeAdditional, containerObj.effectiveness, build.level);
+    for (let k=0;k<NS;k++) sum[k] += vec[k];
+    const existing = chosen.find(c => c.idx === idx && c.quality === slot.quality);
+    if (existing) existing.count++;
+    else chosen.push({idx, quality: slot.quality, count: 1});
+  });
+
+  return { chosen, sum, containerBonus: {...containerObj.bonus}, protection: containerObj.protection, containerObj, skippedSlots };
+}
+
+// Buckets every saved build by container name -> one row per container, rows sorted by
+// container name, builds within a row kept in BUILDS save-order. Builds whose container no
+// longer resolves go into `skipped` for a warning banner instead of breaking the view.
+function groupBuildsForCompare(){
+  const byContainer = {};
+  const skipped = [];
+  BUILDS.forEach(build=>{
+    const result = computeBuildResult(build);
+    if (result.error){ skipped.push({build, error: result.error}); return; }
+    (byContainer[build.container] || (byContainer[build.container] = [])).push({build, result});
+  });
+  const rows = Object.keys(byContainer).sort().map(containerName => ({
+    containerName,
+    containerObj: CONTAINERS.find(c => c.name === containerName),
+    builds: byContainer[containerName]
+  }));
+  return { rows, skipped };
+}
+
+// Top-value-with-ties cutoff, scoped to one row's builds - same tie epsilon computeTopStatSets
+// uses, but a single winner (tier "best build per stat", not top-2) and in-row indices rather
+// than global result indices. A row of fewer than 2 builds has nothing to compare against
+// (step 8 of the plan), so no winner is marked.
+function pickRowWinners(vals){
+  const set = new Set();
+  if (vals.length < 2) return set;
+  const best = Math.max(...vals);
+  vals.forEach((v,i)=>{ if (v >= best - 1e-6) set.add(i); });
+  return set;
+}
+
+// Per-row stat list + per-stat winner set, for renderBuildComparePanel. Effective Health is
+// pinned first (computed per build via computeEffectiveHealth, not part of STAT_NAMES); the
+// rest follow STAT_NAMES order, filtered to the union of stats with a non-negligible value
+// (same 1e-6 epsilon renderResultCard's statCells uses) across the row's builds.
+// Row-scoped winners use raw sum*dir, not the display-adjusted value - safe because every
+// build in a row shares the same protection/bonus/armor inputs, so raw-sum ordering matches
+// displayed-value ordering within a row (would NOT hold across rows with different containers -
+// see "Verified against the codebase" in compare-builds-plan.md).
+function computeRowStatList(rowResults){
+  const ehVals = rowResults.map(rb => computeEffectiveHealth(rb.result.sum, rb.result.containerBonus));
+  const ehWinners = pickRowWinners(ehVals);
+
+  const stats = [];
+  // Follow Valuable Stats order (Utility then Combat only — Misc excluded from compare view).
+  STAT_CATEGORIES.slice(0, 2).flatMap(c => c.names).forEach(name=>{
+    const idx = STAT_IDX[name];
+    const present = rowResults.some(rb => Math.abs(rb.result.sum[idx]) >= 1e-6);
+    if (!present) return;
+    const dir = STAT_META[name].good ? 1 : -1;
+    const winners = pickRowWinners(rowResults.map(rb => rb.result.sum[idx] * dir));
+    stats.push({name, winners});
+  });
+
+  return {ehWinners, stats};
+}
+
+function renderBuildComparePanel(rb, i, statList, containerName){
+  const {build, result} = rb;
+  const {sum, containerBonus, protection} = result;
+  let html = `<div class="result-card build-compare-panel" draggable="true" data-container="${containerName}" data-build-name="${build.name}">`;
+  html += `<button type="button" class="build-compare-close" draggable="false" title="Remove from this comparison (keeps the saved build)">&times;</button>`;
+  html += `<div class="rank-row"><span class="rank-badge">${build.name}</span></div>`;
+
+  const ehVal = computeEffectiveHealth(sum, containerBonus);
+  const ehWin = statList.ehWinners.has(i);
+  const ehArmorNote = (selectedArmor && includeArmorBuffs) ? ` <span style="color:var(--muted);">w/ ${selectedArmor.name}</span>` : '';
+  html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;${ehWin ? 'color:var(--accent);' : 'color:var(--muted);'}margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
+
+  html += '<div class="loadout-list">';
+  result.chosen.forEach(c=>{
+    const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, c.quality) ? ' owned-match' : '';
+    html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}"><b>${c.count}&times;</b> <span style="color:${QUALITY_COLORS[c.quality]};">${ARTIFACTS[c.idx].name}</span></button>`;
+  });
+  html += '</div>';
+  if (result.skippedSlots){
+    html += `<div class="note" style="color:var(--warn);font-size:11px;margin:-2px 0 8px;">${result.skippedSlots} artefact${result.skippedSlots===1?'':'s'} no longer exists - skipped.</div>`;
+  }
+
+  html += '<div class="target-line">';
+  statList.stats.forEach(s=>{
+    const val = sum[STAT_IDX[s.name]];
+    if (Math.abs(val) < 1e-6){
+      html += `<span class="target-pill" style="color:var(--muted);">${s.name}: \u2014</span>`;
+    } else {
+      const win = s.winners.has(i);
+      const good = displayGoodValue(s.name, val, containerBonus, protection);
+      html += `<span class="target-pill ${good?'good':'bad'}${win ? ' top-stat' : ''}">${s.name}: ${fmtWithBonus(s.name, val, containerBonus, protection)}</span>`;
+    }
+  });
+  html += '</div></div>';
+  return html;
+}
+
+// Re-renders just one row's panel strip after a drag reorder, rather than the whole view.
+function rerenderBuildsRow(containerName){
+  const rowEl = Array.from(document.querySelectorAll('.compare-builds-row')).find(r => r.dataset.container === containerName);
+  if (!rowEl) return;
+  const order = compareBuildsRowOrder[containerName];
+  if (!order) return;
+  const rowResults = order.map(b => ({build: b, result: computeBuildResult(b)})).filter(rb => !rb.result.error);
+  const statList = computeRowStatList(rowResults);
+  const strip = rowEl.querySelector('.build-compare-strip');
+  strip.innerHTML = rowResults.map((rb,i) => renderBuildComparePanel(rb, i, statList, containerName)).join('');
+  wireBuildsCompareDragRow(rowEl);
+}
+
+// Native HTML5 DnD, no library. Each panel has three drop zones:
+//   outer-left 25%  → insert before (gap bar on left edge)
+//   center 50%      → swap positions (panel highlight + scale)
+//   outer-right 25% → insert after  (gap bar on right edge)
+// Cross-row dragging is silently ignored — a build's backpack is fixed data.
+let buildsDragSource = null; // {containerName, buildName}
+let buildsDragTarget = null; // {buildName, mode: 'before'|'on'|'after'}
+
+function clearDropIndicators(scopeEl){
+  scopeEl.querySelectorAll('.build-compare-panel.drag-over,.build-compare-panel.drop-before,.build-compare-panel.drop-after')
+    .forEach(p=>p.classList.remove('drag-over','drop-before','drop-after'));
+}
+
+// Removes one build from the current Compare My Builds view only (does not touch BUILDS/
+// localStorage). Reuses compareBuildsRowOrder as the single source of truth for which builds
+// are currently visible per row - splicing a build out here is enough to hide it, and (like
+// drag reordering) this in-memory state resets on the next fresh open of the view. If the row
+// has no builds left, the whole row is removed rather than rendered empty.
+function closeBuildFromCompare(containerName, buildName){
+  const order = compareBuildsRowOrder[containerName];
+  if (!order) return;
+  const idx = order.findIndex(b => b.name === buildName);
+  if (idx === -1) return;
+  order.splice(idx, 1);
+  const rowEl = Array.from(document.querySelectorAll('.compare-builds-row')).find(r => r.dataset.container === containerName);
+  if (order.length === 0){
+    if (rowEl) rowEl.remove();
+    return;
+  }
+  rerenderBuildsRow(containerName);
+}
+
+function wireBuildsCompareDragRow(scopeEl){
+  scopeEl.querySelectorAll('.build-compare-panel').forEach(panel=>{
+    const closeBtn = panel.querySelector('.build-compare-close');
+    if (closeBtn){
+      closeBtn.addEventListener('click', e=>{
+        e.stopPropagation();
+        closeBuildFromCompare(panel.dataset.container, panel.dataset.buildName);
+      });
+    }
+    panel.addEventListener('dragstart', ()=>{
+      buildsDragSource = {containerName: panel.dataset.container, buildName: panel.dataset.buildName};
+      panel.classList.add('dragging');
+    });
+    panel.addEventListener('dragend', ()=>{
+      panel.classList.remove('dragging');
+      clearDropIndicators(scopeEl);
+      buildsDragTarget = null;
+    });
+    panel.addEventListener('dragover', e=>{
+      if (!buildsDragSource || buildsDragSource.containerName !== panel.dataset.container) return;
+      if (panel.dataset.buildName === buildsDragSource.buildName) return; // own panel — no indicator
+      e.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      const frac = (e.clientX - rect.left) / rect.width;
+      // Outer 25% each side = insert; middle 50% = swap.
+      const mode = frac < 0.25 ? 'before' : frac > 0.75 ? 'after' : 'on';
+      buildsDragTarget = {buildName: panel.dataset.buildName, mode};
+      clearDropIndicators(scopeEl);
+      panel.classList.add(mode === 'before' ? 'drop-before' : mode === 'after' ? 'drop-after' : 'drag-over');
+    });
+    panel.addEventListener('dragleave', e=>{
+      // Only clear when the cursor actually leaves the panel, not when it moves to a child.
+      if (panel.contains(e.relatedTarget)) return;
+      panel.classList.remove('drag-over','drop-before','drop-after');
+    });
+    panel.addEventListener('drop', e=>{
+      e.preventDefault();
+      clearDropIndicators(scopeEl);
+      if (!buildsDragSource || !buildsDragTarget) return;
+      if (buildsDragSource.containerName !== panel.dataset.container) return;
+      const containerName = buildsDragSource.containerName;
+      const order = compareBuildsRowOrder[containerName];
+      const fromIdx = order.findIndex(b => b.name === buildsDragSource.buildName);
+      const targetIdx = order.findIndex(b => b.name === buildsDragTarget.buildName);
+      const mode = buildsDragTarget.mode;
+      buildsDragSource = null;
+      buildsDragTarget = null;
+      if (fromIdx === -1 || targetIdx === -1 || fromIdx === targetIdx) return;
+      if (mode === 'on'){
+        // True swap: the two panels exchange positions.
+        [order[fromIdx], order[targetIdx]] = [order[targetIdx], order[fromIdx]];
+      } else {
+        // Insert before or after the target, adjusting for the removal of fromIdx.
+        const rawInsertIdx = mode === 'before' ? targetIdx : targetIdx + 1;
+        const [moved] = order.splice(fromIdx, 1);
+        const finalIdx = fromIdx < rawInsertIdx ? rawInsertIdx - 1 : rawInsertIdx;
+        order.splice(finalIdx, 0, moved);
+        if (finalIdx === fromIdx) return; // no-op
+      }
+      rerenderBuildsRow(containerName);
+    });
+  });
+}
+
+function closeBuildsCompareView(){
+  compareBuildsActive = false;
+  compareBuildsRowOrder = {};
+  const el = document.getElementById('results');
+  if (compareModeActive && lastComparisonRenderArgs){
+    renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+  } else if (lastRenderArgs){
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
+  } else {
+    el.innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit "Find best combination".</div>';
+  }
+}
+
+function renderBuildsCompare(){
+  compareBuildsActive = true;
+  document.getElementById('consumableZone').innerHTML = '';
+  document.getElementById('upgradeTips').innerHTML = '';
+
+  const {rows, skipped} = groupBuildsForCompare();
+  const el = document.getElementById('results');
+
+  let html = `<div class="results-header"><h2>Compare my builds</h2><div class="results-toggles"><button type="button" id="closeBuildsCompareBtn" class="loadout-action-btn" style="color:var(--accent);">\u2715 close</button></div></div>`;
+
+  if (skipped.length){
+    const names = skipped.map(s => `"${s.build.name}" (${s.error})`).join(', ');
+    html += `<div class="msg-error">${skipped.length} build${skipped.length===1?'':'s'} skipped - ${names}.</div>`;
+  }
+
+  if (rows.length === 0){
+    html += `<div class="empty-state">No saved builds could be resolved against the current containers.</div>`;
+  } else {
+    rows.forEach(row=>{
+      // Apply any in-memory drag order for this row; falls back to save-order on first open.
+      const order = compareBuildsRowOrder[row.containerName] || row.builds.map(rb => rb.build);
+      compareBuildsRowOrder[row.containerName] = order;
+      const rowResults = order.map(b => row.builds.find(rb => rb.build === b)).filter(Boolean);
+
+      const tierColor = CONTAINER_TIER_META[row.containerObj.tier].color;
+      const statList = computeRowStatList(rowResults);
+      const panelsHtml = rowResults.map((rb,i) => renderBuildComparePanel(rb, i, statList, row.containerName)).join('');
+
+      html += `<div class="compare-builds-row" data-container="${row.containerName}">
+        <div class="compare-col-header" style="color:${tierColor};">
+          ${row.containerName}
+          <span class="compare-col-sub">${row.containerObj.slots} slots \u00b7 ${row.containerObj.protection}% prot \u00b7 ${row.containerObj.effectiveness}% eff</span>
+        </div>
+        <div class="build-compare-strip">${panelsHtml}</div>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+  document.getElementById('closeBuildsCompareBtn').addEventListener('click', closeBuildsCompareView);
+  wireBuildsCompareDragRow(el);
+}
+
+document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
+  compareBuildsRowOrder = {}; // fresh open always resets to save-order, per the plan's "don't persist" decision
+  renderBuildsCompare();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+});
 
 (function(){
   var link = document.getElementById('revealEmailLink');
