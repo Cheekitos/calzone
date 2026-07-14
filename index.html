@@ -3896,16 +3896,18 @@ let compareModeActive = false;       // which render mode #results currently sho
 let compareBuildsActive = false;     // true = #results currently shows the Compare My Builds view
 let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory drag order - never persisted (see compare-builds-plan.md)
 
-function formatResultForDiscord(result, rank, targetStats){
+function formatResultForDiscord(result, rank, targetStats, containerName, containerBonus, protection){
   const {chosen, sum} = result;
-  // Line 1: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
+  // Line 1: container name (respects compare mode where each column has its own container)
+  const containerLine = containerName ? `[${containerName}]\n` : '';
+  // Line 2: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
   const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
   const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
-  // Line 2: artefact list (count always shown for clarity)
+  // Line 3: artefact list (count always shown for clarity)
   const artParts = chosen.map(c => `${c.count}\u00d7 ${ARTIFACTS[c.idx].name}`);
-  // Line 3: stat totals, pipe-separated
-  const statParts = targetStats.map(t => `${t.name}: ${fmt(t.name, sum[STAT_IDX[t.name]])}`);
-  return `${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
+  // Line 4: stat totals using fmtWithBonus so container/armor bonus toggles are respected
+  const statParts = targetStats.map(t => `${t.name}: ${fmtWithBonus(t.name, sum[STAT_IDX[t.name]], containerBonus, protection)}`);
+  return `${containerLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
 }
 document.getElementById('results').addEventListener('click', e=>{
   // save-build-btn also carries the copy-result-btn class for shared styling (see CSS) -
@@ -3917,7 +3919,29 @@ document.getElementById('results').addEventListener('click', e=>{
   if (!source) return;
   const result = compareModeActive ? source.flatResults[idx] : source.displayResults[idx];
   if (!result) return;
-  const text = formatResultForDiscord(result, idx + 1, source.targetStats);
+  // Resolve container context so the copied text includes the container name and respects
+  // the container/armor bonus toggles (fmtWithBonus reads includeContainerBuffs/includeArmorBuffs).
+  let containerName, containerBonus, protection;
+  if (compareModeActive){
+    // Walk columnResults by flat index - same logic the save-build handler uses above.
+    let remaining = idx;
+    for (const col of source.columnResults){
+      if (col.error) continue;
+      if (remaining < col.results.length){
+        containerName = col.containerCfg.name;
+        containerBonus = col.meta.containerBonusMap;
+        protection = col.containerCfg.protection;
+        break;
+      }
+      remaining -= col.results.length;
+    }
+  } else {
+    const containerObj = CONTAINERS[parseInt(source.containerSel)];
+    containerName = containerObj ? containerObj.name : null;
+    containerBonus = source.containerBonus;
+    protection = source.protection;
+  }
+  const text = formatResultForDiscord(result, idx + 1, source.targetStats, containerName, containerBonus, protection);
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent = '\u2713 copied';
     btn.classList.add('copied');
