@@ -21,7 +21,6 @@
     --warn: #c9a23f;
     --mono: "SF Mono", "Cascadia Code", Consolas, "Courier New", monospace;
     --sans: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    /* Quality colors for My Loadout pills */
     --q-common: #9E9E9E;    --q-common-bg: rgba(158,158,158,0.16);
     --q-uncommon: #00AA00;  --q-uncommon-bg: rgba(11,186,131,0.16);
     --q-special: #3299FF;   --q-special-bg: rgba(50,153,255,0.16);
@@ -94,8 +93,7 @@
   select:focus{outline:1px solid var(--accent-dim);}
   select option{background:var(--panel-2);}
 
-  /* Custom trigger+panel wrapping the native <select> (hidden, kept as source of truth for
-     .value/'change') - needed since native <option> can't show a rich hover tooltip. */
+  /* Wraps native <select> (source of truth) — <option> can't do rich tooltips. */
   .container-dd{position:relative;}
   .container-dd-trigger{
     width:100%;background:var(--panel-2);border:1px solid var(--border);
@@ -230,10 +228,19 @@
 
   .result-card{border:1px solid var(--border);border-radius:5px;padding:12px 14px;margin-bottom:12px;background:var(--panel-2);}
   .rank-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .rank-row-info{display:flex;align-items:center;gap:6px;min-width:0;}
+  .rank-row-actions{display:flex;gap:6px;margin-left:auto;flex-shrink:0;}
   .rank-badge{
     background:var(--accent);color:#1a1306;font-weight:700;font-size:11px;
     border-radius:3px;padding:2px 7px;letter-spacing:0.03em;
   }
+  .price-badge{
+    font-size:10px;font-family:var(--mono);
+    border:1px solid rgba(138,143,151,0.45);border-radius:3px;padding:1px 6px;
+    letter-spacing:0.03em;
+  }
+  .price-sign{color:var(--muted);opacity:0.6;}
+  .price-sign.filled{color:var(--warn);opacity:1;}
   .target-line{margin:8px 0 2px;display:flex;flex-wrap:wrap;gap:6px;}
   .target-pill{font-size:11.5px;font-family:var(--mono);padding:3px 8px;border-radius:3px;border:1px solid var(--border);position:relative;}
   .target-pill.good{color:var(--good);}
@@ -256,7 +263,7 @@
 
   .flag-note{font-size:11.5px;color:var(--warn);background:rgba(201,162,63,0.1);border:1px solid var(--warn);padding:8px 10px;border-radius:4px;margin-top:14px;}
 
-  /* LVL 0/15 toggle - remove to revert to granular level input */
+  /* Remove to revert to granular level input. */
   .lvl-toggle{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
   .lvl-btn{
     flex:1;background:none;border:none;border-right:1px solid var(--border);
@@ -265,9 +272,7 @@
   }
   .lvl-btn:last-child{border-right:none;}
   .lvl-btn.active{background:var(--accent-dim);color:var(--text);}
-  /* Build form's LVL toggle - deliberately not .lvl-btn: page-load code does
-     querySelectorAll('.lvl-btn') and would otherwise wrongly wire these into
-     #levelInput/#includeAdditionalChk. */
+  /* Not .lvl-btn — querySelectorAll('.lvl-btn') on load would mis-wire these into #levelInput/#includeAdditionalChk. */
   .build-lvl-btn{
     flex:1;background:none;border:none;border-right:1px solid var(--border);
     color:var(--muted);font-size:13px;padding:8px 6px;cursor:pointer;
@@ -344,8 +349,7 @@
     100%{left:100%;opacity:0;}
   }
 
-  /* Compare mode: one progress block per container, stays on screen after finishing
-     instead of being overwritten. Colors cycle 3 hues by column so bars stay distinguishable. */
+  /* Persists per container (not overwritten on finish); 3 colors cycle by column. */
   .compare-prog-block{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);}
   .compare-prog-block:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
   .compare-prog-block.done .prog-scan{display:none;}
@@ -384,6 +388,30 @@
     font-family:var(--mono);letter-spacing:0.05em;
   }
   .view-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
+  .price-filter-group{display:flex;align-items:center;gap:5px;}
+  .price-filter-label{font-size:10px;color:var(--muted);letter-spacing:0.03em;}
+  .price-filter-group:not(:last-child){padding-right:8px;border-right:1px solid var(--border);}
+  .price-filter-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
+    font-family:var(--mono);letter-spacing:0.05em;
+  }
+  .price-filter-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
+  .price-filter-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .price-range-slider-row{display:flex;align-items:center;gap:10px;}
+  .price-range-slider-row input[type=range]{
+    flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+    background:var(--panel-2);border:1px solid var(--border);accent-color:var(--accent);
+  }
+  .price-range-slider-row input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:1px solid var(--accent-dim);cursor:pointer;
+  }
+  .price-range-slider-row input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--accent);
+    border:1px solid var(--accent-dim);cursor:pointer;
+  }
+  .price-range-slider-label{font-family:var(--mono);font-size:13px;letter-spacing:0.05em;white-space:nowrap;}
   #artAllBtn,#artNoneBtn,#artUnpinBtn{
     background:none;border:1px solid var(--border);color:var(--muted);
     font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
@@ -395,8 +423,7 @@
     padding:3px 8px;border-radius:3px;font-family:var(--mono);letter-spacing:0.05em;
   }
   .loadout-action-btn:hover{filter:brightness(1.35);}
-  /* Needs ID-level specificity to beat .toggle-row's plain-text-link button style.
-     Declarations mirror .loadout-action-btn for visual consistency. */
+  /* ID specificity needed to beat .toggle-row's link style; mirrors .loadout-action-btn. */
   #statClearBtn{
     background:none;border:1px solid currentColor;color:var(--accent);
     font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
@@ -404,8 +431,7 @@
   }
   #statClearBtn:hover{filter:brightness(1.35);}
 
-  /* On-state mirrors button.primary's amber-fill/dark-text so an engaged filter reads
-     as clearly "on". 3-column grid keeps the row compact; long labels wrap to 2 lines. */
+  /* On-state mirrors button.primary (amber fill/dark text). */
   .debuff-toggle-label{font-size:11.5px;color:var(--muted);margin:2px 0 6px;line-height:1.4;}
   .debuff-toggle-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:4px;}
   .debuff-toggle-btn{
@@ -423,16 +449,14 @@
   .copy-result-btn{
     background:none;border:1px solid var(--border);color:var(--muted);
     font-size:10px;cursor:pointer;padding:2px 7px;border-radius:3px;
-    font-family:var(--mono);letter-spacing:0.05em;margin-left:auto;flex-shrink:0;
+    font-family:var(--mono);letter-spacing:0.05em;flex-shrink:0;white-space:nowrap;
     transition:color 0.12s,border-color 0.12s;
   }
   .copy-result-btn:hover{color:var(--accent);border-color:var(--accent-dim);}
   .copy-result-btn.copied{color:var(--good);border-color:var(--good);}
-  .copy-result-btn.save-build-btn{margin-left:6px;}
   .save-build-btn.saved{color:var(--good);border-color:var(--good);}
 
-  /* Independent on/off each (not mutually exclusive like view-btn); "on" color matches
-     the highlight it controls, so the button doubles as a swatch/legend. */
+  /* Independent toggles (unlike view-btn); on-color matches the highlight it controls (doubles as legend). */
   .hl-toggle-group{display:flex;gap:3px;}
   .hl-toggle-group:not(:last-child){padding-right:8px;border-right:1px solid var(--border);}
   .hl-toggle-btn{
@@ -446,34 +470,30 @@
   .results-grid-view{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:start;}
   .results-grid-view .result-card{margin-bottom:0;}
   @media(max-width:1080px){.results-grid-view{grid-template-columns:repeat(2,1fr);}}
-  /* Single-line chips keep card heights uniform; max-width + min-width:0 on the
-     name span gives ellipsis for long names. */
+  /* min-width:0 on name span enables ellipsis for long names. */
   .results-grid-view .loadout-chip{white-space:nowrap;max-width:100%;}
   .results-grid-view .loadout-chip>span{overflow:hidden;text-overflow:ellipsis;min-width:0;}
-  /* align-content:flex-start keeps chips packed at the top; default 'stretch' would
-     spread rows apart to fill minHeight. */
+  /* align-content:flex-start avoids default 'stretch' spreading rows to fill height. */
   .results-grid-view .loadout-list,
   .compare-grid .loadout-list{align-content:flex-start;}
-  /* Sits at a consistent level across cards since the chip section height is equalised. */
+  /* Consistent position — chip section height is equalised across cards. */
   .results-grid-view .target-line,
   .compare-grid .target-line{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;}
 
-  /* Two independent column stacks by default (see renderResultCard for why). */
+  /* Two independent column stacks (see renderResultCard). */
   .details-cols{display:flex;gap:0 28px;margin-top:8px;}
   .details-col{flex:1;display:flex;flex-direction:column;}
 
-  /* Fixed 3-column layout, distinct from the rank-list grid above */
+  /* Distinct from .results-grid-view above. */
   .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;}
   @media(max-width:1080px){.compare-grid{grid-template-columns:1fr;}}
-  /* Compare columns are too narrow for gauges/stats side by side - stack them instead. */
+  /* Compare columns too narrow for side-by-side gauges/stats - stack instead. */
   .compare-grid .details-cols{flex-direction:column;}
   .compare-grid .details-col + .details-col{margin-top:12px;}
   .compare-column{display:flex;flex-direction:column;gap:10px;min-width:0;}
   .compare-col-header{font-family:var(--mono);font-size:13px;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--border);}
   .compare-col-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:400;margin-top:2px;}
 
-  /* Compare My Builds: one row per backpack, builds within a row side by side in a
-     horizontally-scrollable strip - see compare-builds-plan.md. */
   .compare-builds-row + .compare-builds-row{margin-top:22px;}
   .build-compare-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;}
   .build-compare-panel{margin-bottom:0;position:relative;transition:transform 0.15s ease,opacity 0.15s ease,box-shadow 0.15s ease;}
@@ -483,9 +503,7 @@
   .build-compare-close:hover{background:var(--bad);color:#fff;border-color:var(--bad);}
   .build-compare-panel[draggable="true"]{cursor:grab;}
   .build-compare-panel.dragging{opacity:0.45;filter:grayscale(0.4);}
-  /* Center zone: swap highlight (scale + amber bg). */
   .build-compare-panel.drag-over{border-color:var(--accent);background:rgba(201,137,63,0.1);outline:2px solid var(--accent);outline-offset:-1px;transform:scale(1.03);box-shadow:0 6px 20px rgba(0,0,0,0.45);z-index:1;}
-  /* Edge zones: gap bars appear between panels (outer 25% of panel width each side). */
   .build-compare-panel.drop-before::before,
   .build-compare-panel.drop-after::after{content:'';position:absolute;top:0;bottom:0;width:3px;background:var(--accent);border-radius:2px;box-shadow:0 0 8px rgba(201,137,63,0.7);z-index:2;}
   .build-compare-panel.drop-before::before{left:-8px;}
@@ -502,7 +520,6 @@
   </header>
 
   <div class="grid">
-    <!-- LEFT: controls -->
     <div>
       <div class="btn-row">
         <button class="primary" id="calcBtn" style="flex:1;margin:0;">Find best combination</button>
@@ -531,12 +548,12 @@
         </label>
         <div class="note" id="armorBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
         <div class="row-inline">
-          <!-- GRANULAR LEVEL INPUT: hidden - set label display:block and remove lvl-toggle div below to revert -->
+          <!-- Hidden; set display:block + remove lvl-toggle div below to revert -->
           <label class="field" style="display:none;">
             <span class="lbl">Level (0–15)</span>
             <input type="number" id="levelInput" min="0" max="15" value="0">
           </label>
-          <!-- LEVEL TOGGLE - remove this div to revert to granular input -->
+          <!-- Remove this div to revert to granular input -->
           <div class="field" style="flex:1;">
             <span class="lbl" style="display:block;font-size:12px;color:var(--muted);margin-bottom:5px;">Artefact Level</span>
             <div class="lvl-toggle">
@@ -556,10 +573,10 @@
             </select>
           </label>
         </div>
-        <!-- lvlNote lives outside the row so it doesn't affect toggle/select height alignment -->
+        <!-- Outside the row so it doesn't affect toggle/select height alignment -->
         <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
         <div class="check-group-hdr" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Extra Options</div>
-        <!-- INCLUDE ADDITIONAL CHK: hidden - driven by level toggle; restore display:flex to revert -->
+        <!-- Hidden, driven by level toggle; restore display:flex to revert -->
         <label class="check-item" style="display:none;margin-bottom:4px;">
           <input type="checkbox" id="includeAdditionalChk">
           <span class="name">Include additional stats</span>
@@ -572,8 +589,17 @@
           <input type="checkbox" id="includeArmorBuffsChk" checked>
           <span class="name">Add armor bonus stats in results</span>
         </label>
+        <label class="check-item" style="margin-bottom:4px;">
+          <input type="checkbox" id="showConsumableZoneChk">
+          <span class="name">Consumable-zone results (experimental)</span>
+        </label>
         <div class="debuff-toggle-label">Avoid builds with these debuffs:</div>
         <div class="debuff-toggle-row" id="debuffToggleRow"></div>
+        <div class="debuff-toggle-label" style="margin-top:14px;">Search these price ranges:</div>
+        <div class="price-range-slider-row">
+          <input type="range" id="priceRangeSlider" min="1" max="5" step="1" value="5">
+          <span class="price-range-slider-label" id="priceRangeSliderLabel"></span>
+        </div>
       </div>
 
       <div class="panel">
@@ -626,7 +652,7 @@
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">My Builds</span>
           <span style="display:flex;gap:10px;">
-            <!-- Builds export/import share the My Loadout export/import buttons above (one combined file) - only "clear" stays build-specific. -->
+            <!-- Export/import shared with My Loadout above (one combined file); clear is build-specific -->
             <button type="button" id="newBuildBtn" class="loadout-action-btn" style="color:var(--accent);">+ new build</button>
             <button type="button" id="clearBuildsBtn" class="loadout-action-btn" style="color:var(--bad);">clear</button>
           </span>
@@ -697,22 +723,17 @@
 
     </div>
 
-    <!-- RIGHT: results -->
     <div>
       <div class="panel" id="results">
         <h2>Result</h2>
         <div class="empty-state">Choose stats to optimize and hit "Find best combination".</div>
       </div>
       <div id="consumableZone"></div>
-      <div id="upgradeTips"></div>
     </div>
   </div>
 </div>
 
 <script>
-// good: true = higher is better, false = lower is better.
-// threshold: true marks the 5 damage-cap stats (Frost capped separately at 1; others at 0.5).
-// Psy-emissions rolls are stored under "Psyonics" (same pool/cap).
 const STAT_META = {
   "Bioinfection protection":    {good:true},
   "Biological infection":       {good:false, threshold:true},
@@ -750,7 +771,6 @@ const STAT_META = {
   "Vitality":                   {good:true}
 };
 
-// stats that use a % unit when displayed (rest are flat values)
 const PERCENT_STATS = new Set([
   "Bioinfection protection",
   "Bleeding protection",
@@ -778,14 +798,13 @@ const STAT_IDX = {}; STAT_NAMES.forEach((s,i)=>STAT_IDX[s]=i);
 const THRESHOLD_STATS = STAT_NAMES.filter(s=>STAT_META[s].threshold);
 const NS = STAT_NAMES.length;
 
-// Quality tiers, mirrored from the #qualityInput select (used by My Loadout favoriting).
+// Mirrors #qualityInput select; used by My Loadout favoriting.
 const QUALITY_LABELS = {100:"Common",115:"Uncommon",130:"Special",145:"Rare",160:"Exclusive",175:"Legendary"};
 const QUALITY_COLORS = {100:'var(--q-common)',115:'var(--q-uncommon)',130:'var(--q-special)',145:'var(--q-rare)',160:'var(--q-exclusive)',175:'var(--q-legendary)'};
 const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-160",175:"q-175"};
 
-// Colors the two static Quality <select>s (Backpack panel + Add Artefact row) to match
-// Armor/Container tier colors - both the closed select's text and each <option> (colored
-// inline in the HTML above, must stay in sync with QUALITY_COLORS here).
+// Colors the two static Quality selects to match tier colors — options are colored
+// inline in the HTML above too; keep in sync with QUALITY_COLORS.
 function colorQualitySelect(sel){
   sel.style.color = QUALITY_COLORS[parseInt(sel.value)] || '';
 }
@@ -795,17 +814,11 @@ function colorQualitySelect(sel){
   sel.addEventListener('change', ()=>colorQualitySelect(sel));
 });
 
-// Group 1: positive value = debuff (Formula B, no scaling); negative = buff (Formula A, scales).
 const GROUP1_DEBUFF = new Set(["Temperature","Frost","Biological infection","Radiation","Psyonics"]);
-// Group 2: negative value = debuff (Formula B, no scaling); positive = buff (Formula A, scales).
 const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
 
-// "Avoid builds with these debuffs" toggle buttons (Extra Options, Valuable Stats panel).
-// Recoil is the one "lower is better" stat here (STAT_META['Recoil'].good === false), so its
-// debuff side is a positive sum - the worker direction-adjusts each filter's sum before
-// comparing to zero, so this table is the only place a stat's polarity is looked up.
-// defaultOn also sets what Reset restores to. Rendered from this array by renderDebuffToggles.
-// Order matters: short labels first so row 1 packs tightly in the 3-column grid (.debuff-toggle-row).
+// defaultOn also sets Reset's restore state; rendered by renderDebuffToggles.
+// Order matters: short labels first so row 1 packs tightly in the 3-column grid.
 const NO_DEBUFF_FILTERS = [
   {btn:'noVitalityDebuffBtn',             stat:'Vitality',              label:'Vitality',              defaultOn:true},
   {btn:'noMovementSpeedDebuffBtn',        stat:'Movement speed',        label:'Movespeed',             defaultOn:true},
@@ -815,27 +828,22 @@ const NO_DEBUFF_FILTERS = [
   {btn:'noBulletResistanceDebuffBtn',     stat:'Bullet resistance',     label:'Bullet Resistance',     defaultOn:false},
 ];
 
-// True if this (stat, value) pair uses Formula B (fixed - no level/quality scaling).
 function isFormulaB(statName, value) {
   if (value === 0) return false;
-  if (GROUP1_DEBUFF.has(statName)) return value > 0; // positive = debuff
-  if (GROUP2_DEBUFF.has(statName)) return value < 0; // negative = debuff
-  if (statName === "Bleeding protection") return value < 0; // negative = debuff
-  return false; // all other stats always use Formula A
+  if (GROUP1_DEBUFF.has(statName)) return value > 0;
+  if (GROUP2_DEBUFF.has(statName)) return value < 0;
+  if (statName === "Bleeding protection") return value < 0;
+  return false;
 }
 
-// Formula B: fixed regardless of level/quality - confirmed in-game, not a bug.
 function scaleStat(value, statName, level, quality) {
   if (value === 0) return 0;
   if (isFormulaB(statName, value)) return value;
   return value * (1 + 0.02 * level) * (quality / 100);
 }
 
-// tooltip stores the full [min,max] roll range per stat (Main/Additional so Additional can be
-// toggled). MAIN_VECS/ADD_VECS below derive the single calculation value via deriveStatValue().
 // "Resistance to electricity"/"Electricity resistance" and "Resistance to fire"/"Fire
-// resistance" each merge as one stat.
-// Duplicate entries (Wicked Hedgehog #2) and unnamed entries are omitted.
+// resistance" merge as one stat each. Duplicate (Wicked Hedgehog #2) and unnamed entries omitted.
 const ARTIFACTS = [
  {name:"Acid Crystal", tooltip:{main:{"Vitality":[-8,-6.8],"Health regeneration":[0.76,0.9],"Bioinfection protection":[17,20],"Biological infection":[-2.16,-1.84],"Reaction to chemical burns":[0.76,0.9]}, add:{"Resistance to chemicals":[6.01,7.3],"Bioinfection protection":[8.5,10],"Health regeneration":[0.24,0.3]}}},
  {name:"Amberite", tooltip:{main:{"Running speed":[0.51,0.6],"Carry weight":[9.52,11.2],"Stamina regeneration":[2.21,2.6],"Radiation":[0.53,0.62],"Temperature":[-1.28,-1.09]}, add:{"Movement speed":[0.49,0.6],"Stamina regeneration":[0.765,0.9],"Carry weight":[3.23,3.8]}}},
@@ -940,8 +948,138 @@ const ARTIFACTS = [
  {name:"Wolf Tears", tooltip:{main:{"Stamina":[7.9,9.3],"Carry weight":[3.74,4.4],"Radiation":[0.42,0.5],"Temperature":[-2.16,-1.84],"Reaction to burns":[0.42,0.5]}, add:{"Bullet resistance":[3.485,4.1],"Stamina":[2.55,3.1],"Carry weight":[1.275,1.5]}}}
 ];
 
+// --- Build price -----------------------------------------------------------
+// Keys must match ARTIFACTS[].name exactly.
+const ARTIFACT_PRICES = {
+  "Acid Crystal": 1,
+  "Amberite": 2,
+  "Atom": 4,
+  "Battery": 1,
+  "Berry": 1,
+  "Bismuth": 3,
+  "Black Hole": 4,
+  "Bracelet": 4,
+  "Bubblegum": 5,
+  "Burr": 1,
+  "Candlelight": 1,
+  "Chicken God": 2,
+  "Chilly": 5,
+  "Coil": 4,
+  "Colophony": 2,
+  "Comet": 1,
+  "Cone": 3,
+  "Crust": 1,
+  "Cryogen": 1,
+  "Cursed Rose": 2,
+  "Cycle": 4,
+  "Dark Crystal": 1,
+  "Dark Viburnum": 5,
+  "Disintegrator": 2,
+  "Dumbbell": 3,
+  "Egg": 4,
+  "Embryo": 1,
+  "Eye of the Storm": 3,
+  "Fahrenheit": 2,
+  "Firebird": 1,
+  "Flicker": 3,
+  "Fossil": 4,
+  "Frame": 2,
+  "Frost": 1,
+  "Gills": 3,
+  "Golden Prima": 2,
+  "Gum": 2,
+  "Heart": 1,
+  "Hedgehog": 2,
+  "Heel": 3,
+  "Helium": 4,
+  "Hoop": 4,
+  "Ice Hedgehog": 2,
+  "Ilyich Lamp": 2,
+  "Inkwell": 1,
+  "Inside Out Rose": 3,
+  "Jelly": 5,
+  "Kettlebell": 1,
+  "Lard": 1,
+  "Larva": 2,
+  "Leaded Glass": 2,
+  "Leech": 1,
+  "Lemna": 2,
+  "Link": 5,
+  "Lollipop": 1,
+  "Loop": 4,
+  "Magma": 5,
+  "Mirror": 2,
+  "Mug": 3,
+  "Onion": 1,
+  "Opal": 5,
+  "Peg-Top": 4,
+  "Phlegm": 1,
+  "Polyhedron": 3,
+  "Prima": 1,
+  "Prism": 4,
+  "Proto-Onion": 2,
+  "Pumpkin": 4,
+  "Radiator": 2,
+  "Raisin": 5,
+  "Rattle": 1,
+  "Red Crystal": 1,
+  "Retina": 3,
+  "Rime": 2,
+  "Rose": 1,
+  "Scallop": 1,
+  "Scrubber": 3,
+  "Shard": 3,
+  "Shrimp": 1,
+  "Snail": 2,
+  "Snake Eye": 3,
+  "Spectral Crystal": 1,
+  "Spiral": 3,
+  "Sponge": 1,
+  "Static": 4,
+  "Steel Hedgehog": 4,
+  "Sticky Burr": 2,
+  "Stress Fest": 3,
+  "Sun": 3,
+  "Swamp Rot": 1,
+  "Tallow": 2,
+  "Timber": 4,
+  "Tiny Key": 3,
+  "Transformer": 2,
+  "Veiner": 1,
+  "Viburnum Branch": 4,
+  "Whirlwind": 4,
+  "White Rose": 1,
+  "Wicked Hedgehog": 4,
+  "Wolf Tears": 1,
+};
+
+function buildPriceCategory(chosen){
+  let tierSum = 0, slotCount = 0;
+  for (const c of chosen){
+    const tier = ARTIFACT_PRICES[ARTIFACTS[c.idx].name];
+    if (tier == null){
+      console.warn('No price entry for artifact:', ARTIFACTS[c.idx].name);
+      return null;
+    }
+    tierSum += tier * c.count;
+    slotCount += c.count;
+  }
+  if (slotCount === 0) return null;
+  return Math.round(tierSum / slotCount);
+}
+
+function priceBadgeHtml(chosen){
+  const cat = buildPriceCategory(chosen);
+  if (cat == null) return '';
+  let signs = '';
+  for (let i = 1; i <= 5; i++){
+    signs += `<span class="price-sign${i <= cat ? ' filled' : ''}">$</span>`;
+  }
+  return `<span class="price-badge" title="Price category ${cat}/5">${signs}</span>`;
+}
+
 function deriveStatValue(range){
-  if (range[0] < 0 && range[1] < 0) return Math.min(range[0], range[1]); // fully-negative range: game uses the more-negative bound
+  if (range[0] < 0 && range[1] < 0) return Math.min(range[0], range[1]);
   return range[0] > range[1] ? range[0] : range[1];
 }
 const MAIN_VECS = ARTIFACTS.map(a=>{
@@ -955,13 +1093,9 @@ const ADD_VECS = ARTIFACTS.map(a=>{
   return v;
 });
 const THRESHOLD_IDX = new Set(THRESHOLD_STATS.map(s => STAT_IDX[s]));
-// Stats that bypass the container effectiveness multiplier entirely: the 5 threshold
-// stats, plus Bleeding.
 const EFFMULT_EXEMPT_IDX = new Set([...THRESHOLD_IDX, STAT_IDX["Bleeding"]]);
 let VECS = MAIN_VECS;
-// Scales one artefact's Main(+Additional) stats to a given quality, independent of the
-// global Quality selector. Used by rebuildVecs (global) and the My Loadout pool builder
-// (per-owned-unit quality).
+// Used by rebuildVecs (global) and the My Loadout pool builder (per-owned-unit quality).
 function scaleArtifactVec(artifactIdx, quality, includeAdditional, effectiveness, level){
   const effMult = effectiveness / 100;
   const v = MAIN_VECS[artifactIdx];
@@ -1021,7 +1155,6 @@ STAT_CATEGORIES.forEach((cat, ci)=>{
     hdr.textContent = cat.label;
   }
   statListEl.appendChild(hdr);
-  // preserve explicit order defined in STAT_CATEGORIES
   cat.names.forEach(addStatItem);
 });
 
@@ -1033,8 +1166,7 @@ statListEl.addEventListener('click', e=>{
   btn.classList.add('active');
 });
 
-// Built from NO_DEBUFF_FILTERS so label text lives in one place. Clicking a button just
-// flips its own .active class; on/off state is read directly off the DOM at search time.
+// Built from NO_DEBUFF_FILTERS; active state read from DOM at search time.
 function renderDebuffToggles(){
   const row = document.getElementById('debuffToggleRow');
   NO_DEBUFF_FILTERS.forEach(f=>{
@@ -1049,8 +1181,20 @@ function renderDebuffToggles(){
 }
 renderDebuffToggles();
 
-// Display-only toggle - re-renders cached results instead of re-searching. Branches on
-// compareModeActive to update whichever mode is on screen.
+// Mirrors priceBadgeHtml's fill pattern; also paints the track (native range has no filled side).
+function updatePriceRangeSliderLabel(){
+  const slider = document.getElementById('priceRangeSlider');
+  const v = parseInt(slider.value);
+  let signs = '';
+  for (let i=1;i<=5;i++) signs += `<span class="price-sign${i<=v?' filled':''}">$</span>`;
+  document.getElementById('priceRangeSliderLabel').innerHTML = signs;
+  const pct = (v-1)/(5-1)*100;
+  slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--panel-2) ${pct}%)`;
+}
+document.getElementById('priceRangeSlider').addEventListener('input', updatePriceRangeSliderLabel);
+updatePriceRangeSliderLabel();
+
+// Display-only — re-renders cached results instead of re-searching; branches on compareModeActive.
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
   if (compareBuildsActive){ renderBuildsCompare(); return; }
@@ -1063,12 +1207,9 @@ document.getElementById('includeContainerBuffsChk').addEventListener('change', e
   if (lastRenderArgs){
     renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
   }
-  if (lastTipsArgs){
-    renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
-  }
 });
 
-// Same display-only treatment as includeContainerBuffsChk above, separate toggle/state.
+// Same display-only treatment as includeContainerBuffsChk above.
 document.getElementById('includeArmorBuffsChk').addEventListener('change', e=>{
   includeArmorBuffs = e.target.checked;
   if (compareBuildsActive){ renderBuildsCompare(); return; }
@@ -1081,15 +1222,30 @@ document.getElementById('includeArmorBuffsChk').addEventListener('change', e=>{
   if (lastRenderArgs){
     renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
   }
-  if (lastTipsArgs){
-    renderUpgradeTips(lastTipsArgs.tips, lastTipsArgs.targetStats, lastTipsArgs.protection, lastTipsArgs.validResults, lastTipsArgs.containerBonus);
+});
+
+// Same display-only treatment as includeContainerBuffsChk/includeArmorBuffsChk above.
+document.getElementById('showConsumableZoneChk').addEventListener('change', e=>{
+  showConsumableZone = e.target.checked;
+  if (compareBuildsActive){ renderBuildsCompare(); return; }
+  if (compareModeActive){
+    if (lastComparisonRenderArgs){
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+    }
+    return;
+  }
+  if (lastRenderArgs){
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
   }
 });
 
-// Artefacts excluded from the "Available artefacts" list by default
-// (still selectable - just unticked on load).
-const DEFAULT_OFF = new Set([
+// Not deleted from ARTIFACTS - other artefacts' indices (and index-keyed OWNED) must stay
+// stable. UI surfaces that expose artefacts by name filter these out instead.
+const REMOVED_ARTIFACTS = new Set([
   "Snares"
+]);
+
+const DEFAULT_OFF = new Set([
 ]);
 
 const LS_EXCLUDED = 'artiCalc_excluded';
@@ -1122,16 +1278,12 @@ function loadOwned(){
 function saveOwned(){
   try { localStorage.setItem(LS_OWNED, JSON.stringify(OWNED)); } catch(e){}
 }
-// Normalizes the old per-slot build shape to the current dense-slots shape. A build already
-// in the new shape has level 0/15 and no nulls, so it passes through unchanged (filter/map
-// below are no-ops on it).
 function migrateBuildEntry(entry){
   const rawSlots = Array.isArray(entry.slots) ? entry.slots : [];
   const filled = rawSlots.filter(s => s);
   let level = entry.level;
   if (level !== 0 && level !== 15){
-    // Old format has no build-wide level - best-effort default from the first filled slot's
-    // level (mixed per-slot levels can't be losslessly represented by one value).
+    // Old format has no build-wide level; default from first filled slot's level.
     level = (filled.length && filled[0].level === 15) ? 15 : 0;
   }
   return {
@@ -1153,22 +1305,20 @@ function loadBuilds(){
 function saveBuilds(){
   try { localStorage.setItem(LS_BUILDS, JSON.stringify(BUILDS)); } catch(e){}
 }
-// { [artifactIdx]: [quality, quality, ...] } -- one entry per physically owned unit.
 let OWNED = loadOwned();
-// Plain array of saved builds - see "My Builds" block below for shape/behavior.
 let BUILDS = loadBuilds();
-// Set by the "My Builds" block below - lets Loadout's export/import handlers close an
-// open build form and import data without either feature knowing the other's internals.
+// Set by My Builds block below — lets Loadout's export/import close/import without
+// either feature knowing the other's internals.
 let buildsCloseForm = null;
 let buildsImportData = null;
-// Set by the "My Builds" block below - lets a result card's save-to-build button reuse
-// My Builds' validate/push/persist/re-render path.
+// Set by My Builds block below — lets a result card's save-to-build button reuse its path.
 let buildsSaveFromResult = null;
 let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
 
 const artifactListEl = document.getElementById('artifactList');
 const savedExcluded = loadExcludedNames();
 ARTIFACTS.forEach((a,i)=>{
+  if (REMOVED_ARTIFACTS.has(a.name)) return;
   const id = 'art_'+i;
   const div = document.createElement('label');
   div.className = 'check-item';
@@ -1184,9 +1334,8 @@ ARTIFACTS.forEach((a,i)=>{
 artifactListEl.addEventListener('change', e=>{
   if (e.target.matches('input[type=checkbox]')) saveExcludedNames();
 });
-// Heart opens a favorites popover, lock toggles a pin. Name has no handler here -
-// it falls through to the label's default click (toggles the checkbox); its
-// tooltip is shown on hover instead (below).
+// Heart opens a favorites popover, lock toggles a pin. Name has no handler — falls
+// through to the label's default click (toggles checkbox); tooltip shown on hover instead.
 artifactListEl.addEventListener('click', e=>{
   const lock = e.target.closest('.art-lock');
   if (lock){
@@ -1214,10 +1363,8 @@ artifactListEl.addEventListener('click', e=>{
   }
 });
 
-// Hovering an artefact name opens the same popover used for a loadout chip, and
-// auto-closes after a short delay once the mouse leaves both (long enough to move
-// the cursor into the popover itself). popoverOpenedViaHover gates the auto-close
-// so click-opened popovers elsewhere are never affected.
+// Hovering an artefact name opens the same popover as a loadout chip, auto-closing after a
+// delay once the mouse leaves both; popoverOpenedViaHover gates the auto-close.
 let hoverCloseTimer = null;
 function cancelHoverClose(){
   if (hoverCloseTimer){ clearTimeout(hoverCloseTimer); hoverCloseTimer = null; }
@@ -1239,7 +1386,7 @@ artifactListEl.addEventListener('mouseover', e=>{
     return;
   }
   openChipPopover(name, idx);
-  positionPopoverBesidePanel(name); // override openChipPopover's default below/above-anchor placement, which overlapped neighboring rows in this narrow panel
+  positionPopoverBesidePanel(name); // overrides default anchor placement, which overlapped neighboring rows here
   popoverOpenedViaHover = true;
 });
 artifactListEl.addEventListener('mouseout', e=>{
@@ -1248,13 +1395,10 @@ artifactListEl.addEventListener('mouseout', e=>{
   if (e.relatedTarget && (name.contains(e.relatedTarget) || chipPopoverEl.contains(e.relatedTarget))) return;
   scheduleHoverClose();
 });
-// chipPopoverEl's own mouseover/mouseout listeners (keeps the tooltip open while the
-// cursor is over it) are registered further down, after chipPopoverEl's declaration -
-// calling addEventListener on it here would throw "Cannot access before initialization"
-// (it's a later `const`) and abort the rest of the script.
+// chipPopoverEl's own mouseover/mouseout listeners are registered further down - calling
+// addEventListener on it here would throw "Cannot access before initialization" (later `const`).
 
-// Pins artefacts used in the last results to the top of "Available artefacts",
-// highlighted, so the user can quickly untick ones they don't have.
+// Pins artefacts used in the last results to the top of "Available artefacts", highlighted.
 function usedArtifactIndices(results){
   const set = new Set();
   (results || []).forEach(r => r.chosen.forEach(c => set.add(c.idx)));
@@ -1291,9 +1435,7 @@ const ownedListEl = document.getElementById('ownedList');
 const expandLoadoutBtnEl = document.getElementById('expandLoadoutBtn');
 let ownedListExpanded = false;
 
-// Explicit pixel max-heights on both ends (not 'auto') so the CSS transition above always has
-// a real start/end value to animate between - collapsing back to the fixed 160px, expanding to
-// this render's actual scrollHeight so it settles fully open with no clipping or leftover scroll.
+// Explicit pixel max-heights (not 'auto') give the CSS transition real start/end values.
 function applyOwnedListHeight(){
   ownedListEl.style.maxHeight = ownedListExpanded ? ownedListEl.scrollHeight + 'px' : '160px';
 }
@@ -1351,8 +1493,7 @@ ownedListEl.addEventListener('click', e=>{
 const chipPopoverEl = document.createElement('div');
 chipPopoverEl.className = 'artchip-popover';
 document.body.appendChild(chipPopoverEl);
-// Keeps the hover-triggered tooltip (see artifactListEl mouseover/mouseout above) open
-// while the cursor is over the popover itself, e.g. to click a Favorite/Pin/Exclude button.
+// Keeps the hover-triggered tooltip open while the cursor is over the popover itself.
 chipPopoverEl.addEventListener('mouseover', cancelHoverClose);
 chipPopoverEl.addEventListener('mouseout', e=>{
   if (e.relatedTarget && chipPopoverEl.contains(e.relatedTarget)) return;
@@ -1361,7 +1502,7 @@ chipPopoverEl.addEventListener('mouseout', e=>{
 let popoverOpenIdx = null;
 let popoverAnchorEl = null;
 let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
-let popoverOpenedViaHover = false; // true only for hover-opened popovers; gates auto-close on mouseout (click-opened popovers never auto-close)
+let popoverOpenedViaHover = false; // hover-opened popovers only; gates auto-close on mouseout
 
 function closeChipPopover(){
   chipPopoverEl.classList.remove('open');
@@ -1370,9 +1511,7 @@ function closeChipPopover(){
   popoverOpenQi = null;
   popoverOpenedViaHover = false;
 }
-// Measures the popover's actual current size (stays in the layout tree while closed, so
-// this is accurate) and clamps inside the viewport. Re-call whenever content/height changes
-// (e.g. switching forms, adding rows) - it doesn't auto-reposition.
+// Measures the popover's actual size and clamps inside viewport. Re-call on content/height change.
 function positionPopover(anchorEl){
   const r = anchorEl.getBoundingClientRect();
   const popRect = chipPopoverEl.getBoundingClientRect();
@@ -1386,9 +1525,8 @@ function positionPopover(anchorEl){
   chipPopoverEl.style.left = left + 'px';
   chipPopoverEl.style.top = top + 'px';
 }
-// Used only for the Available artefacts panel's hover tooltip. Anchoring to the row
-// (like positionPopover) overlapped neighboring names in the narrow list, so this pins
-// the popup outside the panel's right edge at a fixed x, tracking only the row's y.
+// Available artefacts hover tooltip only: row-anchoring (like positionPopover) overlapped
+// neighboring names, so this pins the popup outside the panel's right edge, tracking row y.
 const availableArtefactsPanelEl = document.getElementById('availableArtefactsPanel');
 function positionPopoverBesidePanel(anchorEl){
   const panelRect = availableArtefactsPanelEl.getBoundingClientRect();
@@ -1513,9 +1651,8 @@ function updateAllLockStates(){
 chipPopoverEl.addEventListener('click', e=>{
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
-  e.stopPropagation(); // innerHTML swaps below detach e.target from the DOM mid-bubble;
-                        // without this the document-level outside-click listener's
-                        // contains() check would fail and incorrectly close the popover.
+  e.stopPropagation(); // innerHTML swaps below detach e.target mid-bubble; needed so the
+                        // outside-click listener's contains() check doesn't fail
   const idx = popoverOpenIdx;
   if (idx == null) return;
   const act = btn.dataset.act;
@@ -1583,7 +1720,7 @@ document.addEventListener('click', e=>{
   closeChipPopover();
 });
 document.addEventListener('keydown', e=>{ if (e.key === 'Escape') closeChipPopover(); });
-// Delegate clicks on every loadout chip across all result sections (Top 10 / Consumable zone / Upgrade tips).
+// Delegate clicks on every loadout chip across all result sections (Top 10 / Consumable zone).
 document.addEventListener('click', e=>{
   const chip = e.target.closest('.loadout-chip[data-idx]');
   if (!chip) return;
@@ -1617,8 +1754,8 @@ document.getElementById('clearLoadoutBtn').onclick = ()=>{
   updateAllHeartStates();
 };
 
-/* ---------- My Loadout: export / import (JSON, keyed by artefact name so it
-   survives ARTIFACTS being reordered/edited between versions of this file) ---------- */
+/* ---------- My Loadout: export/import (JSON keyed by artefact name — survives
+   ARTIFACTS reordering/edits between versions) ---------- */
 document.getElementById('exportLoadoutBtn').onclick = ()=>{
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
   const data = {
@@ -1715,7 +1852,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
     if (!q){ hideDd(); addRow.style.display = 'none'; selectedIdx = null; return; }
     const matches = ARTIFACTS
       .map((a, i) => ({name: a.name, idx: i}))
-      .filter(a => a.name.toLowerCase().includes(q))
+      .filter(a => !REMOVED_ARTIFACTS.has(a.name) && a.name.toLowerCase().includes(q))
       .slice(0, 12);
     if (matches.length) showDd(matches); else hideDd();
   });
@@ -1729,7 +1866,6 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
     addRow.style.display = ''; // row-inline class provides display:flex
   });
 
-  // Close dropdown on outside click
   document.addEventListener('click', e=>{
     if (!searchDd.classList.contains('open')) return;
     if (searchInput.contains(e.target) || searchDd.contains(e.target)) return;
@@ -1750,8 +1886,8 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
   });
 })();
 document.getElementById('resetAllBtn').onclick = ()=>{
-  // Cancel any running search (including a compare-mode search mid-container - resolve its
-  // pending runOneWorker() promise so it doesn't fire into a page state that just got reset)
+  // Cancel any running search (including compare mode) — resolve its pending runOneWorker()
+  // promise so it doesn't fire into a page state that just got reset.
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
   if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
   selectDefaultContainer();
@@ -1775,11 +1911,15 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   includeContainerBuffs = true;
   document.getElementById('includeArmorBuffsChk').checked = true;
   includeArmorBuffs = true;
+  document.getElementById('showConsumableZoneChk').checked = false;
+  showConsumableZone = false;
   document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.lvl==='0'));
   const lvlNote = document.getElementById('lvlNote');
   lvlNote.textContent = 'Additional stats excluded';
   lvlNote.className = 'lvl-note';
   NO_DEBUFF_FILTERS.forEach(f=>{ document.getElementById(f.btn).classList.toggle('active', f.defaultOn); });
+  document.getElementById('priceRangeSlider').value = 5;
+  updatePriceRangeSliderLabel();
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
   statListEl.querySelectorAll('.stat-min-input').forEach(i=>i.value='');
@@ -1802,8 +1942,6 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   btn.textContent = 'Find best combination';
   document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit \u201cFind best combination\u201d.</div>';
   document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
-  lastTipsArgs = null;
 };
 
 
@@ -1826,9 +1964,6 @@ document.querySelectorAll('.lvl-btn').forEach(btn=>{
   });
 });
 
-/* ---------- Backpacks / Containers: dropdown autofills slots/protection/effectiveness and
-   bakes the container's flat bonus stats into every build unscaled (no Level/Quality/
-   Effectiveness applied, matching the game's tooltip). See activeContainerBonus below. ---------- */
 const CONTAINER_TIER_META = {
   legendary: { label: "Legendary", qClass: "q-175", color: "var(--q-legendary)" },
   exclusive: { label: "Exclusive", qClass: "q-160", color: "var(--q-exclusive)" },
@@ -1837,11 +1972,9 @@ const CONTAINER_TIER_META = {
   uncommon:  { label: "Uncommon",  qClass: "q-115", color: "var(--q-uncommon)" },
 };
 const CONTAINERS = [
-  // Yellow - Legendary
   { name:"Apiary Container",            tier:"legendary", slots:5, protection:89.5, effectiveness:120,  bonus:{} },
   { name:"Berloga-6U Container",        tier:"legendary", slots:6, protection:78.5, effectiveness:114,  bonus:{} },
   { name:"Chitin Backpack",             tier:"legendary", slots:6, protection:60,   effectiveness:115,  bonus:{"Carry weight":47} },
-  // Red - Exclusive
   { name:"Freezer Container",           tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Temperature":-2.5, "Biological infection":0.5} },
   { name:"ZIVCAS ArcticSafe-6",         tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Psyonics":0.5, "Frost":-2.5} },
   { name:"Sheaf Container",             tier:"exclusive", slots:7, protection:60,   effectiveness:97,   bonus:{"Frost":1} },
@@ -1854,7 +1987,6 @@ const CONTAINERS = [
   { name:"Secret Valley 35 Backpack",   tier:"exclusive", slots:6, protection:60,   effectiveness:92.5, bonus:{"Carry weight":81} },
   { name:"SMC Container",               tier:"exclusive", slots:4, protection:95,   effectiveness:120,  bonus:{} },
   { name:"Barrel Container",            tier:"exclusive", slots:7, protection:60,   effectiveness:92.5, bonus:{} },
-  // Purple - Rare
   { name:"Marathon Bag",                tier:"rare", slots:3, protection:78.5, effectiveness:113,   bonus:{"Movement speed":5.7, "Carry weight":37, "Biological infection":-1.62} },
   { name:"Utility Vest Black Eagle Y-73", tier:"rare", slots:3, protection:89.5, effectiveness:110, bonus:{"Movement speed":5.7, "Carry weight":37} },
   { name:"Forager Container",           tier:"rare", slots:4, protection:78.5, effectiveness:113,   bonus:{"Radiation":-1.62} },
@@ -1868,7 +2000,6 @@ const CONTAINERS = [
   { name:"Cell-U Container",            tier:"rare", slots:4, protection:89.5, effectiveness:110,   bonus:{} },
   { name:"Berloga-5u Container",        tier:"rare", slots:5, protection:78.5, effectiveness:100,   bonus:{} },
   { name:"Jagdtasche",                  tier:"rare", slots:4, protection:78.5, effectiveness:112.5, bonus:{"Carry weight":37} },
-  // Blue - Special
   { name:"MBSS Backpack",               tier:"special", slots:4, protection:60,   effectiveness:83.5, bonus:{"Carry weight":48} },
   { name:"Pouch Black Eagle B-33",      tier:"special", slots:3, protection:89.5, effectiveness:95,   bonus:{"Movement speed":4.3, "Carry weight":28} },
   { name:"PROTECT 3B Waist Bag",        tier:"special", slots:2, protection:89.5, effectiveness:110,  bonus:{"Movement speed":3.7, "Carry weight":24} },
@@ -1884,14 +2015,11 @@ const CONTAINERS = [
   { name:"KZS-2U Container",            tier:"special", slots:2, protection:95,   effectiveness:145,  bonus:{} },
   { name:"KZS-M Container",             tier:"special", slots:3, protection:95,   effectiveness:115,  bonus:{} },
   { name:"Cell Container",              tier:"special", slots:4, protection:89.5, effectiveness:95,   bonus:{} },
-  // Green - Uncommon
   { name:"Sports Bag",                  tier:"uncommon", slots:2, protection:89.5, effectiveness:100, bonus:{"Movement speed":2.7, "Carry weight":18} },
 ];
 
-// Populates a <select> with CONTAINERS grouped into rarity optgroups (alphabetical within
-// each tier; CONTAINERS array order/indices untouched - only the rendered option order is
-// sorted). Shared by the main Backpack/Container select and the 3 Compare-mode selects, so
-// there's only one place that needs to agree with CONTAINERS about tiers/colors.
+// Groups CONTAINERS into rarity optgroups (alphabetical within tier; array order/indices
+// untouched). Shared by the main select and the 3 Compare-mode selects.
 function populateContainerSelect(selectEl){
   ['legendary','exclusive','rare','special','uncommon'].forEach(tier=>{
     const meta = CONTAINER_TIER_META[tier];
@@ -1916,8 +2044,8 @@ function populateContainerSelect(selectEl){
 const backpackSelectEl = document.getElementById('backpackSelect');
 populateContainerSelect(backpackSelectEl);
 
-// Compare-mode selects: same options, "-- None --" (hardcoded in the HTML) is
-// their only non-container value, same role as "custom" on backpackSelectEl.
+// "-- None --" (hardcoded in HTML) is Compare selects' only non-container value,
+// same role as "custom" on backpackSelectEl.
 const compareSelectEls = ['compareSelect0','compareSelect1','compareSelect2'].map(id=>document.getElementById(id));
 compareSelectEls.forEach(sel=>{
   populateContainerSelect(sel);
@@ -1928,12 +2056,10 @@ compareSelectEls.forEach(sel=>{
 });
 
 /* ---------- Custom hoverable dropdown for Backpack/Container + Compare selects ----------
-   Native <option> elements can't show a rich hover tooltip, so this wraps the <select> with
-   a custom trigger+panel. The <select> stays intact (hidden) as the source of truth - reads
-   populateContainerSelect's <optgroup>/<option> structure, writes back via .value + a
-   dispatched 'change' event, so every existing listener keeps working unmodified. Uses a
-   separate containerPopoverEl/state (not chipPopoverEl) since that one's click handling is
-   tightly coupled to artefact-specific actions. */
+   Native <option> can't show a rich hover tooltip, so this wraps the <select> with a custom
+   trigger+panel. The <select> stays intact (hidden) as source of truth — reads
+   populateContainerSelect's structure, writes back via .value + a dispatched 'change' event.
+   Uses a separate containerPopoverEl since chipPopoverEl's clicks are artefact-specific. */
 const containerPopoverEl = document.createElement('div');
 containerPopoverEl.className = 'artchip-popover container-popover';
 document.body.appendChild(containerPopoverEl);
@@ -1973,9 +2099,8 @@ function renderContainerPopover(idx){
     ${bonusHtml}
   `;
 }
-// Pins the popup outside the panel's right edge (falls back to left, then clamps to
-// viewport), top-aligned to the hovered row - like positionPopoverBesidePanel, generalized
-// to take the panel as a param since there are 4 of these dropdowns (main + 3 compare).
+// Pins the popup outside the panel's right edge (falls back to left, then clamps to viewport),
+// top-aligned to the hovered row — generalized for all 4 dropdowns (main + 3 compare).
 function positionContainerPopover(anchorEl, panelEl){
   const panelRect = panelEl.getBoundingClientRect();
   const anchorRect = anchorEl.getBoundingClientRect();
@@ -2142,9 +2267,8 @@ compareSelectEls.forEach(enhanceContainerSelect);
   }
   renderBuildsList();
 
-  /* ---- Artefact list: single add point (own ids, separate from My Loadout's) - quality is
-     fixed at add time, re-add to change it. No per-row editing; level is build-wide (see
-     buildLevelToggleEl). ---- */
+  /* ---- Artefact list: single add point (own ids, separate from My Loadout's) - quality
+     fixed at add time, re-add to change it. No per-row editing; level is build-wide. ---- */
   function renderFormSlotsList(){
     const cap = currentCap();
     buildSlotCountLabel.textContent = formSlots.length + '/' + cap;
@@ -2195,7 +2319,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
     if (!q){ hideBuildDd(); buildAddRow.style.display = 'none'; buildSelectedIdx = null; return; }
     const matches = ARTIFACTS
       .map((a, i) => ({name: a.name, idx: i}))
-      .filter(a => a.name.toLowerCase().includes(q))
+      .filter(a => !REMOVED_ARTIFACTS.has(a.name) && a.name.toLowerCase().includes(q))
       .slice(0, 12);
     if (matches.length) showBuildDd(matches); else hideBuildDd();
   });
@@ -2310,9 +2434,8 @@ compareSelectEls.forEach(enhanceContainerSelect);
     closeBuildForm();
   });
 
-  /* ---- Row popover: own element/state, hover-triggered (mirrors artifactListEl's hover
-     pattern for the Available artefacts tooltip), positioned beside myLoadoutPanel the same
-     way that tooltip is positioned beside availableArtefactsPanel. ---- */
+  /* ---- Row popover: own element/state, hover-triggered (mirrors artifactListEl's Available
+     artefacts tooltip pattern), positioned beside myLoadoutPanel the same way. ---- */
   const buildPopoverEl = document.createElement('div');
   buildPopoverEl.className = 'artchip-popover';
   document.body.appendChild(buildPopoverEl);
@@ -2323,8 +2446,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
     buildPopoverEl.classList.remove('open');
     buildPopoverOpenRef = null;
   }
-  // Pins the popup outside myLoadoutPanel's right edge at a fixed x, tracking only the row's
-  // y - see positionPopoverBesidePanel (Available artefacts) for the identical approach.
+  // Same approach as positionPopoverBesidePanel (Available artefacts).
   function positionBuildPopover(anchorEl){
     const panelRect = myLoadoutPanelEl.getBoundingClientRect();
     const anchorRect = anchorEl.getBoundingClientRect();
@@ -2338,8 +2460,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
     buildPopoverEl.style.left = left + 'px';
     buildPopoverEl.style.top = top + 'px';
   }
-  // Hover-close delay, same 200ms pattern as artifactListEl's hoverCloseTimer - keeps the
-  // popover open long enough for the cursor to travel into it (e.g. to click Edit/Delete).
+  // Same 200ms hover-close pattern as artifactListEl's hoverCloseTimer.
   let buildHoverCloseTimer = null;
   function cancelBuildHoverClose(){
     if (buildHoverCloseTimer){ clearTimeout(buildHoverCloseTimer); buildHoverCloseTimer = null; }
@@ -2424,8 +2545,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
       const containerObj = entry ? CONTAINERS.find(c => c.name === entry.container) : null;
       if (!name || !containerObj){ skipped++; return; }
       const cap = containerObj.slots;
-      // migrateBuildEntry normalizes old-format entries (per-slot level/quality, null-padded
-      // slots) the same way loadBuilds() does - see its comment above.
+      // migrateBuildEntry normalizes old-format entries the same way loadBuilds() does.
       const migrated = migrateBuildEntry(entry);
       const slots = migrated.slots
         .filter(s => artNames.has(s.artifact) && validQ.has(s.quality))
@@ -2438,8 +2558,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
     return skipped;
   }
   // Save-to-build from a result card: same push/persist path as the form's Save button, but
-  // auto-suffixes on a name collision ("Name (2)") instead of rejecting - no form here to
-  // show an inline error. Returns null only if containerName is unrecognized.
+  // auto-suffixes on a name collision ("Name (2)") instead of rejecting.
   function saveBuildFromResult(name, containerName, level, slots){
     const containerObj = CONTAINERS.find(c => c.name === containerName);
     if (!containerObj) return null;
@@ -2468,8 +2587,8 @@ compareSelectEls.forEach(enhanceContainerSelect);
   };
 })();
 
-// Currently selected container's flat bonus stats - single source of truth for the note
-// display and the calculation baseline.
+// Currently selected container's flat bonus stats - source of truth for the note display
+// and the calculation baseline.
 let activeContainerBonus = {};
 
 function getEffectiveContainerBonus(){
@@ -2508,9 +2627,8 @@ function selectDefaultContainer(){
 selectDefaultContainer();
 
 /* ---------- Compare-containers mode toggle ----------
-   Doesn't touch activeContainerBonus/getEffectiveContainerBonus - those stay as-is for
-   single-container mode; compare mode reads bonuses straight off CONTAINERS[i].bonus instead
-   (see buildContainerSearchPayload/runComparisonSearch). Uses its own 'active' class, not .checked. */
+   Doesn't touch activeContainerBonus/getEffectiveContainerBonus - compare mode reads bonuses
+   straight off CONTAINERS[i].bonus instead. Uses its own 'active' class, not .checked. */
 const compareModeBtnEl = document.getElementById('compareModeBtn');
 compareModeBtnEl.addEventListener('click', ()=>{
   const on = !compareModeBtnEl.classList.contains('active');
@@ -2521,13 +2639,6 @@ compareModeBtnEl.addEventListener('click', ()=>{
   document.getElementById('compareContainersBlock').style.display = on ? '' : 'none';
 });
 
-/* ---------- Armor: Bullet Resistance -> Effective Health ----------
-   Display-only. Armor tooltip BR doesn't add 1:1 - it converts first:
-     effectiveBR = min(2 * tooltipBR, 1.3 * tooltipBR + 30)
-   Then composes linearly with artefact BR before the Vitality multiplier:
-     EH_total = (100 + effectiveBR + artefactBR) * (1 + Vitality/100)
-   ARMOR_BR_OVERRIDE holds exact in-game-verified values (takes priority over the formula) -
-   add more as they get tested; everything else falls back to the formula. */
 const ARMOR_BR_OVERRIDE = {
   "RAPS AH-6 Nomad": 297.88,
   "Centurion Armored Suit": 355.00,
@@ -2549,14 +2660,9 @@ const ARMOR_TIER_META = {
   exclusive: { label: "Exclusive", color: "var(--q-exclusive)" },
   rare:      { label: "Rare",      color: "var(--q-rare)" },
 };
-// name, br (tooltip BR, feeds Effective Health via armorEffectiveBR), bonus (other
-// buffs/debuffs - same shape/polarity as CONTAINERS' bonus, display-only). Parsed from
-// 03_Stats_Armors.md; other stats in that file are intentionally untracked.
 const ARMORS = [
-  // Yellow - Legendary
   { name:"ZIVCAS M2-C Exoarmor", tier:"legendary", br:216, bonus:{"Carry weight":30, "Periodic healing":3, "Bleeding protection":40} },
   { name:"Albatross Heavy Assault Armored Exoskeleton", tier:"legendary", br:239, bonus:{"Carry weight":30, "Bleeding":-1, "Bleeding protection":40} },
-  // Red - Exclusive
   { name:"Vanguard Armored Suit", tier:"exclusive", br:236, bonus:{"Stamina":20, "Movement speed":-2, "Carry weight":35, "Stability":10, "Bleeding protection":65} },
   { name:"Reiter Super-Heavy Armored Suit", tier:"exclusive", br:282, bonus:{"Stamina":-30, "Movement speed":-10, "Carry weight":15, "Stability":50, "Bleeding protection":60} },
   { name:"CD-4 Armored Suit", tier:"exclusive", br:231, bonus:{"Stamina":20, "Carry weight":30, "Bleeding protection":55} },
@@ -2591,7 +2697,6 @@ const ARMORS = [
   { name:"Punisher Exoarmor", tier:"exclusive", br:176, bonus:{"Movement speed":11, "Carry weight":18, "Bleeding":-0.5, "Bleeding protection":40} },
   { name:"JD ZIVCAS 2A Exoarmor", tier:"exclusive", br:189, bonus:{"Carry weight":25, "Periodic healing":3, "Bleeding protection":40} },
   { name:"Rigel Exoarmor", tier:"exclusive", br:235, bonus:{"Stamina":-5, "Movement speed":-4, "Carry weight":20, "Stability":20, "Bleeding protection":40} },
-  // Purple - Rare
   { name:"Aborigine Exoskeleton", tier:"rare", br:187, bonus:{"Carry weight":30, "Bleeding protection":45} },
   { name:"Bear Exoarmor", tier:"rare", br:197, bonus:{"Stamina":-20, "Movement speed":-8, "Carry weight":14, "Stability":35, "Bleeding protection":55} },
   { name:"Scythian-4 Armored Suit", tier:"rare", br:187, bonus:{"Movement speed":1, "Carry weight":15, "Bleeding protection":40} },
@@ -2647,8 +2752,8 @@ const armorSelectEl = document.getElementById('armorSelect');
   armorSelectEl.appendChild(group);
 });
 
-// Selected armor (null = None) - read by computeEffectiveHealth (via `br`) and the
-// "Add armor bonus stats" toggle (via `bonus`). Display-only, never fed into search/scoring.
+// null = None. Read by computeEffectiveHealth (via `br`) and the "Add armor bonus stats"
+// toggle (via `bonus`). Display-only, never fed into search/scoring.
 let selectedArmor = null;
 function updateArmorBonusNote(){
   const note = document.getElementById('armorBonusNote');
@@ -2672,9 +2777,7 @@ armorSelectEl.addEventListener('change', ()=>{
   updateArmorBonusNote();
 });
 
-// EH for a result build: artefact BR/Vitality (incl. container bonus, gated by the same
-// toggle as displayed stat pills) plus the selected armor's converted BR, gated by its own
-// toggle - keeps this number consistent with what's shown elsewhere for the same build.
+// BR/Vitality gated by their own container/armor buff toggles, same as displayed stats.
 function computeEffectiveHealth(sum, containerBonus){
   const brBonus = containerBonus ? (containerBonus['Bullet resistance'] || 0) : 0;
   const vitBonus = containerBonus ? (containerBonus['Vitality'] || 0) : 0;
@@ -2742,19 +2845,18 @@ function buildPoolModeB(includeAdditional, effectiveness, level){
 
 /* ---------- Per-container search payload builder ----------
    Builds the worker payload for a single search, parameterized by containerCfg =
-   {name, slots, protection, effectiveness, bonus}. Shared by the normal single-search flow
-   and Compare-containers mode (one call per named CONTAINERS entry).
+   {name, slots, protection, effectiveness, bonus}. Shared by normal single-search and
+   Compare-containers mode (one call per named CONTAINERS entry).
 
    sharedCtx = fields that don't vary per container: targetStats, includedIdx,
    includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx.
 
-   Returns {error} or {payload, meta}: payload is posted to the worker; meta carries what
-   finishSearch/rendering need after. Global validation (empty targetStats/pool/loadout)
-   happens once in the caller, before this runs - see calcBtn.onclick and runComparisonSearch. */
+   Returns {error} or {payload, meta}. Global validation (empty targetStats/pool/loadout)
+   happens once in the caller — see calcBtn.onclick and runComparisonSearch. */
 function buildContainerSearchPayload(containerCfg, sharedCtx){
   const { slots, protection, effectiveness, bonus } = containerCfg;
   const { targetStats, includedIdx, includeAdditional, level, quality,
-          noDebuffIdx, useLoadout, pinnedIdx } = sharedCtx;
+          noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed } = sharedCtx;
 
   if (pinnedIdx.length >= slots){
     const msg = containerCfg.name
@@ -2765,9 +2867,6 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
 
   rebuildVecs(includeAdditional, effectiveness, level, quality);
 
-  // Only the 5 threshold stats get baked into containerBaseVec (the calc baseline) - see
-  // "Container bonus stats" in the Project Summary. Everything else stays display-only via
-  // containerBonusMap (kept in full, unaggregated) in meta below.
   const containerBonusMap = { ...bonus };
   const containerBaseVec = new Float64Array(NS);
   Object.entries(containerBonusMap).forEach(([name, val]) => {
@@ -2781,6 +2880,12 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
   }
 
+  let lockedPriceTierSum = 0, lockedPriceMissing = false;
+  pinnedIdx.forEach(pi => {
+    const tier = ARTIFACT_PRICES[ARTIFACTS[pi].name];
+    if (tier == null) lockedPriceMissing = true; else lockedPriceTierSum += tier;
+  });
+
   const pinnedQuality = {};
   let poolVecs, poolMax, poolMeta;
   if (useLoadout){
@@ -2793,9 +2898,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
         : `You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.`;
       return { error: msg };
     }
-    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum. This
-    // check is "global" in outcome (OWNED/pin availability doesn't depend on the container)
-    // but needs no special-casing - it falls out naturally from building the pool per container.
+    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum. Falls
+    // out naturally from building the pool per container — no special-casing needed.
     if (pinnedIdx.length > 0) {
       for (const pi of pinnedIdx) {
         if (!OWNED[pi] || OWNED[pi].length === 0) {
@@ -2822,8 +2926,6 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
   }
 
-  // Pre-sort by descending solo raw score before the search starts (see "Search algorithm"
-  // in the Project Summary) - pure reindexing, poolMeta still maps back correctly.
   {
     const soloScore = v => targetStats.reduce((s,t) => {
       const dir = STAT_META[t.name].good ? 1 : -1;
@@ -2834,6 +2936,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     poolMax  = order.map(i=>poolMax[i]);
     poolMeta = order.map(i=>poolMeta[i]);
   }
+
+  const poolPriceTier = poolMeta.map(m => ARTIFACT_PRICES[ARTIFACTS[m.artifactIdx].name] ?? null);
 
   const statMaxMap = {};
   for (const t of targetStats) {
@@ -2871,7 +2975,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       vecs: poolVecs.map(v=>Array.from(v)), maxCounts: poolMax, slots,
       protection, targetStats: workerTargetStats, thresholds: workerThresholds,
       minStats: workerMinStats, ns: NS, total, noDebuffIdx,
-      lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length
+      lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length,
+      poolPriceTier, lockedPriceTierSum, lockedPriceMissing, priceCategoryAllowed
     },
     meta: {
       poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
@@ -2887,7 +2992,7 @@ self.onmessage = function(e){
   var d = e.data;
   var VECS = d.vecs.map(function(v){ return new Float64Array(v); });
   var n = VECS.length;
-  var maxCounts = d.maxCounts; // per-pool-entry repeat cap (Infinity = unbounded)
+  var maxCounts = d.maxCounts; // per-item repeat cap (Infinity = unbounded)
   var sum = new Float64Array(d.ns);
   if(d.lockedSum){for(var k=0;k<d.ns;k++) sum[k]=d.lockedSum[k];}
   var counts = new Array(n).fill(0);
@@ -2902,9 +3007,11 @@ self.onmessage = function(e){
   var protection = d.protection;
   var total = d.total;
   var noDebuffIdx = d.noDebuffIdx || [];
-  // Below this, a stat rounds to "0.00" on the card (fmt() uses toFixed(2)) even if technically
-  // nonzero - 0.006 clears the 0.005 rounding boundary safely against float error. Mirrored on
-  // the main thread (isolated blob scope can't share the constant) - keep both in sync.
+  var poolPriceTier = d.poolPriceTier;
+  var priceCategoryAllowed = d.priceCategoryAllowed || null;
+  var priceTierSum = d.lockedPriceTierSum;
+  var priceMissingCount = d.lockedPriceMissing ? 1 : 0;
+  // keep in sync with main thread's COVERAGE_EPS (blob scope can't share it)
   var COVERAGE_EPS = 0.006;
 
   function passesThreshold(){
@@ -2966,9 +3073,7 @@ self.onmessage = function(e){
     if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
     return a.ts.l>b.ts.l;
   }
-  // For leaves that pass the damage threshold but miss one or more requested minimums:
-  // count how many are unmet, and sum the normalized (statMax-scaled, same scale as H/M/L)
-  // achieved value on just the unmet ones - used to rank "closest to the minimum" first.
+  // unmet-minimum count + normalized deficit, for "closest to min" ranking
   function unmetMinInfo(){
     var count=0, crit=0;
     for(var i=0;i<minStats.length;i++){
@@ -2981,30 +3086,24 @@ self.onmessage = function(e){
     }
     return {count:count, crit:crit};
   }
-  // Ranks min-stat fallback candidates: fewest unmet minimums wins first, then closest
-  // (highest normalized value) on the unmet minimum(s), then the existing H/M/L comparator.
+  // fewest unmet minimums first, then closest on the unmet ones, then H/M/L
   function beatsFallback(a,b){
     if(a.unmetCount!==b.unmetCount) return a.unmetCount<b.unmetCount;
     if(Math.abs(a.crit-b.crit)>1e-6) return a.crit>b.crit;
     return beats(a,b);
   }
-  var TOP_MISS = 30;
-  var top_miss = [];
   var TOP_EXT = 10;
   var top_ext = [];
   var topMinFallback = [];
-  // Last-resort fallback for builds that clear the threshold but miss full coverage; ranked
-  // with the same beats() comparator as top, so "most stats covered" wins.
+  // last-resort: threshold passes but misses full coverage; same beats() ordering
   var topCoverageFallback = [];
-  // True when a leaf clears the threshold/min but misses coverage - lets the UI blame the
-  // real reason for an empty result set instead of always the damage threshold.
+  // true when a leaf clears threshold/min but misses coverage - real reason for empty results
   var failedCoverageOnly = false;
 
   // ---- Branch-and-bound precomputation (once per search) ----
 
-  // Duplicated from the main-thread combinationCount/boundedCombinationCount (isolated blob
-  // scope can't share it) - lets a pruned subtree's exact leaf count be added to checked in
-  // one shot.
+  // duplicated from main thread (blob scope can't share it) - adds a pruned subtree's exact
+  // leaf count to checked in one shot
   function combinationCount(nn, k){
     if (nn === 0 || k === 0) return 0;
     let r = 1;
@@ -3033,40 +3132,34 @@ self.onmessage = function(e){
 
   var nT = targetStats.length, nThr = thresholds.length, nND = noDebuffIdx.length;
 
-  // Per-item (pool position j) solo contributions, direction-adjusted where relevant.
-  var soloScore = new Float64Array(n);
+  // per-item solo contributions, direction-adjusted
   var soloH = new Float64Array(n), soloM = new Float64Array(n), soloL = new Float64Array(n);
   var soloDirAdj = []; for(var ti0=0; ti0<nT; ti0++) soloDirAdj.push(new Float64Array(n));
   var soloThreshRaw = []; for(var hi0=0; hi0<nThr; hi0++) soloThreshRaw.push(new Float64Array(n));
   var soloNDRaw = []; for(var ndi0=0; ndi0<nND; ndi0++) soloNDRaw.push(new Float64Array(n));
   for(var j=0;j<n;j++){
-    var vec=VECS[j], sc0=0;
+    var vec=VECS[j];
     for(var ti=0; ti<nT; ti++){
       var t=targetStats[ti];
       var val=vec[t.idx]*t.dir;
       soloDirAdj[ti][j]=val;
-      sc0+=val*t.weight;
       var normed=t.statMax>1e-12?val/t.statMax:0;
       if(t.tier==='high') soloH[j]+=normed;
       else if(t.tier==='low') soloL[j]+=normed;
       else soloM[j]+=normed;
     }
-    soloScore[j]=sc0;
     for(var hi=0; hi<nThr; hi++) soloThreshRaw[hi][j]=vec[thresholds[hi].idx];
     for(var ndi=0; ndi<nND; ndi++) soloNDRaw[ndi][j]=vec[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir;
   }
 
-  // Suffix-max/min arrays, indexed by pool position: suffixX[k] = best single item among
-  // indices k..n-1 (n+1 entries; index n = no items left, seeded with the identity value
-  // that correctly makes every reachability check downstream report "unreachable").
-  var suffixMaxScore = new Float64Array(n+1); suffixMaxScore[n]=-Infinity;
+  // suffix best/worst per pool position; index n = none left, seeded so reachability
+  // checks always report "unreachable"
   var suffixMaxH = new Float64Array(n+1), suffixMaxM = new Float64Array(n+1), suffixMaxL = new Float64Array(n+1);
   suffixMaxH[n]=suffixMaxM[n]=suffixMaxL[n]=-Infinity;
   var suffixMaxDirAdj = []; for(var ti1=0; ti1<nT; ti1++){ var a1=new Float64Array(n+1); a1[n]=-Infinity; suffixMaxDirAdj.push(a1); }
   var suffixMinThresh = []; for(var hi1=0; hi1<nThr; hi1++){ var a2=new Float64Array(n+1); a2[n]=Infinity; suffixMinThresh.push(a2); }
   var suffixMinND = []; for(var ndi1=0; ndi1<nND; ndi1++){ var a3=new Float64Array(n+1); a3[n]=Infinity; suffixMinND.push(a3); }
   for(var k=n-1;k>=0;k--){
-    suffixMaxScore[k]=Math.max(soloScore[k],suffixMaxScore[k+1]);
     suffixMaxH[k]=Math.max(soloH[k],suffixMaxH[k+1]);
     suffixMaxM[k]=Math.max(soloM[k],suffixMaxM[k+1]);
     suffixMaxL[k]=Math.max(soloL[k],suffixMaxL[k+1]);
@@ -3075,18 +3168,16 @@ self.onmessage = function(e){
     for(var ndi2=0; ndi2<nND; ndi2++) suffixMinND[ndi2][k]=Math.min(soloNDRaw[ndi2][k],suffixMinND[ndi2][k+1]);
   }
 
-  // minStats is always a filtered subset of targetStats (same idx/dir) - map each minStat
-  // to its position in targetStats so the coverage-bound suffix arrays can be reused (1d).
+  // map each minStat to its targetStats position, to reuse the 1d suffix arrays
   var minStatTargetPos = minStats.map(function(m){
     for(var mti=0; mti<nT; mti++){ if(targetStats[mti].idx===m.idx) return mti; }
     return -1;
   });
 
-  // Per-node bound check (1c/1d/1e). Returns true only if every applicable bucket
-  // (top, top_ext, top_miss, and topMinFallback when minStats is in use) is proven
-  // unable to be helped by anything left in this subtree.
+  // prune only if every applicable bucket (top, top_ext, topMinFallback when in use) is
+  // proven unreachable from this subtree
   function shouldPrune(start, remaining){
-    // 1c/1e: threshold + no-debuff-filter reachability - structural, always checked.
+    // threshold + no-debuff reachability, always checked
     var hardReachable=true, extReachable=true;
     for(var hi=0; hi<nThr; hi++){
       var t=thresholds[hi];
@@ -3104,19 +3195,13 @@ self.onmessage = function(e){
     }
     if(!((!hardReachable&&!extReachable)||noDebuffDead)) return false;
 
-    // Bullets 2-5 only prove anything once their list is full - before that, any leaf
-    // could still be inserted, so don't prune on their account yet.
+    // buckets below only prove anything once full
     if(top.length!==TOP_N) return false;
     if(top_ext.length!==TOP_EXT) return false;
     if(minStats.length>0 && topMinFallback.length!==TOP_N) return false;
     if(topCoverageFallback.length!==TOP_N) return false;
-    if(top_miss.length!==TOP_MISS) return false;
 
-    // Bullet: raw-score reachability vs. top_miss's current worst.
-    var bestScore=rawScore()+remaining*suffixMaxScore[start];
-    if(bestScore>top_miss[top_miss.length-1].score) return false;
-
-    // Bullets vs top/top_ext/topMinFallback share the same optimistic (cov,H,M,L) bound.
+    // shared optimistic (cov,H,M,L) bound for top/top_ext/topMinFallback
     var curCov=coverage(), curTs=tierScores();
     var covBound=curCov;
     for(var ti=0; ti<nT; ti++){
@@ -3162,16 +3247,19 @@ self.onmessage = function(e){
     for(var ndi=0;ndi<noDebuffIdx.length;ndi++){
       if(sum[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir < -1e-6) return;
     }
+    if(priceCategoryAllowed){
+      if(priceMissingCount>0) return;
+      var cat=Math.round(priceTierSum/d.slots);
+      if(!priceCategoryAllowed[cat-1]) return;
+    }
     var passes=passesThreshold();
     var minsOk=passesMinStats();
-    // A leaf that fails both the damage threshold and a minimum is fully discarded - the
-    // fallback pool only ever backfills from builds that are otherwise safe.
+    // fails both cap and min -> discarded; fallback pool only backfills safe builds
     if(!minsOk && !passes) return;
     var sc=rawScore();
     if(passes){
       var ts=tierScores(),cv=coverage();
-      // Zero-benefit coverage excludes a leaf from top/topMinFallback (same as failing the hard
-      // cap) even if it scores well - only topCoverageFallback (last-resort) tracks it.
+      // zero coverage excludes from top/topMinFallback even if it scores well
       if(cv!==targetStats.length){
         failedCoverageOnly=true;
         if(topCoverageFallback.length!==TOP_N||beats({cov:cv,ts:ts},topCoverageFallback[topCoverageFallback.length-1])){
@@ -3201,9 +3289,7 @@ self.onmessage = function(e){
       // Extended zone: over hard cap but within consumable range
       var ts2=tierScores(),cv2=coverage();
       if(cv2===targetStats.length){
-        if(top_ext.length===TOP_EXT&&!beats({cov:cv2,ts:ts2},top_ext[top_ext.length-1])) {
-          // still track for upgrade analysis
-        } else {
+        if(!(top_ext.length===TOP_EXT&&!beats({cov:cv2,ts:ts2},top_ext[top_ext.length-1]))){
           var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:Array.from(sum)};
           var ie=top_ext.length;
           top_ext.push(entry_e);
@@ -3211,29 +3297,13 @@ self.onmessage = function(e){
           if(top_ext.length>TOP_EXT) top_ext.length=TOP_EXT;
         }
       }
-      // Also track as near-miss for upgrade analysis
-      if(top_miss.length<TOP_MISS || sc>top_miss[top_miss.length-1].score){
-        var entry2={counts:counts.slice(),score:sc,ts:{h:0,m:0,l:0},cov:0,sum:Array.from(sum)};
-        var j=top_miss.length;
-        top_miss.push(entry2);
-        while(j>0&&sc>top_miss[j-1].score){top_miss[j]=top_miss[j-1];top_miss[j-1]=entry2;j--;}
-        if(top_miss.length>TOP_MISS) top_miss.length=TOP_MISS;
-      }
-    } else {
-      // Hard fail: track only for upgrade analysis
-      if(top_miss.length===TOP_MISS && sc<=top_miss[top_miss.length-1].score) return;
-      var entry3={counts:counts.slice(),score:sc,ts:{h:0,m:0,l:0},cov:0,sum:Array.from(sum)};
-      var j2=top_miss.length;
-      top_miss.push(entry3);
-      while(j2>0&&sc>top_miss[j2-1].score){top_miss[j2]=top_miss[j2-1];top_miss[j2-1]=entry3;j2--;}
-      if(top_miss.length>TOP_MISS) top_miss.length=TOP_MISS;
     }
+    // hard fail: no bookkeeping needed
   }
   function recurse(start,remaining){
     if(remaining===0){considerLeaf();return;}
     if(shouldPrune(start,remaining)){
-      // Section 4b: account for the whole skipped subtree's exact leaf count in one shot,
-      // instead of just returning silently, so checked/total stays an honest percentage.
+      // count the skipped subtree exactly, so checked/total stays honest
       var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start),remaining):combinationCount(n-start,remaining);
       checked+=skipped;
       if(checked>=nextReport){
@@ -3247,47 +3317,38 @@ self.onmessage = function(e){
       var vec=VECS[i];
       counts[i]++;
       for(var k=0;k<ns;k++) sum[k]+=vec[k];
+      if(priceCategoryAllowed){
+        if(poolPriceTier[i]==null) priceMissingCount++; else priceTierSum+=poolPriceTier[i];
+      }
       recurse(i,remaining-1);
+      if(priceCategoryAllowed){
+        if(poolPriceTier[i]==null) priceMissingCount--; else priceTierSum-=poolPriceTier[i];
+      }
       for(var k=0;k<ns;k++) sum[k]-=vec[k];
       counts[i]--;
     }
   }
   recurse(0,d.slots-(d.lockedSlots||0));
-  self.postMessage({type:'done',top:top,top_miss:top_miss,top_ext:top_ext,top_fallback:topMinFallback,top_coverage_fallback:topCoverageFallback,failedCoverageOnly:failedCoverageOnly});
+  self.postMessage({type:'done',top:top,top_ext:top_ext,top_fallback:topMinFallback,top_coverage_fallback:topCoverageFallback,failedCoverageOnly:failedCoverageOnly});
 };
 `;
 
 /* ---------- Search ---------- */
-// Hard caps: effective value must stay at or below these to avoid damage.
-// Frost ignores backpack protection and has a different cap (1 instead of 0.5).
-// Mirrors WORKER_SRC's own COVERAGE_EPS (isolated blob scope can't share it) - keep both in
-// sync. Marks target pills with no real benefit in a coverage-fallback build (see renderResultCard).
+// Keep in sync with WORKER_SRC's own COVERAGE_EPS (isolated blob scope can't share it).
+// Also marks target pills with no real benefit in a coverage-fallback build.
 const COVERAGE_EPS = 0.006;
-const THRESH_CAP     = 0.5;  // non-Frost hard cap
-const THRESH_CAP_FROST = 1; // Frost hard cap
-const THRESH_EXT     = 0.55;  // non-Frost extended zone (consumable range)
-const THRESH_EXT_FROST = 1; // Frost has no consumables - extended zone disabled (same as hard cap)
+const THRESH_CAP     = 0.5;
+const THRESH_CAP_FROST = 1;
+const THRESH_EXT     = 0.55;
+const THRESH_EXT_FROST = 1;
 
 function thresholdCap(statName){ return statName === 'Frost' ? THRESH_CAP_FROST : THRESH_CAP; }
 function thresholdExtCap(statName){ return statName === 'Frost' ? THRESH_EXT_FROST : THRESH_EXT; }
 
-// Container bonus passes through unprotected regardless of its own sign or the combined
-// total's sign (confirmed via 4 in-game paired tests) - don't route it through protection.
 function thresholdEffValue(raw, bonus, statName, protection){
   const artOnly = raw - bonus;
   const effArt = (artOnly > 0 && statName !== 'Frost') ? artOnly * (1 - protection/100) : artOnly;
   return effArt + bonus;
-}
-
-function passesThreshold(sum, protection, bonusVec){
-  for (const s of THRESHOLD_STATS){
-    const idx = STAT_IDX[s];
-    const raw = sum[idx];
-    const bonus = bonusVec ? bonusVec[idx] : 0;
-    const eff = thresholdEffValue(raw, bonus, s, protection);
-    if (eff > thresholdCap(s) + 1e-6) return false;
-  }
-  return true;
 }
 
 
@@ -3304,10 +3365,8 @@ function fmt(name, val){
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}${pct}`;
 }
-// Threshold stats show the final effective value (thresholdEffValue) - the artefact/bonus
-// split isn't useful, only what matters vs the cap (armor never grants threshold stats).
-// Non-threshold bonus is display-only, added here rather than to totalVal - the container/
-// armor toggles independently gate whether each source's bonus is merged into the shown total.
+// Threshold stats show the final effective value (artefact/bonus split isn't useful, only
+// what matters vs the cap). Non-threshold bonus is display-only, gated by its own toggle.
 function fmtWithBonus(name, totalVal, containerBonus, protection){
   const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
   if (STAT_META[name].threshold){
@@ -3321,18 +3380,13 @@ function fmtWithBonus(name, totalVal, containerBonus, protection){
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
 }
-// For threshold stats, `sum` has the container bonus baked in but not protection applied -
-// same math as thresholdEffValue/fmtWithBonus. Coloring off the raw sum instead of the
-// effective value can disagree with what's printed (e.g. artefact-only total is a debuff,
-// but the protected total plus a negative container bonus nets beneficial).
+// Colors off the same merged total fmtWithBonus prints, not the raw artefact-only sum -
+// otherwise a stat that's a buff only via container/armor bonus would miscolor.
 function displayGoodValue(name, sumVal, containerBonus, protection){
   const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
   if (STAT_META[name].threshold){
     return isGoodValue(name, thresholdEffValue(sumVal, bonus, name, protection));
   }
-  // Must track whatever fmtWithBonus prints - merged total when toggle(s) are on, artefact-
-  // only otherwise. Using just the artefact-only sign would miscolor a stat that's a buff
-  // only via container/armor bonus (artefact contribution ~0).
   const armorBonus = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[name] || 0) : 0;
   const containerPart = includeContainerBuffs ? bonus : 0;
   return isGoodValue(name, sumVal + containerPart + armorBonus);
@@ -3380,13 +3434,13 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
       const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
       const eff = thresholdEffValue(raw, bonus, s, protection);
       if (eff > thresholdCap(s) + 1e-6){
-        overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;margin-left:4px;">${s} ${eff.toFixed(2)}</span>`;
+        overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;">${s} ${eff.toFixed(2)}</span>`;
       }
     });
   }
 
   const wouldBeNote = wouldBeRank != null
-    ? `<span style="font-size:10px;color:var(--muted);margin-left:8px;">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
+    ? `<span style="font-size:10px;color:var(--muted);">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
     : '';
 
   const copyBtn = (!isExtended && resultIndex >= 0)
@@ -3395,11 +3449,12 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const saveBuildBtn = (!isExtended && resultIndex >= 0)
     ? `<button type="button" class="copy-result-btn save-build-btn" data-result-idx="${resultIndex}" title="Save to My Builds">💾 save</button>`
     : '';
-  html += `<div class="rank-row"><span class="rank-badge">#${rank}</span>${overBadges}${wouldBeNote}${copyBtn}${saveBuildBtn}</div>`;
+  html += `<div class="rank-row">
+      <div class="rank-row-info"><span class="rank-badge">#${rank}</span>${priceBadgeHtml(chosen)}${overBadges}${wouldBeNote}</div>
+      <div class="rank-row-actions">${copyBtn}${saveBuildBtn}</div>
+    </div>`;
 
-  // Effective Health: display-only, from this build's Bullet resistance + Vitality (respecting
-  // "Add containers bonus stats" so it matches those stats elsewhere on the card) plus the
-  // selected armor's converted Bullet resistance. See computeEffectiveHealth for the formula.
+  // Display-only; respects "Add containers bonus stats" so it matches stats shown elsewhere.
   const ehVal = computeEffectiveHealth(sum, containerBonus);
   const ehArmorNote = (selectedArmor && includeArmorBuffs) ? ` <span style="color:var(--muted);">w/ ${selectedArmor.name}</span>` : '';
   html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
@@ -3459,14 +3514,11 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const statCells = [];
   STAT_NAMES.forEach(s=>{
     const val = sum[STAT_IDX[s]];
-    // Non-threshold bonus stats never enter `sum` (display-only, see containerBaseVec), so a
-    // stat purely from the container bonus would otherwise be skipped here - only count it
-    // when the include-buffs toggle is on, since with it off there's nothing of its own to show.
+    // A stat purely from container bonus would be skipped here otherwise - only count it
+    // when the include-buffs toggle is on (off = nothing of its own to show).
     const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
     const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
-    // Armor bonus merges into the same displayed total as container bonus (see fmtWithBonus/
-    // displayGoodValue), gated by its own includeArmorBuffs toggle - also counted here so a
-    // stat purely from armor still gets a row instead of being skipped.
+    // Same reasoning for armor bonus, gated by its own includeArmorBuffs toggle.
     const armorBonusVal = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[s] || 0) : 0;
     if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6 && Math.abs(armorBonusVal) < 1e-6) return;
     const good = displayGoodValue(s, val, containerBonus, protection);
@@ -3477,10 +3529,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     </div>`);
   });
 
-  // Gauges and stats are independent lists of different lengths - stacking them in
-  // their own column (rather than pairing into shared grid rows) keeps each column's
-  // internal spacing/border-rhythm consistent instead of rows stretching to fit
-  // whichever column happens to be taller at that index.
+  // Independent lists of different lengths - stacking each in its own column keeps
+  // spacing/border-rhythm consistent instead of rows stretching to the tallest at that index.
   let gridHtml = '<div class="details-cols">';
   gridHtml += '<div class="details-col">' + gaugeCells.join('') + '</div>';
   gridHtml += '<div class="details-col">' + statCells.join('') + '</div>';
@@ -3511,9 +3561,8 @@ function renderConsumableZone(results, extResults, targetStats, protection, cont
   el.innerHTML = html;
 }
 
-// In grid view, artifact chip rows (.loadout-list) can be different heights across cards,
-// pushing the stat pills out of alignment. This measures the tallest chip section per
-// group-of-N (matching the CSS column count) and gives the shorter ones a matching min-height.
+// Grid view: chip rows (.loadout-list) can be different heights across cards, pushing stat
+// pills out of alignment. Measures the tallest chip section per row-of-N and matches it.
 function equalizeGridCardChips(resultsEl){
   const gridEl = resultsEl.querySelector('.results-grid-view');
   if (!gridEl) return;
@@ -3573,6 +3622,19 @@ function equalizeCompareCardChips(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
+// Shared by renderResults and renderComparisonResults - disables tiers above
+// lastSearchedMaxPriceTier (mirroring visiblePriceTiers itself, read directly).
+// Every tier button is independently toggled: "active" = currently shown.
+function priceFilterGroupHtml(){
+  let tierBtns = '';
+  for (let t=1;t<=5;t++){
+    const disabled = t > lastSearchedMaxPriceTier;
+    const active = visiblePriceTiers.has(t);
+    tierBtns += `<button type="button" class="price-filter-btn${active?' active':''}" data-price="${t}"${disabled?' disabled':''}>${'$'.repeat(t)}</button>`;
+  }
+  return `<div class="price-filter-group">${tierBtns}</div>`;
+}
+
 function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel){
   lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel};
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
@@ -3593,33 +3655,55 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     displayResults = coverageFallbackResults.slice(0, RESULTS_DISPLAY_CAP);
   }
   const minLabel = hasMin ? minCriteriaLabel(targetStats) : '';
-  const showPartialLabels = hasMin && metCount > 0 && metCount < RESULTS_DISPLAY_CAP && displayResults.length > metCount;
-  const showZeroBanner = hasMin && metCount === 0 && displayResults.length > 0 && !showCoverageFallback;
+
+  // Applied last, preserving the met/fallback split (see plan §9.3 for why a single flat
+  // pass over displayResults won't work).
+  const allPriceTiersVisible = visiblePriceTiers.size === 5;
+  const passesPriceFilter = r => {
+    if (allPriceTiersVisible) return true;
+    const cat = buildPriceCategory(r.chosen);
+    return cat != null && visiblePriceTiers.has(cat);
+  };
+  const preFilterCount = displayResults.length;
+  let filteredMetCount = metCount;
+  if (!allPriceTiersVisible){
+    const metPortion = displayResults.slice(0, metCount).filter(passesPriceFilter);
+    const restPortion = displayResults.slice(metCount).filter(passesPriceFilter);
+    filteredMetCount = metPortion.length;
+    displayResults = metPortion.concat(restPortion);
+  }
+  const priceFilterEmptied = !allPriceTiersVisible && preFilterCount > 0 && displayResults.length === 0;
+
+  const showPartialLabels = hasMin && filteredMetCount > 0 && filteredMetCount < RESULTS_DISPLAY_CAP && displayResults.length > filteredMetCount;
+  const showZeroBanner = hasMin && filteredMetCount === 0 && displayResults.length > 0 && !showCoverageFallback;
   lastRenderArgs.displayResults = displayResults;
 
   highlightUsedArtifacts(usedArtifactIndices(displayResults));
   const el = document.getElementById('results');
-  if (!displayResults || displayResults.length === 0){
+  if (!displayResults || (displayResults.length === 0 && !priceFilterEmptied)){
     const msg = failedCoverageOnly
       ? `No combination gives a beneficial value to every stat you selected at once. Try unchecking a stat, increasing slots, or including different artefacts.`
       : `No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.`;
     el.innerHTML = `<h2>Result</h2><div class="msg-error">${msg}</div>`;
-    renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
+    if (showConsumableZone) {
+      renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
+    } else {
+      document.getElementById('consumableZone').innerHTML = '';
+    }
     return;
   }
   const topSets = topStatHighlightOn ? computeTopStatSets(displayResults, targetStats) : null;
 
-  const viewToggleHtml = displayResults.length > 1
-    ? `<div class="results-view-toggle">
+  const viewToggleHtml = `<div class="results-view-toggle">
         <button type="button" class="view-btn${!gridView ? ' active' : ''}" data-view="list">List</button>
         <button type="button" class="view-btn${gridView ? ' active' : ''}" data-view="grid">Grid</button>
-      </div>`
-    : '';
+      </div>`;
   const hlToggleHtml = `<div class="hl-toggle-group">
         <button type="button" class="hl-toggle-btn toggle-owned${ownedHighlightOn ? ' active' : ''}" data-hl="owned" title="Highlight chips you already own">Owned</button>
         <button type="button" class="hl-toggle-btn toggle-topstat${topStatHighlightOn ? ' active' : ''}" data-hl="topstat" title="Highlight the top-2 result for each target stat">Top stats</button>
       </div>`;
-  const toggleHtml = `<div class="results-toggles">${hlToggleHtml}${viewToggleHtml}</div>`;
+  const priceFilterHtml = priceFilterGroupHtml();
+  const toggleHtml = `<div class="results-toggles">${priceFilterHtml}${hlToggleHtml}${viewToggleHtml}</div>`;
 
   let html = `<div class="results-header"><h2>Top ${displayResults.length} combination${displayResults.length>1?'s':''}</h2>${toggleHtml}</div>`;
 
@@ -3634,11 +3718,15 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     : '';
 
   let cardsHtml = zeroBannerHtml + coverageFallbackBannerHtml;
-  displayResults.forEach((r,i)=>{
-    if (showPartialLabels && i === metCount) cardsHtml += partialBannerHtml;
-    const minStatus = showPartialLabels && i < metCount ? 'met' : null;
-    cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus, containerBonus);
-  });
+  if (priceFilterEmptied){
+    cardsHtml += `<div class="empty-state">No builds in the current results match that price filter.</div>`;
+  } else {
+    displayResults.forEach((r,i)=>{
+      if (showPartialLabels && i === filteredMetCount) cardsHtml += partialBannerHtml;
+      const minStatus = showPartialLabels && i < filteredMetCount ? 'met' : null;
+      cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus, containerBonus);
+    });
+  }
 
   if (gridView && displayResults.length > 1) {
     html += '<div class="results-grid-view">' + cardsHtml + '</div>';
@@ -3662,239 +3750,43 @@ function renderResults(results, extResults, targetStats, protection, minFallback
       renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
     });
   });
-
-  renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
-}
-
-/* ---------- Upgrade analysis ---------- */
-// For each near-miss combination, try upgrading one artifact at a time
-// (levels 1–15) and find the minimum level that makes the build valid.
-// Returns tip objects only if the upgraded build would beat any of the top-3
-// valid results by score.
-function analyzeUpgrades(misses, includedIdx, targetStats, protection, includeAdditional, effectiveness, validResults, containerBase){
-  if (!misses || misses.length === 0) return [];
-  const tips = [];
-  const seen = new Set(); // deduplicate by (build-key, enabler-idx, min-level)
-
-  // Score threshold: must be at least as good as the 3rd valid result
-  const minValidScore = validResults.length > 0
-    ? validResults[Math.min(2, validResults.length - 1)].score
-    : -Infinity;
-
-  // Pre-compute per-stat index+direction for scoring
-  const tsDirs = targetStats.map(t=>({ idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, weight: t.weight }));
-
-  function scoreSum(sumArr){
-    let s = 0;
-    for (const t of tsDirs) s += sumArr[t.idx] * t.dir * t.weight;
-    return s;
-  }
-
-  // Rebuild sum vector for a combination with one artifact upgraded to overrideLvl.
-  // Non-enabler artifacts use the current VECS (already baked with current level/quality).
-  // The enabler is recomputed at overrideLvl with quality=100 (common), since we assume
-  // the user upgrades a base-quality copy. If includeAdditional is on at overrideLvl 15,
-  // the enabler's add stats are included too.
-  function buildSum(counts, localIndices, overrideIdx, overrideLvl){
-    const effMult = effectiveness / 100;
-    const s = new Float64Array(NS);
-    if (containerBase) { for (let k = 0; k < NS; k++) s[k] = containerBase[k]; }
-    localIndices.forEach((globalIdx, localI)=>{
-      const cnt = counts[localI];
-      if (cnt === 0) return;
-      if (globalIdx !== overrideIdx){
-        // Use the already-computed VECS value (current level/quality setting)
-        for (let k = 0; k < NS; k++) s[k] += cnt * VECS[globalIdx][k];
-      } else {
-        // Re-compute the enabler at overrideLvl (Common 100% quality)
-        for (let k = 0; k < NS; k++){
-          const statName = STAT_NAMES[k];
-          let val = scaleStat(MAIN_VECS[globalIdx][k], statName, overrideLvl, 100);
-          if (overrideLvl === 15){
-            val += scaleStat(ADD_VECS[globalIdx][k], statName, overrideLvl, 100);
-          }
-          s[k] += cnt * (EFFMULT_EXEMPT_IDX.has(k) ? val : val * effMult);
-        }
-      }
-    });
-    return s;
-  }
-
-  misses.forEach(miss=>{
-    // Resolve which global artifact indices (with counts) are in this combination
-    const localIndices = []; // parallel to miss.counts
-    const chosen = [];
-    miss.counts.forEach((cnt, localI)=>{
-      localIndices.push(includedIdx[localI]);
-      if (cnt > 0) chosen.push({idx: includedIdx[localI], count: cnt});
-    });
-    if (chosen.length === 0) return;
-
-    // Get the unique artifact indices in this build (we try each as the enabler)
-    const uniqueGlobal = [...new Set(chosen.map(c=>c.idx))];
-
-    uniqueGlobal.forEach(enablerGlobalIdx=>{
-      // Ascending scan: find the minimum enabler level (1-15) that makes this build valid
-      let minLevel = null;
-      for (let lvl = 1; lvl <= 15; lvl++){
-        const sum = buildSum(miss.counts, localIndices, enablerGlobalIdx, lvl);
-        if (passesThreshold(sum, protection, containerBase)){
-          minLevel = lvl;
-          break;
-        }
-      }
-      if (minLevel === null) return; // no level makes this build valid
-
-      const upgradedSum = buildSum(miss.counts, localIndices, enablerGlobalIdx, minLevel);
-      const upgradedScore = scoreSum(upgradedSum);
-
-      // Only surface if it beats the 3rd-best valid result
-      if (upgradedScore <= minValidScore + 1e-6) return;
-
-      // Dedup key: sorted artifact indices + counts + enabler + level
-      const buildKey = chosen.map(c=>`${c.idx}x${c.count}`).sort().join(',') + `|${enablerGlobalIdx}@${minLevel}`;
-      if (seen.has(buildKey)) return;
-      seen.add(buildKey);
-
-      tips.push({
-        chosen,
-        enablerIdx: enablerGlobalIdx,
-        minLevel,
-        upgradedSum,
-        upgradedScore
-      });
+  el.querySelectorAll('.price-filter-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const t = parseInt(btn.dataset.price);
+      if (visiblePriceTiers.has(t)) visiblePriceTiers.delete(t); else visiblePriceTiers.add(t);
+      renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
     });
   });
 
-  tips.sort((a,b)=>b.upgradedScore - a.upgradedScore);
-  return tips.slice(0, 5);
-}
-
-function renderUpgradeTips(tips, targetStats, protection, validResults, containerBonus){
-  const el = document.getElementById('upgradeTips');
-  if (!tips || tips.length === 0){ el.innerHTML = ''; return; }
-
-  // Quality % multiplier strings for display
-  const LVL_QUALITY = [100,102,104,106,108,110,112,114,116,118,120,122,124,126,128,130];
-
-  let html = `<div class="section-title" style="margin-top:20px;">💡 Upgrade-Unlocked Builds</div>
-<div class="flag-note" style="margin-bottom:12px;">These builds fail the damage threshold at LVL&nbsp;0 but become valid if you upgrade one specific artifact. They score as well as the top 3 above.</div>`;
-
-  tips.forEach((tip, i)=>{
-    const enablerName = ARTIFACTS[tip.enablerIdx].name;
-    const qualityPct = LVL_QUALITY[tip.minLevel];
-    const sum = tip.upgradedSum;
-
-    html += `<div class="result-card" style="border-color:var(--accent-dim);">`;
-    html += `<div class="rank-row">
-      <span class="rank-badge" style="background:var(--accent-dim);color:var(--text);">TIP ${i+1}</span>
-      <span class="score-line" style="margin:0;">score ${tip.upgradedScore.toFixed(3)}</span>
-    </div>`;
-
-    // Loadout chips
-    html += '<div class="loadout-list">';
-    tip.chosen.forEach(c=>{
-      const isEnabler = c.idx === tip.enablerIdx;
-      const tipQuality = parseInt(document.getElementById('qualityInput').value) || 100;
-      const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, tipQuality) ? ' owned-match' : '';
-      html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}" style="${isEnabler?'border-color:var(--accent);':''}">${isEnabler?'<b style="color:var(--accent)">★</b> ':''}${c.count > 1 ? `<b>${c.count}&times;</b> ` : ''}${ARTIFACTS[c.idx].name}</button>`;
-    });
-    html += '</div>';
-
-    // Enabler upgrade note
-    html += `<div style="font-size:12px;margin:8px 0 4px;color:var(--warn);">
-      ★ Upgrade <b>${enablerName}</b> to LVL ${tip.minLevel} (${qualityPct}% quality) to unlock this build
-    </div>`;
-
-    // Target stat pills
-    html += '<div class="target-line">';
-    targetStats.forEach(t=>{
-      const name = t.name;
-      const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus, protection);
-      html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}">${name}: ${valStr}</span>`;
-    });
-    html += '</div>';
-
-    // Threshold gauges in details
-    html += '<details><summary>Damage thresholds &amp; full stat breakdown</summary>';
-    const tipGaugeCells = [];
-    THRESHOLD_STATS.forEach(s=>{
-      const raw = sum[STAT_IDX[s]];
-      const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
-      const eff = thresholdEffValue(raw, bonus, s, protection);
-      const cap = thresholdCap(s);
-      const extCap = thresholdExtCap(s);
-      const ratio = Math.max(0, eff) / cap;
-      let color = 'var(--good)', statusColor='var(--good)', statusText='safe';
-      if (eff > extCap + 1e-6){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
-      else if (eff > cap + 1e-6){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
-      else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
-      const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
-      const markerPct = (cap / extCap) * (100/1.15);
-      tipGaugeCells.push(`<div style="padding:3px 0 5px;">
-        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
-          <span>${s}</span>
-          <span style="font-family:var(--mono);color:${statusColor};">${eff.toFixed(2)} <span style="font-size:10px;">${statusText}</span></span>
-        </div>
-        <div class="gauge-track"><div class="gauge-fill" style="width:${widthPct}%;background:${color};"></div>
-          <div class="gauge-marker" style="left:${markerPct}%;"></div></div>
-      </div>`);
-    });
-    const tipStatCells = [];
-    STAT_NAMES.forEach(s=>{
-      const val = sum[STAT_IDX[s]];
-      // Same reasoning as the main result card: non-threshold bonus stats never enter `sum`,
-      // and only count toward showing/coloring a bonus-only row when the toggle is on.
-      const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
-      const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
-      const armorBonusVal = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[s] || 0) : 0;
-      if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6 && Math.abs(armorBonusVal) < 1e-6) return;
-      const good = displayGoodValue(s, val, containerBonus, protection);
-      const isTarget = targetStats.some(t => t.name === s);
-      tipStatCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
-        <span style="font-family:var(--sans);">${s}</span>
-        <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus,protection)}</span>
-      </div>`);
-    });
-    let tipGrid = '<div style="display:flex;gap:0 28px;margin-top:8px;">';
-    tipGrid += '<div style="flex:1;display:flex;flex-direction:column;">' + tipGaugeCells.join('') + '</div>';
-    tipGrid += '<div style="flex:1;display:flex;flex-direction:column;">' + tipStatCells.join('') + '</div>';
-    tipGrid += '</div>';
-    html += tipGrid;
-    html += '</details></div>';
-  });
-
-  el.innerHTML = html;
+  if (showConsumableZone) {
+    renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
+  } else {
+    document.getElementById('consumableZone').innerHTML = '';
+  }
 }
 
 
 let activeWorker = null;
-let showOwnedHighlight = false; // false in Mode B: every chip is from the loadout already
+let showOwnedHighlight = false; // false in Mode B: every chip is already from the loadout
 let gridView = false;           // true = 3-column grid layout for results
-let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (still gated by showOwnedHighlight/Mode B above)
+let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (gated by showOwnedHighlight/Mode B above)
 let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
-let includeContainerBuffs = true; // user toggle (Valuable Stats > Extra Options): merge non-threshold
-                                    // backpack/container bonus buffs (Carry weight, Bullet resistance,
-                                    // etc.) into the displayed total instead of hiding them. Read
-                                    // directly by fmtWithBonus and the stat-breakdown filters below -
-                                    // purely a display concern, doesn't affect calc, so toggling it
-                                    // re-renders cached results/tips without re-running the search.
-let includeArmorBuffs = true;   // user toggle (Valuable Stats > Extra Options): merge the selected
-                                    // armor's bonus stats (Carry weight, Movement speed, Stamina, etc.)
-                                    // into the result cards. Deliberately separate from
-                                    // includeContainerBuffs/its checkbox - shown as its own line per
-                                    // stat (see the "armor" row in renderResultCard's stat breakdown),
-                                    // not merged into the same number as the artefact/container total.
-                                    // Purely a display concern - the selected armor's `br` (-> Effective
-                                    // Health) is unaffected by this toggle either way.
+let visiblePriceTiers = new Set([1,2,3,4,5]); // shown price tiers; all on by default
+let lastSearchedMaxPriceTier = 5; // max tier actually searched last time; drives post-filter disabling/clamping
+// user toggle (Valuable Stats > Extra Options): merge non-threshold container bonus buffs into
+// the displayed total; purely a display concern, re-renders cached results without re-searching.
+let includeContainerBuffs = true;
+// Same as includeContainerBuffs but for the selected armor's bonus stats; shown as its own row,
+// not merged into the artefact/container total. Doesn't affect Effective Health either way.
+let includeArmorBuffs = true;
+let showConsumableZone = false; // user toggle: shows/hides the already-computed consumable zone
 let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
-let lastTipsArgs = null;        // cached upgrade-tips render args, same purpose
-let lastComparisonRenderArgs = null; // {columnResults, flatResults, targetStats} - columnResults lets
-                                      // the container-bonus toggle live-redraw the compare grid; flatResults
-                                      // is for the copy button in compare mode
-let compareModeActive = false;       // which render mode #results currently shows: true = compare-grid, false = normal
-let compareBuildsActive = false;     // true = #results currently shows the Compare My Builds view
-let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory drag order - never persisted (see compare-builds-plan.md)
+// {columnResults, flatResults, targetStats} - columnResults lets the container-bonus toggle
+// live-redraw the compare grid; flatResults is for the copy button in compare mode.
+let lastComparisonRenderArgs = null;
+let compareModeActive = false;       // true = #results shows the compare-grid, false = normal
+let compareBuildsActive = false;     // true = #results shows the Compare My Builds view
+let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory drag order, never persisted
 
 function formatResultForDiscord(result, rank, targetStats, containerName, containerBonus, protection){
   const {chosen, sum} = result;
@@ -3923,9 +3815,11 @@ document.getElementById('results').addEventListener('click', e=>{
   // the container/armor bonus toggles (fmtWithBonus reads includeContainerBuffs/includeArmorBuffs).
   let containerName, containerBonus, protection;
   if (compareModeActive){
-    // Walk columnResults by flat index - same logic the save-build handler uses above.
+    // Walk filteredColumnResults by flat index (same as the save-build handler above). Must
+    // use filtered lengths - unfiltered col.results.length would misattribute once a price
+    // filter shrinks an earlier column.
     let remaining = idx;
-    for (const col of source.columnResults){
+    for (const col of source.filteredColumnResults){
       if (col.error) continue;
       if (remaining < col.results.length){
         containerName = col.containerCfg.name;
@@ -3950,11 +3844,8 @@ document.getElementById('results').addEventListener('click', e=>{
 });
 
 // Save-to-build: prompts for a name, then pushes the result's container/level/artefact+
-// quality-per-slot into BUILDS via buildsSaveFromResult (same save path the My Builds form
-// uses - see the "My Builds" block above). Normal-mode results carry a single global level/
-// quality (cached on lastRenderArgs at search time); compare-mode results share level/quality
-// across all columns too, but each column has its own real container name (found by walking
-// columnResults to locate which column the flat index falls in).
+// quality-per-slot into BUILDS via buildsSaveFromResult (same path the My Builds form uses).
+// Compare-mode results share level/quality across columns but resolve their own container name.
 document.getElementById('results').addEventListener('click', e=>{
   const btn = e.target.closest('.save-build-btn');
   if (!btn) return;
@@ -3967,7 +3858,7 @@ document.getElementById('results').addEventListener('click', e=>{
     level = source.level;
     quality = source.quality;
     let remaining = idx;
-    for (const col of source.columnResults){
+    for (const col of source.filteredColumnResults){
       if (col.error) continue;
       if (remaining < col.results.length){ containerName = col.containerCfg.name; break; }
       remaining -= col.results.length;
@@ -3985,8 +3876,7 @@ document.getElementById('results').addEventListener('click', e=>{
   const name = prompt('Build name:');
   if (!name || !name.trim()) return;
   // Expand chosen {idx,count,quality} entries into a dense per-slot list, same shape as
-  // the My Builds form's formSlots - each entry's own quality if set, else the search's
-  // global quality (mirrors the fallback renderResultCard uses to display each chip).
+  // the My Builds form's formSlots.
   const slots = [];
   result.chosen.forEach(c=>{
     const q = c.quality != null ? c.quality : quality;
@@ -4004,9 +3894,8 @@ document.getElementById('calcBtn').onclick = ()=>{
   if (activeWorker){
     activeWorker.terminate();
     activeWorker = null;
-    // If a compare-mode search is mid-container, its runOneWorker() promise is awaiting
-    // this resolve - fire it with null so runComparisonSearch's loop aborts the whole
-    // comparison instead of hanging forever (terminate() doesn't fire onmessage/onerror).
+    // If a compare-mode search is mid-container, its runOneWorker() promise awaits this
+    // resolve - fire null so the loop aborts instead of hanging (terminate() fires no event).
     if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
     const btn = document.getElementById('calcBtn');
     btn.classList.remove('stop-mode');
@@ -4036,14 +3925,19 @@ document.getElementById('calcBtn').onclick = ()=>{
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
   const includeAdditional = document.getElementById('includeAdditionalChk').checked;
-  // Stat index + direction for every currently-toggled-on "avoid debuff" button; the worker
-  // rejects any leaf where one of these stats' direction-adjusted sum goes negative (i.e.
-  // its raw sum lands on the debuff side of that stat's own polarity - see NO_DEBUFF_FILTERS).
+  // Stat index + direction for every currently-toggled-on "avoid debuff" button.
   const noDebuffIdx = NO_DEBUFF_FILTERS
     .filter(f=>document.getElementById(f.btn).classList.contains('active'))
     .map(f=>({idx: STAT_IDX[f.stat], dir: STAT_META[f.stat].good ? 1 : -1}));
   const useLoadout = document.getElementById('useLoadoutChk').checked;
   showOwnedHighlight = !useLoadout;
+
+  const priceMaxTier = parseInt(document.getElementById('priceRangeSlider').value);
+  const priceCategoryAllowed = priceMaxTier === 5
+    ? null
+    : [1,2,3,4,5].map(cat => cat <= priceMaxTier);
+  lastSearchedMaxPriceTier = priceMaxTier;
+  if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4,5]);
 
   // Pinned artefacts: must appear in every result in both Mode A and Mode B.
   const pinnedIdx = Array.from(PINNED);
@@ -4075,7 +3969,7 @@ document.getElementById('calcBtn').onclick = ()=>{
 
   // Built from a containerCfg + sharedCtx pair via buildContainerSearchPayload - the same
   // function Compare-containers mode calls once per container.
-  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx };
+  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed };
   const containerCfg = { name: selectedContainer.name, slots, protection, effectiveness, bonus: getEffectiveContainerBonus() };
   const built = buildContainerSearchPayload(containerCfg, sharedCtx);
   if (built.error){
@@ -4088,8 +3982,6 @@ document.getElementById('calcBtn').onclick = ()=>{
   // Cancel any previous search
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
   document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
-  lastTipsArgs = null;
 
   // Show progress UI
   btn.classList.add('stop-mode');
@@ -4140,9 +4032,7 @@ document.getElementById('calcBtn').onclick = ()=>{
       document.getElementById('progStatus').textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
 
     } else if (e.data.type === 'done'){
-      // Purely cosmetic: smoothly fills the bar to a believable minimum duration instead of
-      // snapping to 100% instantly (B&B pruning makes 5+ slot searches finish very fast). No
-      // search work is delayed - the real result is already in e.data, waiting to be shown.
+      // Purely cosmetic fill delay - see Project_Summary.md.
       const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
       if (remainingMs > 0){
         animateFakeCompletion(remainingMs, () => finishSearch(e.data));
@@ -4206,23 +4096,6 @@ document.getElementById('calcBtn').onclick = ()=>{
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults, level, quality, backpackSelectEl.value);
-
-      // Upgrade analysis assumes unlimited supply of every other artefact in a near-miss
-      // build while sweeping one enabler's level -- that doesn't hold for a bounded,
-      // per-unit-quality My Loadout pool, so it's skipped in that mode.
-      document.getElementById('upgradeTips').innerHTML = '';
-      lastTipsArgs = null;
-      if (!useLoadout){
-        const misses = data.top_miss || [];
-        if (misses.length > 0 && results.length > 0){
-          const tips = analyzeUpgrades(
-            misses, includedIdx, targetStats, protection,
-            includeAdditional, effectiveness, results, containerBaseVec
-          );
-          renderUpgradeTips(tips, targetStats, protection, results, containerBonusMap);
-          lastTipsArgs = {tips, targetStats, protection, validResults: results, containerBonus: containerBonusMap};
-        }
-      }
   }
 
   activeWorker.onerror = err=>{
@@ -4248,12 +4121,10 @@ document.getElementById('calcBtn').onclick = ()=>{
 let pendingWorkerResolve = null;
 
 // Promise-wrapped version of the same Worker/Blob/postMessage/onmessage pattern
-// calcBtn.onclick uses for a normal search - one call per container. `idx` is the
-// container's position in the comparison (0/1/2) and selects which stacked progress
-// block (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx}, built by
-// runComparisonSearch) this call updates - each container keeps its own block on
-// screen instead of the next container overwriting it. Resolves with the worker's
-// 'done' payload, {__workerError} if the worker threw, or null if the user pressed Stop.
+// calcBtn.onclick uses for a normal search - one call per container. `idx` selects which
+// stacked progress block (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx},
+// built by runComparisonSearch) this call updates, so earlier containers' bars stay visible.
+// Resolves with the worker's 'done' payload, {__workerError} if it threw, or null on Stop.
 function runOneWorker(payload, slots, idx){
   return new Promise(resolve=>{
     pendingWorkerResolve = resolve;
@@ -4350,10 +4221,8 @@ function runOneWorker(payload, slots, idx){
   });
 }
 
-// Reads the 2-3 chosen containers + all the shared search fields, then searches them one
-// at a time via buildContainerSearchPayload + runOneWorker, collecting the top 5 builds per
-// container. Mirrors calcBtn.onclick's normal-mode field-reading exactly, since both modes
-// need the same sharedCtx shape - see buildContainerSearchPayload's doc comment.
+// Reads the 2-3 chosen containers + shared search fields, then searches them one at a time
+// via buildContainerSearchPayload + runOneWorker, collecting the top 5 per container.
 async function runComparisonSearch(){
   const selects = ['compareSelect0','compareSelect1','compareSelect2']
     .map(id => document.getElementById(id).value)
@@ -4387,6 +4256,13 @@ async function runComparisonSearch(){
   const useLoadout = document.getElementById('useLoadoutChk').checked;
   showOwnedHighlight = !useLoadout;
 
+  const priceMaxTier = parseInt(document.getElementById('priceRangeSlider').value);
+  const priceCategoryAllowed = priceMaxTier === 5
+    ? null
+    : [1,2,3,4,5].map(cat => cat <= priceMaxTier);
+  lastSearchedMaxPriceTier = priceMaxTier;
+  if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4,5]);
+
   const pinnedIdx = Array.from(PINNED);
   if (!useLoadout) {
     pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
@@ -4412,10 +4288,8 @@ async function runComparisonSearch(){
   }
 
   document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
-  lastTipsArgs = null;
 
-  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx };
+  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed };
 
   btn.classList.add('stop-mode');
   btn.textContent = 'STOP';
@@ -4501,20 +4375,32 @@ async function runComparisonSearch(){
   renderComparisonResults(columnResults, targetStats, level, quality);
 }
 
-// Renders the 2-3 column comparison grid. No Extended-results toggle, no per-column
-// Upgrade tips (both explicitly out of scope for compare mode). The "Add
-// containers bonus stats" toggle IS wired here (see includeContainerBuffsChk listener
-// above) - it re-renders all columns in place via the cached columnResults.
+// Renders the 2-3 column comparison grid. No Extended-results toggle (out of scope for
+// compare mode). The "Add containers bonus stats" toggle IS wired here (see
+// includeContainerBuffsChk listener above) - it re-renders all columns via cached columnResults.
 function renderComparisonResults(columnResults, targetStats, level, quality){
+  const allPriceTiersVisible = visiblePriceTiers.size === 5;
+  const passesPriceFilter = r => {
+    if (allPriceTiersVisible) return true;
+    const cat = buildPriceCategory(r.chosen);
+    return cat != null && visiblePriceTiers.has(cat);
+  };
+  // Filtered once up front; `columnResults` (the original, unfiltered param) stays untouched
+  // so lastComparisonRenderArgs can restore "All" later.
+  const filteredColumnResults = columnResults.map(col => ({
+    ...col,
+    results: (col.results && !allPriceTiersVisible) ? col.results.filter(passesPriceFilter) : col.results
+  }));
+
   // Flattened up front (rather than accumulated during the render loop below) so topSets
   // can be computed from the complete cross-column list before any card is rendered -
   // "Top stats" here highlights the top-2 per stat across ALL columns combined, not
   // per-column, so a card needs its global flatIdx position resolved against this list.
-  const flatResults = columnResults.flatMap(col => col.results || []);
+  const flatResults = filteredColumnResults.flatMap(col => col.results || []);
   const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats) : null;
   let flatIdx = 0;
 
-  const columnsHtml = columnResults.map(col => {
+  const columnsHtml = filteredColumnResults.map((col, colI) => {
     const tierColor = CONTAINER_TIER_META[col.containerCfg.tier].color;
     if (col.error){
       return `<div class="compare-column">
@@ -4523,9 +4409,13 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
       </div>`;
     }
     if (col.results.length === 0){
+      const wasFilteredEmpty = !allPriceTiersVisible && columnResults[colI].results && columnResults[colI].results.length > 0;
+      const emptyMsg = wasFilteredEmpty
+        ? 'No builds in this column match the price filter.'
+        : 'No valid combination for this container. The container\'s bonus stats do NOT count towards required stats minimums.';
       return `<div class="compare-column">
         <div class="compare-col-header" style="color:${tierColor};">${col.containerCfg.name}</div>
-        <div class="empty-state">No valid combination for this container. The container's bonus stats do NOT count towards required stats minimums.</div>
+        <div class="empty-state">${emptyMsg}</div>
       </div>`;
     }
     let cardsHtml = '';
@@ -4545,6 +4435,7 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
     </div>`;
   }).join('');
 
+  const priceFilterHtml = priceFilterGroupHtml();
   const hlToggleHtml = `<div class="hl-toggle-group">
         <button type="button" class="hl-toggle-btn toggle-owned${ownedHighlightOn ? ' active' : ''}" data-hl="owned" title="Highlight chips you already own">Owned</button>
         <button type="button" class="hl-toggle-btn toggle-topstat${topStatHighlightOn ? ' active' : ''}" data-hl="topstat" title="Highlight the top-2 result for each target stat, across all columns">Top stats</button>
@@ -4552,12 +4443,12 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
 
   const resultsEl = document.getElementById('results');
   resultsEl.innerHTML =
-    `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${hlToggleHtml}</div></div><div class="compare-grid">${columnsHtml}</div>`;
+    `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${priceFilterHtml}${hlToggleHtml}</div></div><div class="compare-grid">${columnsHtml}</div>`;
   equalizeCompareCardChips(resultsEl);
 
-  lastComparisonRenderArgs = { columnResults, flatResults, targetStats, level, quality };
+  lastComparisonRenderArgs = { columnResults, filteredColumnResults, flatResults, targetStats, level, quality };
 
-  const allUsedIdx = usedArtifactIndices(columnResults.flatMap(c => c.results || []));
+  const allUsedIdx = usedArtifactIndices(filteredColumnResults.flatMap(c => c.results || []));
   highlightUsedArtifacts(allUsedIdx);
 
   resultsEl.querySelectorAll('.hl-toggle-btn').forEach(btn=>{
@@ -4567,26 +4458,22 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
       renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
     });
   });
+  resultsEl.querySelectorAll('.price-filter-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const t = parseInt(btn.dataset.price);
+      if (visiblePriceTiers.has(t)) visiblePriceTiers.delete(t); else visiblePriceTiers.add(t);
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+    });
+  });
 
   document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
 }
 
 /* ---------- Compare My Builds ----------
-   Row = one CONTAINERS entry (backpack); builds within a row shown side by side, best value
-   per stat highlighted per row, drag-reorderable but never persisted (reopening via the
-   button always recomputes fresh from BUILDS save-order). Reuses the existing global toggles
-   (includeContainerBuffs/includeArmorBuffs/selectedArmor/ownedHighlightOn) and the existing
-   render helpers (fmtWithBonus, displayGoodValue, computeEffectiveHealth) so a saved build
-   renders identically to how it would as a live search result. See compare-builds-plan.md. */
+   Reuses the existing global toggles and render helpers (fmtWithBonus, displayGoodValue,
+   computeEffectiveHealth) so a saved build renders identically to a live search result. */
 
-// Turns a saved My Builds entry into the {chosen, sum, containerBonus, protection} shape
-// renderResultCard/computeEffectiveHealth already consume - the pure per-artefact scaling
-// (scaleArtifactVec) needs no search/worker and doesn't depend on any globally-selected
-// container, so this reproduces a build's numbers directly from its own saved fields.
-// Mirrors buildContainerSearchPayload's threshold-only container-bonus seeding (lines ~2696-
-// 2701) - verified during implementation that this reproduces a "save"-originated result's
-// sum exactly.
+// Pure function, no worker - reproduces a saved build's numbers directly from its own fields.
 function computeBuildResult(build){
   const containerObj = CONTAINERS.find(c => c.name === build.container);
   if (!containerObj) return { error: `container "${build.container}" no longer exists` };
@@ -4613,9 +4500,7 @@ function computeBuildResult(build){
   return { chosen, sum, containerBonus: {...containerObj.bonus}, protection: containerObj.protection, containerObj, skippedSlots };
 }
 
-// Buckets every saved build by container name -> one row per container, rows sorted by
-// container name, builds within a row kept in BUILDS save-order. Builds whose container no
-// longer resolves go into `skipped` for a warning banner instead of breaking the view.
+// One row per container, sorted by name; unresolvable containers go to `skipped`.
 function groupBuildsForCompare(){
   const byContainer = {};
   const skipped = [];
@@ -4632,10 +4517,8 @@ function groupBuildsForCompare(){
   return { rows, skipped };
 }
 
-// Top-value-with-ties cutoff, scoped to one row's builds - same tie epsilon computeTopStatSets
-// uses, but a single winner (tier "best build per stat", not top-2) and in-row indices rather
-// than global result indices. A row of fewer than 2 builds has nothing to compare against
-// (step 8 of the plan), so no winner is marked.
+// Same tie epsilon as computeTopStatSets, but single winner + in-row indices.
+// Fewer than 2 builds in a row has nothing to compare against, so no winner is marked.
 function pickRowWinners(vals){
   const set = new Set();
   if (vals.length < 2) return set;
@@ -4644,14 +4527,10 @@ function pickRowWinners(vals){
   return set;
 }
 
-// Per-row stat list + per-stat winner set, for renderBuildComparePanel. Effective Health is
-// pinned first (computed per build via computeEffectiveHealth, not part of STAT_NAMES); the
-// rest follow STAT_NAMES order, filtered to the union of stats with a non-negligible value
-// (same 1e-6 epsilon renderResultCard's statCells uses) across the row's builds.
-// Row-scoped winners use raw sum*dir, not the display-adjusted value - safe because every
-// build in a row shares the same protection/bonus/armor inputs, so raw-sum ordering matches
-// displayed-value ordering within a row (would NOT hold across rows with different containers -
-// see "Verified against the codebase" in compare-builds-plan.md).
+// Effective Health is pinned first, rest follow STAT_NAMES order, filtered to stats with a
+// non-negligible value (same 1e-6 epsilon as renderResultCard's statCells) across the row.
+// Winners use raw sum*dir - valid since every build in a row shares the same
+// protection/bonus/armor inputs (would NOT hold across rows with different containers).
 function computeRowStatList(rowResults){
   const ehVals = rowResults.map(rb => computeEffectiveHealth(rb.result.sum, rb.result.containerBonus));
   const ehWinners = pickRowWinners(ehVals);
@@ -4675,7 +4554,7 @@ function renderBuildComparePanel(rb, i, statList, containerName){
   const {sum, containerBonus, protection} = result;
   let html = `<div class="result-card build-compare-panel" draggable="true" data-container="${containerName}" data-build-name="${build.name}">`;
   html += `<button type="button" class="build-compare-close" draggable="false" title="Remove from this comparison (keeps the saved build)">&times;</button>`;
-  html += `<div class="rank-row"><span class="rank-badge">${build.name}</span></div>`;
+  html += `<div class="rank-row"><span class="rank-badge">${build.name}</span>${priceBadgeHtml(result.chosen)}</div>`;
 
   const ehVal = computeEffectiveHealth(sum, containerBonus);
   const ehWin = statList.ehWinners.has(i);
@@ -4720,11 +4599,8 @@ function rerenderBuildsRow(containerName){
   wireBuildsCompareDragRow(rowEl);
 }
 
-// Native HTML5 DnD, no library. Each panel has three drop zones:
-//   outer-left 25%  → insert before (gap bar on left edge)
-//   center 50%      → swap positions (panel highlight + scale)
-//   outer-right 25% → insert after  (gap bar on right edge)
-// Cross-row dragging is silently ignored - a build's backpack is fixed data.
+// Native HTML5 DnD, no library. See Project_Summary.md's Drag-to-reorder section for the
+// three-zone breakdown. Cross-row dragging is silently ignored - a build's backpack is fixed.
 let buildsDragSource = null; // {containerName, buildName}
 let buildsDragTarget = null; // {buildName, mode: 'before'|'on'|'after'}
 
@@ -4733,11 +4609,7 @@ function clearDropIndicators(scopeEl){
     .forEach(p=>p.classList.remove('drag-over','drop-before','drop-after'));
 }
 
-// Removes one build from the current Compare My Builds view only (does not touch BUILDS/
-// localStorage). Reuses compareBuildsRowOrder as the single source of truth for which builds
-// are currently visible per row - splicing a build out here is enough to hide it, and (like
-// drag reordering) this in-memory state resets on the next fresh open of the view. If the row
-// has no builds left, the whole row is removed rather than rendered empty.
+// View-only removal (does not touch BUILDS/localStorage); if the row empties, remove it.
 function closeBuildFromCompare(containerName, buildName){
   const order = compareBuildsRowOrder[containerName];
   if (!order) return;
@@ -4832,7 +4704,6 @@ function closeBuildsCompareView(){
 function renderBuildsCompare(){
   compareBuildsActive = true;
   document.getElementById('consumableZone').innerHTML = '';
-  document.getElementById('upgradeTips').innerHTML = '';
 
   const {rows, skipped} = groupBuildsForCompare();
   const el = document.getElementById('results');
