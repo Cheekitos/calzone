@@ -487,8 +487,10 @@
   /* Distinct from .results-grid-view above. */
   .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;}
   @media(max-width:1080px){.compare-grid{grid-template-columns:1fr;}}
-  /* Compare columns too narrow for side-by-side gauges/stats - stack instead. */
+  /* Grid columns too narrow for side-by-side gauges/stats - stack instead. */
+  .results-grid-view .details-cols,
   .compare-grid .details-cols{flex-direction:column;}
+  .results-grid-view .details-col + .details-col,
   .compare-grid .details-col + .details-col{margin-top:12px;}
   .compare-column{display:flex;flex-direction:column;gap:10px;min-width:0;}
   .compare-col-header{font-family:var(--mono);font-size:13px;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--border);}
@@ -3422,7 +3424,36 @@ function computeTopStatSets(results, targetStats){
   return topSets;
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus){
+// Same "does this stat show a real value" check as the statCells loop below, extracted so
+// row-level stat sharing can be computed for a group of builds before any card is rendered.
+function computeShownStats(sum, containerBonus){
+  const shown = new Set();
+  STAT_NAMES.forEach(s=>{
+    const val = sum[STAT_IDX[s]];
+    const bonusVal = containerBonus ? (containerBonus[s] || 0) : 0;
+    const shownBonusVal = (STAT_META[s].threshold || includeContainerBuffs) ? bonusVal : 0;
+    const armorBonusVal = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[s] || 0) : 0;
+    if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6 && Math.abs(armorBonusVal) < 1e-6) return;
+    shown.add(s);
+  });
+  return shown;
+}
+
+// A stat is "shared" for a row if 2+ of the row's builds display it - used to order each
+// card's stat breakdown so the same stat lands in the same spot across cards in a row,
+// making side-by-side comparison easier. rowEntries: [{sum, containerBonus}, ...].
+function computeRowSharedStats(rowEntries){
+  const counts = {};
+  rowEntries.forEach(({sum, containerBonus})=>{
+    computeShownStats(sum, containerBonus).forEach(s=>{ counts[s] = (counts[s] || 0) + 1; });
+  });
+  const shared = new Set();
+  Object.keys(counts).forEach(s=>{ if (counts[s] >= 2) shared.add(s); });
+  return shared;
+}
+
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats){
+  rowSharedStats = rowSharedStats || new Set();
   const {chosen, sum} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
   let html = `<div class="result-card" style="${borderStyle}">`;
@@ -3512,7 +3543,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     </div>`);
   });
 
-  const statCells = [];
+  const statCellsByName = {};
   STAT_NAMES.forEach(s=>{
     const val = sum[STAT_IDX[s]];
     // A stat purely from container bonus would be skipped here otherwise - only count it
@@ -3524,11 +3555,22 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     if (Math.abs(val) < 1e-6 && Math.abs(shownBonusVal) < 1e-6 && Math.abs(armorBonusVal) < 1e-6) return;
     const good = displayGoodValue(s, val, containerBonus, protection);
     const isTarget = targetStats.some(t => t.name === s);
-    statCells.push(`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
+    statCellsByName[s] = `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:12px;${isTarget?'font-weight:700;color:#fff;':''}">
       <span style="font-family:var(--sans);">${s}</span>
       <span style="font-family:var(--mono);" class="val ${good?'good':'bad'}">${fmtWithBonus(s,val,containerBonus,protection)}</span>
-    </div>`);
+    </div>`;
   });
+
+  // Order: (1) stats the user selected for this search, in the same order shown in the
+  // target-line above, (2) stats shared with other builds in the same row (canonical stat
+  // order) so equivalent rows line up for side-by-side comparison, (3) everything else this
+  // build alone shows (canonical order).
+  const shownStatNames = new Set(Object.keys(statCellsByName));
+  const targetOrder = targetStats.map(t=>t.name).filter(n => shownStatNames.has(n));
+  const targetSet = new Set(targetOrder);
+  const sharedOrder = STAT_NAMES.filter(s => shownStatNames.has(s) && !targetSet.has(s) && rowSharedStats.has(s));
+  const restOrder = STAT_NAMES.filter(s => shownStatNames.has(s) && !targetSet.has(s) && !rowSharedStats.has(s));
+  const statCells = [...targetOrder, ...sharedOrder, ...restOrder].map(s => statCellsByName[s]);
 
   // Independent lists of different lengths - stacking each in its own column keeps
   // spacing/border-rhythm consistent instead of rows stretching to the tallest at that index.
@@ -3617,7 +3659,34 @@ function equalizeCompareCardChips(resultsEl){
     const targetLines = cardsAtRank.map(c => c.querySelector('.target-line')).filter(Boolean);
     const maxTargetH = Math.max(...targetLines.map(d => d.getBoundingClientRect().height));
     targetLines.forEach(d => { d.style.minHeight = maxTargetH + 'px'; });
+
+    // Full-card height, same rank across columns - mirrors how CSS Grid auto-sizes a row
+    // track to its tallest item in .results-grid-view (align-items:start leaves shorter
+    // cards with blank space below rather than stretching them), so an opened "Damage
+    // thresholds & full stat breakdown" panel pushes the next rank down in every column,
+    // keeping ranks aligned. Compare-grid's cards live in independent per-column flex
+    // stacks with no shared row track, so this is emulated with margin-bottom. Reset first
+    // so re-runs (see the details-toggle listener below) measure natural height, not a
+    // previous run's padded height.
+    cardsAtRank.forEach(c => { c.style.marginBottom = ''; });
+    const baseMargins = cardsAtRank.map(c => parseFloat(getComputedStyle(c).marginBottom) || 0);
+    const cardHeights = cardsAtRank.map(c => c.getBoundingClientRect().height);
+    const maxCardH = Math.max(...cardHeights);
+    cardsAtRank.forEach((c, i) => { c.style.marginBottom = (baseMargins[i] + maxCardH - cardHeights[i]) + 'px'; });
   }
+}
+
+// Compare-grid's row alignment (see equalizeCompareCardChips) depends on each card's actual
+// height, which changes when a "Damage thresholds & full stat breakdown" <details> is opened
+// or closed. That's a native browser toggle, not something our render code drives, so it's
+// re-run via a 'toggle' listener per <details> - the event doesn't bubble, so each one needs
+// its own listener rather than delegating from the grid.
+function wireCompareDetailsRealign(resultsEl){
+  const gridEl = resultsEl.querySelector('.compare-grid');
+  if (!gridEl) return;
+  gridEl.querySelectorAll('.result-card details').forEach(d=>{
+    d.addEventListener('toggle', ()=> equalizeCompareCardChips(resultsEl));
+  });
 }
 
 // Total cards shown in the main list - must match the worker's TOP_N.
@@ -3718,6 +3787,17 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     ? `<div class="min-warning-banner">No combination gives a beneficial value to every stat you selected at once. Here's the closest you can get - stat pills marked ⚠ got no real benefit in that build:</div>`
     : '';
 
+  // Groups of 3 match .results-grid-view's 3-column layout - only meaningful when the grid
+  // is actually shown; List view has no "row" for stats to line up across.
+  const rowSharedByIdx = [];
+  if (gridView && displayResults.length > 1){
+    for (let i = 0; i < displayResults.length; i += 3){
+      const rowResults = displayResults.slice(i, i + 3);
+      const shared = computeRowSharedStats(rowResults.map(r => ({sum: r.sum, containerBonus})));
+      rowResults.forEach((_, j) => { rowSharedByIdx[i + j] = shared; });
+    }
+  }
+
   let cardsHtml = zeroBannerHtml + coverageFallbackBannerHtml;
   if (priceFilterEmptied){
     cardsHtml += `<div class="empty-state">No builds in the current results match that price filter.</div>`;
@@ -3725,7 +3805,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     displayResults.forEach((r,i)=>{
       if (showPartialLabels && i === filteredMetCount) cardsHtml += partialBannerHtml;
       const minStatus = showPartialLabels && i < filteredMetCount ? 'met' : null;
-      cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus, containerBonus);
+      cardsHtml += renderResultCard(r, targetStats, protection, i+1, false, topSets, i, false, null, minStatus, containerBonus, rowSharedByIdx[i]);
     });
   }
 
@@ -4401,6 +4481,18 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats) : null;
   let flatIdx = 0;
 
+  // Row = same rank across all compare columns (col A's #1 vs col B's #1 vs col C's #1, ...) -
+  // computed once up front so every card in a row shares the same "shared stats" set,
+  // mirroring how equalizeCompareCardChips groups rank-across-columns rather than DOM order.
+  const maxRank = Math.max(0, ...filteredColumnResults.map(col => (col.results ? col.results.length : 0)));
+  const rowSharedByRank = [];
+  for (let i = 0; i < maxRank; i++){
+    const rowEntries = filteredColumnResults
+      .filter(col => col.results && col.results[i])
+      .map(col => ({ sum: col.results[i].sum, containerBonus: col.meta.containerBonusMap }));
+    rowSharedByRank.push(computeRowSharedStats(rowEntries));
+  }
+
   const columnsHtml = filteredColumnResults.map((col, colI) => {
     const tierColor = CONTAINER_TIER_META[col.containerCfg.tier].color;
     if (col.error){
@@ -4423,7 +4515,7 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
     col.results.forEach((r, i) => {
       cardsHtml += renderResultCard(
         r, targetStats, col.meta.protection, i + 1, false,
-        topSets, flatIdx, false, null, null, col.meta.containerBonusMap
+        topSets, flatIdx, false, null, null, col.meta.containerBonusMap, rowSharedByRank[i]
       );
       flatIdx++;
     });
@@ -4446,6 +4538,7 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   resultsEl.innerHTML =
     `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${priceFilterHtml}${hlToggleHtml}</div></div><div class="compare-grid">${columnsHtml}</div>`;
   equalizeCompareCardChips(resultsEl);
+  wireCompareDetailsRealign(resultsEl);
 
   lastComparisonRenderArgs = { columnResults, filteredColumnResults, flatResults, targetStats, level, quality };
 
