@@ -7,4 +7,4 @@ Work in progress.
 
 ---
 
-While the Official STALZONE [Build Calculator](https://stalzone.wiki/en/builds-calculator) is an excellent tool, it requires you to think and actually spend some time experimenting, and we don't want any of that.
+Based on the data from the Official STALZONE [Build Calculator](https://stalzone.wiki/en/builds-calculator)
