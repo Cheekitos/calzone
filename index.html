@@ -378,6 +378,11 @@
   .art-lock.pinned{color:var(--accent);}
   .art-lock.pinned:hover{color:var(--accent-dim);}
 
+  .art-maxcap{
+    font-family:var(--mono);font-size:10.5px;color:var(--accent);
+    flex-shrink:0;letter-spacing:0.02em;
+  }
+
   .results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
   .results-header h2{margin:0;}
   .results-toggles{display:flex;align-items:center;gap:8px;}
@@ -412,6 +417,23 @@
     border:1px solid var(--accent-dim);cursor:pointer;
   }
   .price-range-slider-label{font-family:var(--mono);font-size:13px;letter-spacing:0.05em;white-space:nowrap;}
+
+  .popover-maxcopies{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+  .popover-maxcopies-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .popover-maxcopies-row .lbl{font-size:12px;color:var(--muted);}
+  .popover-maxcopies-val{font-family:var(--mono);font-size:13px;color:var(--accent);}
+  .popover-maxcopies input[type=range]{
+    width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+    background:var(--panel-2);border:1px solid var(--border);accent-color:var(--accent);
+  }
+  .popover-maxcopies input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:1px solid var(--accent-dim);cursor:pointer;
+  }
+  .popover-maxcopies input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--accent);
+    border:1px solid var(--accent-dim);cursor:pointer;
+  }
   #artAllBtn,#artNoneBtn,#artUnpinBtn{
     background:none;border:1px solid var(--border);color:var(--muted);
     font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
@@ -1253,6 +1275,8 @@ const DEFAULT_OFF = new Set([
 const LS_EXCLUDED = 'artiCalc_excluded';
 const LS_OWNED = 'artiCalc_owned';
 const LS_BUILDS = 'artiCalc_builds';
+const LS_MAXCOPIES = 'artiCalc_maxCopies';
+const LS_PINNED = 'artiCalc_pinned';
 
 function loadExcludedNames(){
   try {
@@ -1266,6 +1290,28 @@ function saveExcludedNames(){
     .filter(c => !c.checked)
     .map(c => ARTIFACTS[parseInt(c.dataset.idx)].name);
   try { localStorage.setItem(LS_EXCLUDED, JSON.stringify(excluded)); } catch(e){}
+}
+// Max-copies caps: name-keyed (not index-keyed) so reordering ARTIFACTS can't silently
+// corrupt saved caps, unlike OWNED below. Absent entry = unlimited (Mode A search only).
+function loadMaxCopies(){
+  try {
+    const raw = localStorage.getItem(LS_MAXCOPIES);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){ return {}; }
+}
+function saveMaxCopies(){
+  try { localStorage.setItem(LS_MAXCOPIES, JSON.stringify(MAX_COPIES)); } catch(e){}
+}
+// Pins are name-keyed on disk (converted to/from PINNED's index Set) for the same
+// reordering-safety reason as MAX_COPIES.
+function loadPinnedNames(){
+  try {
+    const raw = localStorage.getItem(LS_PINNED);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+function savePinnedNames(){
+  try { localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(PINNED).map(i => ARTIFACTS[i].name))); } catch(e){}
 }
 function loadOwned(){
   try {
@@ -1316,6 +1362,14 @@ let buildsImportData = null;
 // Set by My Builds block below — lets a result card's save-to-build button reuse its path.
 let buildsSaveFromResult = null;
 let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
+{
+  const savedPinNames = loadPinnedNames();
+  if (savedPinNames){
+    const byName = new Map(ARTIFACTS.map((a,i) => [a.name, i]));
+    savedPinNames.forEach(n => { if (byName.has(n)) PINNED.add(byName.get(n)); }); // drops names no longer in ARTIFACTS
+  }
+}
+let MAX_COPIES = loadMaxCopies(); // {artifactName: cap 1-5}; absent = unlimited
 
 const artifactListEl = document.getElementById('artifactList');
 const savedExcluded = loadExcludedNames();
@@ -1327,8 +1381,10 @@ ARTIFACTS.forEach((a,i)=>{
   const isExcluded = savedExcluded ? savedExcluded.has(a.name) : DEFAULT_OFF.has(a.name);
   const checkedAttr = isExcluded ? '' : 'checked';
   const ownedAtLoad = !!(OWNED[i] && OWNED[i].length);
+  const capAtLoad = MAX_COPIES[a.name];
   div.innerHTML = `<input type="checkbox" id="${id}" data-idx="${i}" ${checkedAttr}>
     <span class="name">${a.name}</span>
+    <span class="art-maxcap" data-idx="${i}" title="Max copies in search" style="display:${capAtLoad?'inline':'none'}">\u00d7${capAtLoad||''}</span>
     <button type="button" class="art-heart${ownedAtLoad?' owned':''}" data-idx="${i}">${ownedAtLoad?'♥':'♡'}</button>
     <button type="button" class="art-lock" data-idx="${i}" title="Pin: must include in results">🔓</button>`;
   artifactListEl.appendChild(div);
@@ -1344,6 +1400,7 @@ artifactListEl.addEventListener('click', e=>{
     e.stopPropagation();
     const idx = parseInt(lock.dataset.idx);
     if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
+    savePinnedNames();
     updateLockState(idx);
     return;
   }
@@ -1551,6 +1608,7 @@ function qualitySelectHtml(q, i){
 function renderPopoverMain(idx){
   const isOwned = !!(OWNED[idx] && OWNED[idx].length);
   const isPinned = PINNED.has(idx);
+  const cap = MAX_COPIES[ARTIFACTS[idx].name]; // undefined = unlimited (slider at 6)
   const vec = VECS[idx];
   const statRows = STAT_NAMES
     .map((s, i) => ({ name: s, val: vec[i] }))
@@ -1565,11 +1623,30 @@ function renderPopoverMain(idx){
   chipPopoverEl.innerHTML = `
     <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:6px;">${ARTIFACTS[idx].name}</div>
     <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);">${statRows}</div>
+    <div class="popover-maxcopies">
+      <div class="popover-maxcopies-row">
+        <span class="lbl">Max copies in search</span>
+        <span class="popover-maxcopies-val" id="maxCopiesVal">${cap ? cap : '\u221e'}</span>
+      </div>
+      <input type="range" min="1" max="6" step="1" id="maxCopiesSlider" value="${cap || 6}" title="Limits how many copies of this artefact the default search can use per build">
+    </div>
     <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Favorite' : 'Favorite'}</button>
     ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Favorites</button>' : ''}
     <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
     <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
   `;
+  const slider = document.getElementById('maxCopiesSlider');
+  const valEl = document.getElementById('maxCopiesVal');
+  slider.addEventListener('input', ()=>{
+    const v = parseInt(slider.value);
+    valEl.textContent = v === 6 ? '\u221e' : v;
+  });
+  slider.addEventListener('change', ()=>{
+    const v = parseInt(slider.value);
+    if (v === 6) delete MAX_COPIES[ARTIFACTS[idx].name]; else MAX_COPIES[ARTIFACTS[idx].name] = v;
+    saveMaxCopies();
+    updateMaxCopiesBadge(idx);
+  });
 }
 function renderPopoverFavorite(idx){
   const existing = (OWNED[idx] || []).slice();
@@ -1650,6 +1727,20 @@ function updateAllLockStates(){
     l.classList.toggle('pinned', pinned);
   });
 }
+function updateMaxCopiesBadge(idx){
+  const cap = MAX_COPIES[ARTIFACTS[idx].name];
+  artifactListEl.querySelectorAll(`.art-maxcap[data-idx="${idx}"]`).forEach(b=>{
+    b.textContent = cap ? ('\u00d7'+cap) : '';
+    b.style.display = cap ? 'inline' : 'none';
+  });
+}
+function updateAllMaxCopiesBadges(){
+  artifactListEl.querySelectorAll('.art-maxcap').forEach(b=>{
+    const cap = MAX_COPIES[ARTIFACTS[parseInt(b.dataset.idx)].name];
+    b.textContent = cap ? ('\u00d7'+cap) : '';
+    b.style.display = cap ? 'inline' : 'none';
+  });
+}
 chipPopoverEl.addEventListener('click', e=>{
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
@@ -1660,6 +1751,7 @@ chipPopoverEl.addEventListener('click', e=>{
   const act = btn.dataset.act;
   if (act === 'toggle-pin'){
     if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
+    savePinnedNames();
     updateLockState(idx);
     closeChipPopover();
   } else if (act === 'exclude'){
@@ -1747,6 +1839,7 @@ document.getElementById('artNoneBtn').onclick = ()=>{
 };
 document.getElementById('artUnpinBtn').onclick = ()=>{
   PINNED.clear();
+  savePinnedNames();
   updateAllLockStates();
 };
 document.getElementById('clearLoadoutBtn').onclick = ()=>{
@@ -1932,7 +2025,11 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   saveExcludedNames();
   highlightUsedArtifacts([]);
   PINNED.clear();
+  savePinnedNames();
   updateAllLockStates();
+  MAX_COPIES = {};
+  saveMaxCopies();
+  updateAllMaxCopiesBadges();
   // useLoadoutChk off - favorited artefacts stay; they're inventory, not a search param.
   document.getElementById('useLoadoutChk').checked = false;
   document.getElementById('loadoutSearchInput').value = '';
@@ -2823,7 +2920,7 @@ function boundedCombinationCount(maxCounts, slots){
    quality when using the global Quality selector). */
 function buildPoolModeA(includedIdx){
   const poolVecs = includedIdx.map(i => VECS[i]);
-  const poolMax = includedIdx.map(() => Infinity);
+  const poolMax = includedIdx.map(i => MAX_COPIES[ARTIFACTS[i].name] ?? Infinity);
   const poolMeta = includedIdx.map(i => ({artifactIdx: i, quality: null}));
   return {poolVecs, poolMax, poolMeta};
 }
@@ -2927,6 +3024,13 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   } else {
     const built = buildPoolModeA(includedIdx);
     poolVecs = built.poolVecs; poolMax = built.poolMax; poolMeta = built.poolMeta;
+    // A pinned artefact already contributes one guaranteed copy via lockedSum above; reduce
+    // its pool cap by 1 so a max-copies limit reflects the total build count, not just the
+    // free-slot portion (mirrors the Mode B poolMax[bestLocalIdx]-- above).
+    pinnedIdx.forEach(pi => {
+      const pmIdx = poolMeta.findIndex(m => m.artifactIdx === pi);
+      if (pmIdx !== -1) poolMax[pmIdx] = Math.max(0, poolMax[pmIdx] - 1);
+    });
   }
 
   {
@@ -2952,7 +3056,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   }
 
   const freeSlots = slots - pinnedIdx.length;
-  const total = useLoadout ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
+  const isBoundedPool = poolMax.some(m => m !== Infinity);
+  const total = isBoundedPool ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
   const totalFmt = total.toLocaleString();
 
   const workerTargetStats = targetStats.map(t=>({
@@ -3531,8 +3636,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     if (eff > extCap + 1e-6){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
     else if (eff > cap + 1e-6){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
     else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
-    const widthPct = Math.min(eff / extCap, 1.15) * (100/1.15);
-    const markerPct = (cap / extCap) * (100/1.15);
+    // Bar always spans 0 to 2x this stat's own cap, so the cap marker sits at a fixed 50%
+    // regardless of whether cap is 0.5 (Radiation/Temp/Bio/Psy) or 1 (Frost).
+    const widthPct = Math.min(eff / (2 * cap), 1) * 100;
+    const markerPct = 50;
     gaugeCells.push(`<div style="padding:3px 0 5px;">
       <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
         <span>${s}</span>
