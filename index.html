@@ -93,7 +93,7 @@
   select:focus{outline:1px solid var(--accent-dim);}
   select option{background:var(--panel-2);}
 
-  /* Wraps native <select> (source of truth) — <option> can't do rich tooltips. */
+  /* Wraps native select (source of truth) - option can't do rich tooltips. */
   .container-dd{position:relative;}
   .container-dd-trigger{
     width:100%;background:var(--panel-2);border:1px solid var(--border);
@@ -272,7 +272,7 @@
   }
   .lvl-btn:last-child{border-right:none;}
   .lvl-btn.active{background:var(--accent-dim);color:var(--text);}
-  /* Not .lvl-btn — querySelectorAll('.lvl-btn') on load would mis-wire these into #levelInput/#includeAdditionalChk. */
+  /* Not .lvl-btn - would mis-wire into #levelInput/#includeAdditionalChk on load. */
   .build-lvl-btn{
     flex:1;background:none;border:none;border-right:1px solid var(--border);
     color:var(--muted);font-size:13px;padding:8px 6px;cursor:pointer;
@@ -445,7 +445,7 @@
     padding:3px 8px;border-radius:3px;font-family:var(--mono);letter-spacing:0.05em;
   }
   .loadout-action-btn:hover{filter:brightness(1.35);}
-  /* ID specificity needed to beat .toggle-row's link style; mirrors .loadout-action-btn. */
+  /* ID needed to beat .toggle-row's link style; mirrors .loadout-action-btn. */
   #statClearBtn{
     background:none;border:1px solid currentColor;color:var(--accent);
     font-size:10px;cursor:pointer;padding:3px 8px;border-radius:3px;
@@ -498,7 +498,7 @@
   /* align-content:flex-start avoids default 'stretch' spreading rows to fill height. */
   .results-grid-view .loadout-list,
   .compare-grid .loadout-list{align-content:flex-start;}
-  /* Consistent position — chip section height is equalised across cards. */
+  /* Keeps chip section height consistent across cards. */
   .results-grid-view .target-line,
   .compare-grid .target-line{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;}
 
@@ -827,8 +827,7 @@ const QUALITY_LABELS = {100:"Common",115:"Uncommon",130:"Special",145:"Rare",160
 const QUALITY_COLORS = {100:'var(--q-common)',115:'var(--q-uncommon)',130:'var(--q-special)',145:'var(--q-rare)',160:'var(--q-exclusive)',175:'var(--q-legendary)'};
 const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-160",175:"q-175"};
 
-// Colors the two static Quality selects to match tier colors — options are colored
-// inline in the HTML above too; keep in sync with QUALITY_COLORS.
+// Matches tier colors; HTML options are colored inline too - keep in sync with QUALITY_COLORS.
 function colorQualitySelect(sel){
   sel.style.color = QUALITY_COLORS[parseInt(sel.value)] || '';
 }
@@ -1218,7 +1217,7 @@ function updatePriceRangeSliderLabel(){
 document.getElementById('priceRangeSlider').addEventListener('input', updatePriceRangeSliderLabel);
 updatePriceRangeSliderLabel();
 
-// Display-only — re-renders cached results instead of re-searching; branches on compareModeActive.
+// Display-only: re-renders cached results instead of re-searching; branches on compareModeActive.
 document.getElementById('includeContainerBuffsChk').addEventListener('change', e=>{
   includeContainerBuffs = e.target.checked;
   if (compareBuildsActive){ renderBuildsCompare(); return; }
@@ -1291,8 +1290,6 @@ function saveExcludedNames(){
     .map(c => ARTIFACTS[parseInt(c.dataset.idx)].name);
   try { localStorage.setItem(LS_EXCLUDED, JSON.stringify(excluded)); } catch(e){}
 }
-// Max-copies caps: name-keyed (not index-keyed) so reordering ARTIFACTS can't silently
-// corrupt saved caps, unlike OWNED below. Absent entry = unlimited (Mode A search only).
 function loadMaxCopies(){
   try {
     const raw = localStorage.getItem(LS_MAXCOPIES);
@@ -1302,8 +1299,6 @@ function loadMaxCopies(){
 function saveMaxCopies(){
   try { localStorage.setItem(LS_MAXCOPIES, JSON.stringify(MAX_COPIES)); } catch(e){}
 }
-// Pins are name-keyed on disk (converted to/from PINNED's index Set) for the same
-// reordering-safety reason as MAX_COPIES.
 function loadPinnedNames(){
   try {
     const raw = localStorage.getItem(LS_PINNED);
@@ -1355,11 +1350,11 @@ function saveBuilds(){
 }
 let OWNED = loadOwned();
 let BUILDS = loadBuilds();
-// Set by My Builds block below — lets Loadout's export/import close/import without
+// Set by My Builds block below - lets Loadout's export/import close/import without
 // either feature knowing the other's internals.
 let buildsCloseForm = null;
 let buildsImportData = null;
-// Set by My Builds block below — lets a result card's save-to-build button reuse its path.
+// Set by My Builds block below - lets a result card's save-to-build button reuse its path.
 let buildsSaveFromResult = null;
 let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
 {
@@ -1392,7 +1387,7 @@ ARTIFACTS.forEach((a,i)=>{
 artifactListEl.addEventListener('change', e=>{
   if (e.target.matches('input[type=checkbox]')) saveExcludedNames();
 });
-// Heart opens a favorites popover, lock toggles a pin. Name has no handler — falls
+// Heart opens a favorites popover, lock toggles a pin. Name has no handler - falls
 // through to the label's default click (toggles checkbox); tooltip shown on hover instead.
 artifactListEl.addEventListener('click', e=>{
   const lock = e.target.closest('.art-lock');
@@ -1849,7 +1844,7 @@ document.getElementById('clearLoadoutBtn').onclick = ()=>{
   updateAllHeartStates();
 };
 
-/* ---------- My Loadout: export/import (JSON keyed by artefact name — survives
+/* ---------- My Loadout: export/import (JSON keyed by artefact name - survives
    ARTIFACTS reordering/edits between versions) ---------- */
 document.getElementById('exportLoadoutBtn').onclick = ()=>{
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
@@ -1981,7 +1976,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
   });
 })();
 document.getElementById('resetAllBtn').onclick = ()=>{
-  // Cancel any running search (including compare mode) — resolve its pending runOneWorker()
+  // Cancel any running search (including compare mode) - resolve its pending runOneWorker()
   // promise so it doesn't fire into a page state that just got reset.
   if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
   if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
@@ -2157,7 +2152,7 @@ compareSelectEls.forEach(sel=>{
 
 /* ---------- Custom hoverable dropdown for Backpack/Container + Compare selects ----------
    Native <option> can't show a rich hover tooltip, so this wraps the <select> with a custom
-   trigger+panel. The <select> stays intact (hidden) as source of truth — reads
+   trigger+panel. The <select> stays intact (hidden) as source of truth - reads
    populateContainerSelect's structure, writes back via .value + a dispatched 'change' event.
    Uses a separate containerPopoverEl since chipPopoverEl's clicks are artefact-specific. */
 const containerPopoverEl = document.createElement('div');
@@ -2200,7 +2195,7 @@ function renderContainerPopover(idx){
   `;
 }
 // Pins the popup outside the panel's right edge (falls back to left, then clamps to viewport),
-// top-aligned to the hovered row — generalized for all 4 dropdowns (main + 3 compare).
+// top-aligned to the hovered row - generalized for all 4 dropdowns (main + 3 compare).
 function positionContainerPopover(anchorEl, panelEl){
   const panelRect = panelEl.getBoundingClientRect();
   const anchorRect = anchorEl.getBoundingClientRect();
@@ -2952,7 +2947,7 @@ function buildPoolModeB(includeAdditional, effectiveness, level){
    includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx.
 
    Returns {error} or {payload, meta}. Global validation (empty targetStats/pool/loadout)
-   happens once in the caller — see calcBtn.onclick and runComparisonSearch. */
+   happens once in the caller - see calcBtn.onclick and runComparisonSearch. */
 function buildContainerSearchPayload(containerCfg, sharedCtx){
   const { slots, protection, effectiveness, bonus } = containerCfg;
   const { targetStats, includedIdx, includeAdditional, level, quality,
@@ -2999,7 +2994,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       return { error: msg };
     }
     // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum. Falls
-    // out naturally from building the pool per container — no special-casing needed.
+    // out naturally from building the pool per container - no special-casing needed.
     if (pinnedIdx.length > 0) {
       for (const pi of pinnedIdx) {
         if (!OWNED[pi] || OWNED[pi].length === 0) {
@@ -3557,6 +3552,15 @@ function computeRowSharedStats(rowEntries){
   return shared;
 }
 
+// Pinned artefacts first (alphabetical among themselves), then the rest alphabetically.
+function sortChosenForDisplay(chosen){
+  return chosen.slice().sort((a, b)=>{
+    const aPinned = PINNED.has(a.idx), bPinned = PINNED.has(b.idx);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    return ARTIFACTS[a.idx].name.localeCompare(ARTIFACTS[b.idx].name);
+  });
+}
+
 function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats){
   rowSharedStats = rowSharedStats || new Set();
   const {chosen, sum} = result;
@@ -3597,7 +3601,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
 
   html += '<div class="loadout-list">';
-  chosen.forEach(c=>{
+  sortChosenForDisplay(chosen).forEach(c=>{
     const effectiveQuality = c.quality != null ? c.quality : (parseInt(document.getElementById('qualityInput').value) || 100);
     const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
     html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}"><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span></button>`;
@@ -3767,14 +3771,9 @@ function equalizeCompareCardChips(resultsEl){
     const maxTargetH = Math.max(...targetLines.map(d => d.getBoundingClientRect().height));
     targetLines.forEach(d => { d.style.minHeight = maxTargetH + 'px'; });
 
-    // Full-card height, same rank across columns - mirrors how CSS Grid auto-sizes a row
-    // track to its tallest item in .results-grid-view (align-items:start leaves shorter
-    // cards with blank space below rather than stretching them), so an opened "Damage
-    // thresholds & full stat breakdown" panel pushes the next rank down in every column,
-    // keeping ranks aligned. Compare-grid's cards live in independent per-column flex
-    // stacks with no shared row track, so this is emulated with margin-bottom. Reset first
-    // so re-runs (see the details-toggle listener below) measure natural height, not a
-    // previous run's padded height.
+    // Emulates CSS Grid's tallest-item row sizing via margin-bottom, since compare-grid
+    // columns are independent flex stacks with no shared row track. Reset first so re-runs
+    // measure natural height, not previous padding.
     cardsAtRank.forEach(c => { c.style.marginBottom = ''; });
     const baseMargins = cardsAtRank.map(c => parseFloat(getComputedStyle(c).marginBottom) || 0);
     const cardHeights = cardsAtRank.map(c => c.getBoundingClientRect().height);
@@ -3783,11 +3782,8 @@ function equalizeCompareCardChips(resultsEl){
   }
 }
 
-// Compare-grid's row alignment (see equalizeCompareCardChips) depends on each card's actual
-// height, which changes when a "Damage thresholds & full stat breakdown" <details> is opened
-// or closed. That's a native browser toggle, not something our render code drives, so it's
-// re-run via a 'toggle' listener per <details> - the event doesn't bubble, so each one needs
-// its own listener rather than delegating from the grid.
+// Re-realigns on <details> toggle (native, not render-driven); event doesn't bubble
+// so each <details> needs its own listener, no delegating from the grid.
 function wireCompareDetailsRealign(resultsEl){
   const gridEl = resultsEl.querySelector('.compare-grid');
   if (!gridEl) return;
@@ -3984,7 +3980,7 @@ function formatResultForDiscord(result, rank, targetStats, containerName, contai
   const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
   const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
   // Line 3: artefact list (count always shown for clarity)
-  const artParts = chosen.map(c => `${c.count}\u00d7 ${ARTIFACTS[c.idx].name}`);
+  const artParts = sortChosenForDisplay(chosen).map(c => `${c.count}\u00d7 ${ARTIFACTS[c.idx].name}`);
   // Line 4: stat totals using fmtWithBonus so container/armor bonus toggles are respected
   const statParts = targetStats.map(t => `${t.name}: ${fmtWithBonus(t.name, sum[STAT_IDX[t.name]], containerBonus, protection)}`);
   return `${containerLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
@@ -4220,7 +4216,6 @@ document.getElementById('calcBtn').onclick = ()=>{
       document.getElementById('progStatus').textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
 
     } else if (e.data.type === 'done'){
-      // Purely cosmetic fill delay - see Project_Summary.md.
       const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
       if (remainingMs > 0){
         animateFakeCompletion(remainingMs, () => finishSearch(e.data));
@@ -4800,8 +4795,6 @@ function rerenderBuildsRow(containerName){
   wireBuildsCompareDragRow(rowEl);
 }
 
-// Native HTML5 DnD, no library. See Project_Summary.md's Drag-to-reorder section for the
-// three-zone breakdown. Cross-row dragging is silently ignored - a build's backpack is fixed.
 let buildsDragSource = null; // {containerName, buildName}
 let buildsDragTarget = null; // {buildName, mode: 'before'|'on'|'after'}
 
