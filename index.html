@@ -826,7 +826,7 @@ const NO_DEBUFF_FILTERS = [
   {btn:'noMovementSpeedDebuffBtn',        stat:'Movement speed',        label:'Movespeed',             defaultOn:true},
   {btn:'noRecoilDebuffBtn',               stat:'Recoil',                label:'Recoil',                defaultOn:false},
   {btn:'noBleedingProtectionDebuffBtn',   stat:'Bleeding protection',   label:'Bleeding Protection',   defaultOn:false},
-  {btn:'noHealingEffectivenessDebuffBtn', stat:'Healing effectiveness', label:'Healing Effectiveness', defaultOn:false},
+  {btn:'noHealingEffectivenessDebuffBtn', stat:'Healing effectiveness', label:'Healing Effectiveness', defaultOn:true},
   {btn:'noBulletResistanceDebuffBtn',     stat:'Bullet resistance',     label:'Bullet Resistance',     defaultOn:false},
 ];
 
@@ -1136,7 +1136,7 @@ function addStatItem(name){
       <span class="name">${name}</span>
     </label>
     <div class="stat-controls">
-      <input type="number" class="stat-min-input" placeholder="min" title="Guarantee at least this much benefit in ${name}">
+      <input type="text" inputmode="decimal" class="stat-min-input" placeholder="min" title="Guarantee at least this much benefit in ${name}">
       <div class="tier-group">
         <button type="button" class="tier-btn" data-tier="high">H</button>
         <button type="button" class="tier-btn active" data-tier="med">M</button>
@@ -4001,7 +4001,7 @@ document.getElementById('calcBtn').onclick = ()=>{
     const tier = activeBtn ? activeBtn.dataset.tier : 'med';
     const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
     const minInput = item.querySelector('.stat-min-input');
-    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value) : null;
+    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value.replace(',', '.')) : null;
     return {name: chk.dataset.stat, weight, tier, min: (min !== null && !isNaN(min)) ? min : null};
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
@@ -4326,7 +4326,7 @@ async function runComparisonSearch(){
     const tier = activeBtn ? activeBtn.dataset.tier : 'med';
     const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
     const minInput = item.querySelector('.stat-min-input');
-    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value) : null;
+    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value.replace(',', '.')) : null;
     return {name: chk.dataset.stat, weight, tier, min: (min !== null && !isNaN(min)) ? min : null};
   });
   const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
