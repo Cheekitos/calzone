@@ -108,6 +108,11 @@
     max-height:280px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.5);
   }
   .container-dd-panel.open{display:block;}
+  .container-dd-search-wrap{
+    position:sticky;top:0;background:var(--panel);
+    padding:6px 8px;border-bottom:1px solid var(--border);z-index:1;
+  }
+  .container-dd-search-wrap input{padding:5px 8px;font-size:12.5px;}
   .container-dd-group-label{
     padding:6px 10px 2px;font-size:13px;font-weight:700;
   }
@@ -2211,7 +2216,7 @@ function positionContainerPopover(anchorEl, panelEl){
 }
 // Wraps a populated container <select> with a custom trigger+panel for click-to-select and
 // hover-to-preview-stats - see block comment above for why the <select> itself stays intact.
-function enhanceContainerSelect(selectEl){
+function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
   const wrapper = document.createElement('div');
   wrapper.className = 'container-dd';
   wrapper.setAttribute('style', selectEl.getAttribute('style') || ''); // preserve e.g. margin-bottom from the original <select>
@@ -2235,6 +2240,14 @@ function enhanceContainerSelect(selectEl){
   panel.className = 'container-dd-panel';
   wrapper.appendChild(panel);
 
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'container-dd-search-wrap';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search...';
+  searchWrap.appendChild(searchInput);
+  panel.appendChild(searchWrap);
+
   function makeRow(opt){
     const row = document.createElement('div');
     row.className = 'container-dd-item';
@@ -2244,6 +2257,11 @@ function enhanceContainerSelect(selectEl){
     return row;
   }
   // Built once from the <select>'s existing structure - CONTAINERS is static at runtime.
+  // sections tracks {header, items} per optgroup (header null for any bare top-level
+  // <option>, e.g. "-- None --") so the search filter can hide a whole group when every
+  // row under it is filtered out.
+  let currentSection = { header: null, items: [] };
+  const sections = [currentSection];
   Array.from(selectEl.children).forEach(child=>{
     if (child.tagName === 'OPTGROUP'){
       const hdr = document.createElement('div');
@@ -2251,11 +2269,33 @@ function enhanceContainerSelect(selectEl){
       hdr.textContent = child.label;
       hdr.style.color = child.style.color;
       panel.appendChild(hdr);
-      Array.from(child.children).forEach(opt => panel.appendChild(makeRow(opt)));
+      currentSection = { header: hdr, items: [] };
+      sections.push(currentSection);
+      Array.from(child.children).forEach(opt => {
+        const row = makeRow(opt);
+        panel.appendChild(row);
+        currentSection.items.push(row);
+      });
     } else if (child.tagName === 'OPTION'){
-      panel.appendChild(makeRow(child));
+      const row = makeRow(child);
+      panel.appendChild(row);
+      currentSection.items.push(row);
     }
   });
+
+  function applyFilter(query){
+    const q = query.trim().toLowerCase();
+    sections.forEach(({header, items})=>{
+      let anyVisible = false;
+      items.forEach(row=>{
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+      if (header) header.style.display = anyVisible ? '' : 'none';
+    });
+  }
+  searchInput.addEventListener('input', ()=>applyFilter(searchInput.value));
 
   function syncTrigger(){
     const opt = selectEl.options[selectEl.selectedIndex];
@@ -2270,6 +2310,9 @@ function enhanceContainerSelect(selectEl){
   function openPanel(){
     panel.classList.add('open');
     document.addEventListener('mousedown', onDocClick);
+    searchInput.value = '';
+    applyFilter('');
+    searchInput.focus();
   }
   function onDocClick(e){
     if (!wrapper.contains(e.target)) closePanel();
@@ -2295,7 +2338,7 @@ function enhanceContainerSelect(selectEl){
     if (isNaN(idx)) return; // "-- None --" rows (compare only) have no stats
     cancelContainerHoverClose();
     if (containerPopoverOpenIdx === idx && containerPopoverEl.classList.contains('open')) return;
-    renderContainerPopover(idx);
+    renderFn(idx);
     positionContainerPopover(row, panel);
     containerPopoverEl.classList.add('open');
     containerPopoverOpenIdx = idx;
@@ -2836,16 +2879,41 @@ const armorSelectEl = document.getElementById('armorSelect');
   const group = document.createElement('optgroup');
   group.label = meta.label;
   group.style.color = meta.color;
-  ARMORS.forEach((a,i)=>{
-    if (a.tier !== tier) return;
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = a.name;
-    opt.style.color = meta.color;
-    group.appendChild(opt);
-  });
+  ARMORS.map((a,i)=>({a,i})).filter(({a})=>a.tier===tier)
+    .sort((x,y)=>x.a.name.localeCompare(y.a.name))
+    .forEach(({a,i})=>{
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = a.name;
+      opt.style.color = meta.color;
+      group.appendChild(opt);
+    });
   armorSelectEl.appendChild(group);
 });
+
+// Hover-popover for the armor dropdown - same visual structure as renderContainerPopover,
+// pulling from ARMORS instead of CONTAINERS. Shares containerPopoverEl/positioning/hover-close
+// machinery via enhanceContainerSelect's renderFn param.
+function renderArmorPopover(idx){
+  const a = ARMORS[idx];
+  const meta = ARMOR_TIER_META[a.tier];
+  const baseRow = (label, val) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:11.5px;">
+    <span style="color:var(--muted);">${label}</span>
+    <span style="font-family:var(--mono);color:var(--text);">${val}</span>
+  </div>`;
+  const bonusEntries = Object.entries(a.bonus);
+  const bonusHtml = bonusEntries.length
+    ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11.5px;">
+        ${bonusEntries.map(([n,v])=>`<div style="padding:2px 0;">${formatBonusStat(n,v)}</div>`).join('')}
+      </div>`
+    : '';
+  containerPopoverEl.innerHTML = `
+    <div style="font-size:12px;color:${meta.color};font-weight:700;margin-bottom:6px;">${a.name}</div>
+    <div>${baseRow('Bullet resistance', a.br)}</div>
+    ${bonusHtml}
+  `;
+}
+enhanceContainerSelect(armorSelectEl, renderArmorPopover);
 
 // null = None. Read by computeEffectiveHealth (via `br`) and the "Add armor bonus stats"
 // toggle (via `bonus`). Display-only, never fed into search/scoring.
