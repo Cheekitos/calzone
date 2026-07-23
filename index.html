@@ -1983,7 +1983,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
 document.getElementById('resetAllBtn').onclick = ()=>{
   // Cancel any running search (including compare mode) - resolve its pending runOneWorker()
   // promise so it doesn't fire into a page state that just got reset.
-  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  if (activeWorkers.length){ activeWorkers.forEach(w=>w.terminate()); activeWorkers = []; }
   if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
   selectDefaultContainer();
   // Compare mode off: reset compare selects, show Backpack select again.
@@ -2787,6 +2787,19 @@ const ARMOR_BR_OVERRIDE = {
   "Saturn Jumpsuit": 261.48,
   "Navigator Jumpsuit": 287.50,
   "Investigator Exoarmor": 258.90,
+  "Magnet Jumpsuit": 163.98,
+  "ZIVCAS M2-C Exoarmor": 310.82,
+  "Chieftain Super-Heavy Armored Suit": 396.77,
+  "Albatross Heavy Assault Armored Exoskeleton": 340.81,
+  "Granite Super-Heavy Armored Suit": 396.77,
+  "Apostle Super-Heavy Armored Suit": 396.77,
+  "Brigand Armored Suit": 259.52,
+  "Fog Hunter Heavy Armored Suit": 249.78,
+  "Longevity": 253.70,
+  "Punisher Exoarmor": 258.90,
+  "MIS-X ATLAS": 261.48,
+  "SBA TANK": 383.79,
+  "Templar Armored Suit": 346.03,
 };
 function armorEffectiveBR(armor){
   if (Object.prototype.hasOwnProperty.call(ARMOR_BR_OVERRIDE, armor.name)) return ARMOR_BR_OVERRIDE[armor.name];
@@ -3123,6 +3136,46 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   const total = isBoundedPool ? boundedCombinationCount(poolMax, freeSlots) : combinationCount(poolVecs.length, freeSlots);
   const totalFmt = total.toLocaleString();
 
+  // ---- Multi-worker split: bin-pack top-level pool indices (positions in the just-sorted
+  // poolVecs/poolMax) across workers, greedily by estimated subtree size, so each worker
+  // gets a roughly equal-sized slice of the search space. `bins` is an array of index
+  // arrays, one per worker to spawn - consumed by runSplitSearch as each worker's
+  // `assignedIndices`. Estimate only; approximate is fine.
+  let bins;
+  if (freeSlots <= 0) {
+    // All slots pinned: today's recurse(0,0) is a single direct leaf, no top-level pick
+    // exists to split. Single worker, nothing assigned - WORKER_SRC's topRemaining===0
+    // branch calls considerLeaf() directly for this case.
+    bins = [[]];
+  } else {
+    const subtreeSize = i => {
+      if (poolMax[i] === 0) return 0;
+      if (freeSlots - 1 === 0) return 1; // combinationCount returns 0 for k=0 by convention; real leaf count is 1
+      if (isBoundedPool) {
+        const capped = poolMax.slice(i);
+        capped[0] = poolMax[i] - 1; // this index already "used" once by being the top-level pick
+        return boundedCombinationCount(capped, freeSlots - 1);
+      }
+      return combinationCount(poolVecs.length - i, freeSlots - 1);
+    };
+    const numBins = Math.min(navigator.hardwareConcurrency || 4, 8);
+    const order = poolVecs.map((_, i) => i)
+      .filter(i => poolMax[i] !== 0)
+      .sort((a, b) => subtreeSize(b) - subtreeSize(a));
+    const binTotals = new Array(numBins).fill(0);
+    bins = Array.from({length: numBins}, () => []);
+    order.forEach(i => {
+      let best = 0;
+      for (let b = 1; b < numBins; b++) if (binTotals[b] < binTotals[best]) best = b;
+      bins[best].push(i);
+      binTotals[best] += subtreeSize(i);
+    });
+    bins = bins.filter(b => b.length > 0);
+    // Empty pool (n===0): every bin ends up empty above. Still need exactly one worker to
+    // get a 'done' message and render (empty) results, same as today.
+    if (bins.length === 0) bins = [[]];
+  }
+
   const workerTargetStats = targetStats.map(t=>({
     idx: STAT_IDX[t.name],
     dir: STAT_META[t.name].good ? 1 : -1,
@@ -3151,7 +3204,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     },
     meta: {
       poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
-      protection, total, totalFmt, containerCfg
+      protection, total, totalFmt, containerCfg, bins
     }
   };
 }
@@ -3164,9 +3217,7 @@ self.onmessage = function(e){
   var VECS = d.vecs.map(function(v){ return new Float64Array(v); });
   var n = VECS.length;
   var maxCounts = d.maxCounts; // per-item repeat cap (Infinity = unbounded)
-  var sum = new Float64Array(d.ns);
-  if(d.lockedSum){for(var k=0;k<d.ns;k++) sum[k]=d.lockedSum[k];}
-  var counts = new Array(n).fill(0);
+  var counts = new Int32Array(n);
   var top = [];
   var checked = 0;
   var REPORT_EVERY = 500000;
@@ -3185,32 +3236,51 @@ self.onmessage = function(e){
   // keep in sync with main thread's COVERAGE_EPS (blob scope can't share it)
   var COVERAGE_EPS = 0.006;
 
-  function passesThreshold(){
+  // .idx fields below are still full-width VECS indices - remapped to activeIdx
+  // positions later, right before recurse() (precomputation below needs full-width first).
+  var activeIdx = [];
+  var idxMap = {};
+  for(var ai=0; ai<thresholds.length; ai++){
+    var oi=thresholds[ai].idx;
+    if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
+  }
+  for(var ai=0; ai<targetStats.length; ai++){
+    var oi=targetStats[ai].idx;
+    if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
+  }
+  for(var ai=0; ai<noDebuffIdx.length; ai++){
+    var oi=noDebuffIdx[ai].idx;
+    if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
+  }
+  for(var ai=0; ai<minStats.length; ai++){
+    var oi=minStats[ai].idx;
+    if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
+  }
+
+  var sum = new Float64Array(activeIdx.length);
+  if(d.lockedSum){ for(var k=0;k<activeIdx.length;k++) sum[k]=d.lockedSum[activeIdx[k]]; }
+
+  // merged: hard-cap and extended-cap checks share the same per-threshold eff
+  // computation, so compute both in one pass instead of two separate loops
+  // (passesExtended previously only ever ran on leaves that already failed
+  // the hard cap).
+  function checkThresholds(){
+    var passes=true, extPasses=true;
     for(var i=0;i<thresholds.length;i++){
       var t=thresholds[i];
       var raw=sum[t.idx];
       var artOnly=raw-t.bonus;
       var effArt=(artOnly>0&&!t.isFrost)?artOnly*(1-protection/100):artOnly;
       var eff=effArt+t.bonus;
-      if(eff>t.cap+1e-6) return false;
+      if(eff>t.cap+1e-6) passes=false;
+      if(eff>t.extCap+1e-6) extPasses=false;
     }
-    return true;
+    return {passes:passes, extPasses:extPasses};
   }
   function passesMinStats(){
     for(var i=0;i<minStats.length;i++){
       var m=minStats[i];
       if(sum[m.idx]*m.dir < m.min - 1e-6) return false;
-    }
-    return true;
-  }
-  function passesExtended(){
-    for(var i=0;i<thresholds.length;i++){
-      var t=thresholds[i];
-      var raw=sum[t.idx];
-      var artOnly=raw-t.bonus;
-      var effArt=(artOnly>0&&!t.isFrost)?artOnly*(1-protection/100):artOnly;
-      var eff=effArt+t.bonus;
-      if(eff>t.extCap+1e-6) return false;
     }
     return true;
   }
@@ -3345,6 +3415,13 @@ self.onmessage = function(e){
     return -1;
   });
 
+  // Remap .idx fields to short-list positions now that the precomputation above (which
+  // needed original indices against full-width VECS) is done. Must happen before recurse().
+  for(var ri=0; ri<thresholds.length; ri++) thresholds[ri].idx = idxMap[thresholds[ri].idx];
+  for(var ri=0; ri<targetStats.length; ri++) targetStats[ri].idx = idxMap[targetStats[ri].idx];
+  for(var ri=0; ri<noDebuffIdx.length; ri++) noDebuffIdx[ri].idx = idxMap[noDebuffIdx[ri].idx];
+  for(var ri=0; ri<minStats.length; ri++) minStats[ri].idx = idxMap[minStats[ri].idx];
+
   // prune only if every applicable bucket (top, top_ext, topMinFallback when in use) is
   // proven unreachable from this subtree
   function shouldPrune(start, remaining){
@@ -3409,6 +3486,23 @@ self.onmessage = function(e){
     return true;
   }
 
+  // Reconstructs the full 34-stat line for a leaf's bucket entry: seeds from d.lockedSum
+  // (full-width, untouched), then adds VECS[i] once per repeat, i ascending, repeats
+  // consecutive - replicates today's exact incremental accumulation order so results stay
+  // bit-identical (not counts[i]*VECS[i][k] in one multiply).
+  function fullSumSnapshot(){
+    var full = new Float64Array(ns);
+    if(d.lockedSum){ for(var fi=0; fi<ns; fi++) full[fi]=d.lockedSum[fi]; }
+    for(var fi2=0; fi2<n; fi2++){
+      if(counts[fi2]<=0) continue;
+      var v=VECS[fi2];
+      for(var rep=0; rep<counts[fi2]; rep++){
+        for(var fk=0; fk<ns; fk++) full[fk]+=v[fk];
+      }
+    }
+    return Array.from(full);
+  }
+
   function considerLeaf(){
     checked++;
     if(checked>=nextReport){
@@ -3423,7 +3517,8 @@ self.onmessage = function(e){
       var cat=Math.round(priceTierSum/d.slots);
       if(!priceCategoryAllowed[cat-1]) return;
     }
-    var passes=passesThreshold();
+    var thr=checkThresholds();
+    var passes=thr.passes;
     var minsOk=passesMinStats();
     // fails both cap and min -> discarded; fallback pool only backfills safe builds
     if(!minsOk && !passes) return;
@@ -3434,7 +3529,7 @@ self.onmessage = function(e){
       if(cv!==targetStats.length){
         failedCoverageOnly=true;
         if(topCoverageFallback.length!==TOP_N||beats({cov:cv,ts:ts},topCoverageFallback[topCoverageFallback.length-1])){
-          var entryCF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
+          var entryCF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:fullSumSnapshot()};
           var ci=topCoverageFallback.length;
           topCoverageFallback.push(entryCF);
           while(ci>0&&beats(entryCF,topCoverageFallback[ci-1])){topCoverageFallback[ci]=topCoverageFallback[ci-1];topCoverageFallback[ci-1]=entryCF;ci--;}
@@ -3442,7 +3537,7 @@ self.onmessage = function(e){
         }
       } else if(minsOk){
         if(top.length===TOP_N&&!beats({cov:cv,ts:ts},top[top.length-1])) return;
-        var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum)};
+        var entry={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:fullSumSnapshot()};
         var i=top.length;
         top.push(entry);
         while(i>0&&beats(entry,top[i-1])){top[i]=top[i-1];top[i-1]=entry;i--;}
@@ -3450,18 +3545,18 @@ self.onmessage = function(e){
       } else {
         var mi=unmetMinInfo();
         if(topMinFallback.length===TOP_N&&!beatsFallback({unmetCount:mi.count,crit:mi.crit,cov:cv,ts:ts},topMinFallback[topMinFallback.length-1])) return;
-        var entryF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:Array.from(sum),unmetCount:mi.count,crit:mi.crit};
+        var entryF={counts:counts.slice(),score:sc,ts:ts,cov:cv,sum:fullSumSnapshot(),unmetCount:mi.count,crit:mi.crit};
         var fi=topMinFallback.length;
         topMinFallback.push(entryF);
         while(fi>0&&beatsFallback(entryF,topMinFallback[fi-1])){topMinFallback[fi]=topMinFallback[fi-1];topMinFallback[fi-1]=entryF;fi--;}
         if(topMinFallback.length>TOP_N) topMinFallback.length=TOP_N;
       }
-    } else if(passesExtended()){
+    } else if(thr.extPasses){
       // Extended zone: over hard cap but within consumable range
       var ts2=tierScores(),cv2=coverage();
       if(cv2===targetStats.length){
         if(!(top_ext.length===TOP_EXT&&!beats({cov:cv2,ts:ts2},top_ext[top_ext.length-1]))){
-          var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:Array.from(sum)};
+          var entry_e={counts:counts.slice(),score:sc,ts:ts2,cov:cv2,sum:fullSumSnapshot()};
           var ie=top_ext.length;
           top_ext.push(entry_e);
           while(ie>0&&beats(entry_e,top_ext[ie-1])){top_ext[ie]=top_ext[ie-1];top_ext[ie-1]=entry_e;ie--;}
@@ -3487,7 +3582,7 @@ self.onmessage = function(e){
       if(counts[i]>=maxCounts[i]) continue;
       var vec=VECS[i];
       counts[i]++;
-      for(var k=0;k<ns;k++) sum[k]+=vec[k];
+      for(var k=0;k<activeIdx.length;k++) sum[k]+=vec[activeIdx[k]];
       if(priceCategoryAllowed){
         if(poolPriceTier[i]==null) priceMissingCount++; else priceTierSum+=poolPriceTier[i];
       }
@@ -3495,11 +3590,37 @@ self.onmessage = function(e){
       if(priceCategoryAllowed){
         if(poolPriceTier[i]==null) priceMissingCount--; else priceTierSum-=poolPriceTier[i];
       }
-      for(var k=0;k<ns;k++) sum[k]-=vec[k];
+      for(var k=0;k<activeIdx.length;k++) sum[k]-=vec[activeIdx[k]];
       counts[i]--;
     }
   }
-  recurse(0,d.slots-(d.lockedSlots||0));
+  // ---- Multi-worker split: this worker only explores subtrees started by its assigned
+  // top-level picks (d.assignedIndices, a partition of 0..n-1 computed by the main thread's
+  // bin-packing). Inlines recurse's own for(i=start;i<n;i++) loop body verbatim, restricted
+  // to the assigned indices - recurse/shouldPrune/considerLeaf/beats/beatsFallback above are
+  // otherwise untouched. All-pinned (topRemaining===0) has no top-level pick to loop over
+  // (today's recurse(0,0) is a single direct leaf), so it's handled directly.
+  var topRemaining = d.slots-(d.lockedSlots||0);
+  if(topRemaining===0){
+    considerLeaf();
+  } else {
+    for(var ii=0; ii<d.assignedIndices.length; ii++){
+      var i=d.assignedIndices[ii];
+      if(counts[i]>=maxCounts[i]) continue;
+      var vec=VECS[i];
+      counts[i]++;
+      for(var k=0;k<activeIdx.length;k++) sum[k]+=vec[activeIdx[k]];
+      if(priceCategoryAllowed){
+        if(poolPriceTier[i]==null) priceMissingCount++; else priceTierSum+=poolPriceTier[i];
+      }
+      recurse(i,topRemaining-1);
+      if(priceCategoryAllowed){
+        if(poolPriceTier[i]==null) priceMissingCount--; else priceTierSum-=poolPriceTier[i];
+      }
+      for(var k=0;k<activeIdx.length;k++) sum[k]-=vec[activeIdx[k]];
+      counts[i]--;
+    }
+  }
   self.postMessage({type:'done',top:top,top_ext:top_ext,top_fallback:topMinFallback,top_coverage_fallback:topCoverageFallback,failedCoverageOnly:failedCoverageOnly});
 };
 `;
@@ -3508,6 +3629,21 @@ self.onmessage = function(e){
 // Keep in sync with WORKER_SRC's own COVERAGE_EPS (isolated blob scope can't share it).
 // Also marks target pills with no real benefit in a coverage-fallback build.
 const COVERAGE_EPS = 0.006;
+// Keep in sync with WORKER_SRC's own beats()/beatsFallback() (isolated blob scope can't
+// share it) - third duplication, alongside COVERAGE_EPS and combinationCount/
+// boundedCombinationCount above. Used by runSplitSearch to merge each worker's
+// top/top_ext/topMinFallback/topCoverageFallback buckets back into single-thread order.
+function beats(a,b){
+  if(a.cov!==b.cov) return a.cov>b.cov;
+  if(Math.abs(a.ts.h-b.ts.h)>1e-6) return a.ts.h>b.ts.h;
+  if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
+  return a.ts.l>b.ts.l;
+}
+function beatsFallback(a,b){
+  if(a.unmetCount!==b.unmetCount) return a.unmetCount<b.unmetCount;
+  if(Math.abs(a.crit-b.crit)>1e-6) return a.crit>b.crit;
+  return beats(a,b);
+}
 const THRESH_CAP     = 0.5;
 const THRESH_CAP_FROST = 1;
 const THRESH_EXT     = 0.55;
@@ -3988,7 +4124,6 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   el.innerHTML = html;
   if (gridView && displayResults.length > 1) equalizeGridCardChips(el);
 
-  // Attach toggle handlers after innerHTML is set
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       gridView = btn.dataset.view === 'grid';
@@ -4018,7 +4153,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
 }
 
 
-let activeWorker = null;
+let activeWorkers = [];
 let showOwnedHighlight = false; // false in Mode B: every chip is already from the loadout
 let gridView = false;           // true = 3-column grid layout for results
 let ownedHighlightOn = true;    // user toggle: green-highlight chips you already own (gated by showOwnedHighlight/Mode B above)
@@ -4142,10 +4277,10 @@ document.getElementById('results').addEventListener('click', e=>{
   }
 });
 
-document.getElementById('calcBtn').onclick = ()=>{
-  if (activeWorker){
-    activeWorker.terminate();
-    activeWorker = null;
+document.getElementById('calcBtn').onclick = async ()=>{
+  if (activeWorkers.length){
+    activeWorkers.forEach(w=>w.terminate());
+    activeWorkers = [];
     // If a compare-mode search is mid-container, its runOneWorker() promise awaits this
     // resolve - fire null so the loop aborts instead of hanging (terminate() fires no event).
     if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
@@ -4229,13 +4364,11 @@ document.getElementById('calcBtn').onclick = ()=>{
     return;
   }
   const { payload, meta } = built;
-  const { poolMeta, pinnedQuality, containerBonusMap, containerBaseVec, total, totalFmt } = meta;
+  const { poolMeta, pinnedQuality, containerBonusMap, containerBaseVec, totalFmt } = meta;
 
-  // Cancel any previous search
-  if (activeWorker){ activeWorker.terminate(); activeWorker = null; }
+  if (activeWorkers.length){ activeWorkers.forEach(w=>w.terminate()); activeWorkers = []; }
   document.getElementById('consumableZone').innerHTML = '';
 
-  // Show progress UI
   btn.classList.add('stop-mode');
   btn.textContent = 'STOP';
   el.innerHTML = `
@@ -4253,75 +4386,23 @@ document.getElementById('calcBtn').onclick = ()=>{
     <div class="prog-status" id="progStatus">Initializing\u2026</div>
   `;
 
-  const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
-  const workerUrl = URL.createObjectURL(blob);
-  activeWorker = new Worker(workerUrl);
+  // 2.5: shared pool-runner - same promise-based shape runOneWorker already used for
+  // compare mode (intentional, request-driven change per Step 2.5, not scope creep).
+  const data = await runSplitSearch(payload, meta, { idx: '' });
 
-  const startTime = Date.now();
-  const FAKE_FILL_MIN_MS = 3000; // 5+ slot searches: keep the bar visible at least this long
-  let lastShownPct = 0;
-  let lastShownDone = 0;
-
-  activeWorker.onmessage = e=>{
-    if (e.data.type === 'progress'){
-      const done = e.data.done;
-      const pct = Math.min(99, Math.round(done / total * 100)); // hold at 99% until truly done
-      lastShownPct = pct;
-      lastShownDone = done;
-      const elapsed = (Date.now() - startTime) / 1000;
-      const rate = elapsed > 0 ? done / elapsed : 0;
-      const remaining = rate > 0 ? (total - done) / rate : 0;
-      const etaStr = remaining > 60
-        ? Math.round(remaining / 60) + ' min remaining'
-        : Math.round(remaining) + 's remaining';
-      const rateStr = rate > 0
-        ? (rate >= 1e6 ? (rate/1e6).toFixed(1)+'M' : Math.round(rate/1e3)+'K') + ' combinations/sec'
-        : '';
-
-      document.getElementById('progFill').style.width = pct + '%';
-      document.getElementById('progPct').textContent = pct + '%';
-      document.getElementById('progCount').textContent = done.toLocaleString() + ' / ' + totalFmt;
-      document.getElementById('progStatus').textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
-
-    } else if (e.data.type === 'done'){
-      const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
-      if (remainingMs > 0){
-        animateFakeCompletion(remainingMs, () => finishSearch(e.data));
-      } else {
-        finishSearch(e.data);
-      }
-    }
-  };
-
-  function animateFakeCompletion(durationMs, onComplete){
-    const startPct = lastShownPct;
-    const startDone = lastShownDone;
-    const animStart = Date.now();
-    const fillEl = document.getElementById('progFill');
-    const pctEl = document.getElementById('progPct');
-    const countEl = document.getElementById('progCount');
-    const statusEl = document.getElementById('progStatus');
-    statusEl.textContent = 'Finishing up\u2026';
-    const timer = setInterval(()=>{
-      if (!activeWorker){ clearInterval(timer); return; } // cancelled via Stop button
-      const t = Math.min(1, (Date.now() - animStart) / durationMs);
-      const pct = Math.round(startPct + (100 - startPct) * t);
-      const shownDone = Math.round(startDone + (total - startDone) * t);
-      fillEl.style.width = pct + '%';
-      pctEl.textContent = pct + '%';
-      countEl.textContent = shownDone.toLocaleString() + ' / ' + totalFmt;
-      if (t >= 1){
-        clearInterval(timer);
-        onComplete();
-      }
-    }, 50);
+  if (data === null) return; // Stop pressed mid-search - the Stop branch above already reset the UI
+  if (data.__workerError){
+    btn.disabled = false;
+    btn.classList.remove('stop-mode');
+    btn.textContent = 'Find best combination';
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Search error: ' + data.__workerError + '</div>';
+    return;
   }
+  finishSearch(data);
 
   function finishSearch(data){
       compareModeActive = false; // this render mode always overwrites whatever #results last showed
       compareBuildsActive = false;
-      URL.revokeObjectURL(workerUrl);
-      activeWorker = null;
       btn.disabled = false;
       btn.classList.remove('stop-mode');
       btn.textContent = 'Find best combination';
@@ -4348,17 +4429,6 @@ document.getElementById('calcBtn').onclick = ()=>{
       const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults, level, quality, backpackSelectEl.value);
   }
-
-  activeWorker.onerror = err=>{
-    URL.revokeObjectURL(workerUrl);
-    activeWorker = null;
-    btn.disabled = false;
-    btn.classList.remove('stop-mode');
-    btn.textContent = 'Find best combination';
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Search error: ' + (err.message || 'unknown error') + '</div>';
-  };
-
-  activeWorker.postMessage(payload);
 };
 
 /* ---------- Compare-containers mode: sequential orchestration + rendering ----------
@@ -4367,28 +4437,71 @@ document.getElementById('calcBtn').onclick = ()=>{
    idx param updates it) so earlier containers' bars stay visible - "stacked" is a rendering
    choice only, not parallel workers. */
 
-// Set by runOneWorker while a compare-mode search is in flight; lets the Stop button (in
-// calcBtn.onclick above) resolve the pending promise with null instead of leaving it hanging.
+// Set while a compare-mode search is in flight; lets the Stop button (in calcBtn.onclick
+// above) resolve the pending promise with null instead of leaving it hanging.
 let pendingWorkerResolve = null;
 
-// Promise-wrapped version of the same Worker/Blob/postMessage/onmessage pattern
-// calcBtn.onclick uses for a normal search - one call per container. `idx` selects which
-// stacked progress block (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx},
-// built by runComparisonSearch) this call updates, so earlier containers' bars stay visible.
-// Resolves with the worker's 'done' payload, {__workerError} if it threw, or null on Stop.
-function runOneWorker(payload, slots, idx){
+// ---- 2.5: Shared worker-pool runner ----
+// Spawns one worker per bin in meta.bins (computed by buildContainerSearchPayload's
+// bin-packing - see 2.1), tracks aggregate progress across the pool, and on completion
+// merges each worker's top/top_ext/topMinFallback/topCoverageFallback buckets back into
+// the same order a single unsplit search would have produced (see mergeCompare below).
+// Used by both calcBtn.onclick's direct-search path and runOneWorker() (compare mode) -
+// one shared implementation instead of two copies; this converts calcBtn.onclick's
+// direct-search path to the same promise-based shape runOneWorker already used
+// (Step 2.5 - an intentional, request-driven change, not scope creep).
+//
+// opts.idx: '' for the plain, non-suffixed progress block IDs (progFill/progPct/progCount/
+// progStatus) calcBtn.onclick's direct search uses, or a number (0,1,2...) for compare
+// mode's stacked per-container blocks (progFill0/progPct0/...) - same suffix convention
+// runOneWorker already used.
+// Resolves with the merged {top,top_ext,top_fallback,top_coverage_fallback,
+// failedCoverageOnly} payload (same shape a single worker's 'done' message had), null if
+// Stop was pressed mid-search, or {__workerError} if a worker errored.
+function runSplitSearch(payload, meta, opts){
+  opts = opts || {};
+  const idx = opts.idx !== undefined ? opts.idx : '';
   return new Promise(resolve=>{
     pendingWorkerResolve = resolve;
-    const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
-    const workerUrl = URL.createObjectURL(blob);
-    activeWorker = new Worker(workerUrl);
 
+    const bins = meta.bins;
     const total = payload.total;
     const totalFmt = total.toLocaleString();
     const startTime = Date.now();
     const FAKE_FILL_MIN_MS = 3000; // 5+ slot searches: keep the bar visible at least this long
     let lastShownPct = 0;
     let lastShownDone = 0;
+
+    const workerUrls = bins.map(()=>URL.createObjectURL(new Blob([WORKER_SRC], {type:'application/javascript'})));
+    activeWorkers = workerUrls.map(u => new Worker(u));
+
+    const lastChecked = activeWorkers.map(()=>0); // one slot per worker, progress-message-driven
+    const results = new Array(activeWorkers.length).fill(null);
+    let doneCount = 0;
+
+    function reportProgress(){
+      const done = lastChecked.reduce((s,c)=>s+c, 0);
+      const pct = Math.min(99, Math.round(done / total * 100)); // hold at 99% until truly done
+      lastShownPct = pct;
+      lastShownDone = done;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const rate = elapsed > 0 ? done / elapsed : 0;
+      const remaining = rate > 0 ? (total - done) / rate : 0;
+      const etaStr = remaining > 60
+        ? Math.round(remaining / 60) + ' min remaining'
+        : Math.round(remaining) + 's remaining';
+      const rateStr = rate > 0
+        ? (rate >= 1e6 ? (rate/1e6).toFixed(1)+'M' : Math.round(rate/1e3)+'K') + ' combinations/sec'
+        : '';
+      const fillEl = document.getElementById('progFill'+idx);
+      const pctEl = document.getElementById('progPct'+idx);
+      const countEl = document.getElementById('progCount'+idx);
+      const statusEl = document.getElementById('progStatus'+idx);
+      if (fillEl) fillEl.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+      if (countEl) countEl.textContent = done.toLocaleString() + ' / ' + totalFmt;
+      if (statusEl) statusEl.textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
+    }
 
     function animateFakeCompletion(durationMs, onComplete){
       const startPct = lastShownPct;
@@ -4400,7 +4513,7 @@ function runOneWorker(payload, slots, idx){
       const statusEl = document.getElementById('progStatus'+idx);
       if (statusEl) statusEl.textContent = 'Finishing up\u2026';
       const timer = setInterval(()=>{
-        if (!activeWorker){ clearInterval(timer); return; } // cancelled via Stop button
+        if (!activeWorkers.length){ clearInterval(timer); return; } // cancelled via Stop button
         const t = Math.min(1, (Date.now() - animStart) / durationMs);
         const pct = Math.round(startPct + (100 - startPct) * t);
         const shownDone = Math.round(startDone + (total - startDone) * t);
@@ -4414,12 +4527,32 @@ function runOneWorker(payload, slots, idx){
       }, 50);
     }
 
-    function finish(data){
-      URL.revokeObjectURL(workerUrl);
-      activeWorker = null;
+    // entry.__srcIdx = the top-level pool index a leaf was first picked from. Bin-packing
+    // gives each top-level index to exactly one worker, so any two leaves from different
+    // workers have different __srcIdx and this tie-break alone reproduces single-thread
+    // order for cross-worker pairs. Same-worker leaves sharing a __srcIdx were already
+    // ordered correctly by that worker's own unmodified recurse/considerLeaf/insertion-sort
+    // logic - Array#sort is a stable sort, and results are concatenated worker-by-worker
+    // below without reordering each worker's own array first, so that order carries through.
+    function mergeCompare(beatsFn, a, b){
+      if (beatsFn(a, b)) return -1;
+      if (beatsFn(b, a)) return 1;
+      return a.__srcIdx - b.__srcIdx; // only reached on a true tie
+    }
+    function mergeBucket(key, beatsFn){
+      const all = [];
+      results.forEach(r => { (r[key]||[]).forEach(e => { e.__srcIdx = e.counts.findIndex(c=>c>0); all.push(e); }); });
+      all.sort((a,b)=>mergeCompare(beatsFn,a,b));
+      return all.slice(0, RESULTS_DISPLAY_CAP); // worker's TOP_N===TOP_EXT===RESULTS_DISPLAY_CAP today
+    }
+
+    function mergeAndFinish(){
+      workerUrls.forEach(u=>URL.revokeObjectURL(u));
+      activeWorkers = [];
       pendingWorkerResolve = null;
-      // Freeze this container's block at 100% and mark it done so it stays on screen,
-      // visually complete, while the next container's block appears below it.
+      // Freeze this block at 100%/DONE - matches today's per-container compare-mode
+      // behavior (progBlock+fillEl+... don't exist for the plain single-search progress
+      // block, so this is a no-op there).
       const blockEl = document.getElementById('progBlock'+idx);
       const fillEl = document.getElementById('progFill'+idx);
       const pctEl = document.getElementById('progPct'+idx);
@@ -4430,46 +4563,54 @@ function runOneWorker(payload, slots, idx){
       if (pctEl) pctEl.textContent = '100%';
       if (countEl) countEl.textContent = totalFmt + ' / ' + totalFmt;
       if (statusEl) statusEl.textContent = '\u2714 DONE';
-      resolve(data);
+
+      resolve({
+        top: mergeBucket('top', beats),
+        top_ext: mergeBucket('top_ext', beats),
+        top_fallback: mergeBucket('top_fallback', beatsFallback),
+        top_coverage_fallback: mergeBucket('top_coverage_fallback', beats),
+        failedCoverageOnly: results.some(r=>r.failedCoverageOnly)
+      });
     }
 
-    activeWorker.onmessage = e=>{
-      if (e.data.type === 'progress'){
-        const done = e.data.done;
-        const pct = Math.min(99, Math.round(done / total * 100));
-        lastShownPct = pct;
-        lastShownDone = done;
-        const elapsed = (Date.now() - startTime) / 1000;
-        const rate = elapsed > 0 ? done / elapsed : 0;
-        const remaining = rate > 0 ? (total - done) / rate : 0;
-        const etaStr = remaining > 60
-          ? Math.round(remaining / 60) + ' min remaining'
-          : Math.round(remaining) + 's remaining';
-        const rateStr = rate > 0
-          ? (rate >= 1e6 ? (rate/1e6).toFixed(1)+'M' : Math.round(rate/1e3)+'K') + ' combinations/sec'
-          : '';
-        const fillEl = document.getElementById('progFill'+idx);
-        const pctEl = document.getElementById('progPct'+idx);
-        const countEl = document.getElementById('progCount'+idx);
-        const statusEl = document.getElementById('progStatus'+idx);
-        if (fillEl) fillEl.style.width = pct + '%';
-        if (pctEl) pctEl.textContent = pct + '%';
-        if (countEl) countEl.textContent = done.toLocaleString() + ' / ' + totalFmt;
-        if (statusEl) statusEl.textContent = rateStr ? rateStr + ' \u00b7 ' + etaStr : 'Calculating\u2026';
-      } else if (e.data.type === 'done'){
-        const remainingMs = slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
-        if (remainingMs > 0) animateFakeCompletion(remainingMs, () => finish(e.data));
-        else finish(e.data);
-      }
-    };
-    activeWorker.onerror = err=>{
-      URL.revokeObjectURL(workerUrl);
-      activeWorker = null;
-      pendingWorkerResolve = null;
-      resolve({ __workerError: err.message || 'unknown error' });
-    };
-    activeWorker.postMessage(payload);
+    activeWorkers.forEach((w, wi)=>{
+      w.onmessage = e=>{
+        if (e.data.type === 'progress'){
+          lastChecked[wi] = e.data.done;
+          reportProgress();
+        } else if (e.data.type === 'done'){
+          results[wi] = e.data;
+          doneCount++;
+          if (doneCount === activeWorkers.length){
+            // Computed once, at the moment the last worker posts 'done' - not per-worker.
+            const remainingMs = payload.slots >= 5 ? (FAKE_FILL_MIN_MS - (Date.now() - startTime)) : 0;
+            if (remainingMs > 0) animateFakeCompletion(remainingMs, mergeAndFinish);
+            else mergeAndFinish();
+          }
+        }
+      };
+      w.onerror = err=>{
+        if (!activeWorkers.length) return; // pool already torn down (Stop, or another worker's error)
+        workerUrls.forEach(u=>URL.revokeObjectURL(u));
+        activeWorkers.forEach(w2=>w2.terminate());
+        activeWorkers = [];
+        pendingWorkerResolve = null;
+        resolve({ __workerError: err.message || 'unknown error' });
+      };
+    });
+
+    activeWorkers.forEach((w, wi)=>{
+      w.postMessage({...payload, assignedIndices: bins[wi]});
+    });
   });
+}
+
+// Thin wrapper around runSplitSearch, kept as its own function for compare mode's call
+// site/comment below. `idx` selects which stacked progress block
+// (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx}, built by
+// runComparisonSearch) this call updates, so earlier containers' bars stay visible.
+function runOneWorker(payload, meta, idx){
+  return runSplitSearch(payload, meta, { idx });
 }
 
 // Reads the 2-3 chosen containers + shared search fields, then searches them one at a time
@@ -4561,7 +4702,7 @@ async function runComparisonSearch(){
 
     // Append this container's own block below any earlier ones instead of overwriting
     // them, so each container's progress bar stays on screen (frozen at 100%/DONE by
-    // runOneWorker's finish()) once it completes. Color cycles by column position.
+    // runSplitSearch's mergeAndFinish()) once it completes. Color cycles by column position.
     progWrap.insertAdjacentHTML('beforeend', `
       <div class="compare-prog-block compare-prog-color-${i % 3}" id="progBlock${i}">
         <p class="prog-tagline">Container ${i+1} of ${selects.length} - ${containerCfg.name}: checking <b>${built.meta.totalFmt}</b> possible combinations</p>
@@ -4578,7 +4719,7 @@ async function runComparisonSearch(){
       </div>
     `);
 
-    const data = await runOneWorker(built.payload, containerCfg.slots, i);
+    const data = await runOneWorker(built.payload, built.meta, i);
 
     if (data === null){
       // Stop pressed - calcBtn.onclick's Stop branch already reset the button and showed
