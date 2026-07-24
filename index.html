@@ -64,6 +64,26 @@
     color:var(--accent);margin:0 0 12px;font-weight:700;
   }
 
+  /* Basic/Advanced mode toggle - same segmented-control look as .lvl-toggle. */
+  .mode-toggle{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:14px;}
+  .mode-toggle-btn{
+    flex:1;background:none;border:none;border-right:1px solid var(--border);
+    color:var(--muted);font-size:12px;padding:9px 6px;cursor:pointer;
+    font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase;
+  }
+  .mode-toggle-btn:last-child{border-right:none;}
+  .mode-toggle-btn.active{background:var(--accent-dim);color:var(--text);}
+
+  .advanced-wrap{display:grid;grid-template-rows:0fr;opacity:0;
+    transition:grid-template-rows 0.35s ease,margin-top 0.35s ease,opacity 0.25s ease;}
+  .advanced-wrap .advanced-inner{overflow:hidden;min-height:0;}
+  /* Escapes clip for an open dropdown (e.g. armor select) inside; doesn't affect the animation. */
+  .advanced-wrap .advanced-inner.dd-panel-open{overflow:visible;}
+  body.advanced-mode .advanced-wrap{grid-template-rows:1fr;opacity:1;}
+  .advanced-wrap.panel-gap{margin-top:0;}
+  body.advanced-mode .advanced-wrap.panel-gap{margin-top:14px;}
+  body:not(.advanced-mode) #compareModeBtn{display:none;}
+
   label.field{display:block;margin-bottom:12px;}
   label.field span.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
   input[type=number],input[type=text]{
@@ -204,29 +224,14 @@
   button.quality-pill{cursor:pointer;}
   button.quality-pill:hover{filter:brightness(1.35);}
   button.quality-pill.active{box-shadow:0 0 0 1px currentColor;filter:brightness(1.25);}
+  .owned-pills .quality-pill.pinned{outline:1px solid var(--q-legendary);outline-offset:2px;}
 
-  .score-line{font-size:12px;color:var(--muted);margin:10px 0 0;}
-  .score-line b{color:var(--text);}
-
-  table.stat-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
-  table.stat-table th{
-    text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;
-    letter-spacing:0.04em;padding:6px 8px;border-bottom:1px solid var(--border);
-  }
-  table.stat-table td{padding:6px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);}
-  table.stat-table td.statname{font-family:var(--sans);}
-  table.stat-table tr.target td.statname{font-weight:700;color:#fff;}
   .val.good{color:var(--good);}
   .val.bad{color:var(--bad);}
 
-  .gauge-wrap{margin-bottom:12px;}
-  .gauge-head{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
-  .gauge-head .gname{color:var(--text);}
-  .gauge-head .gval{font-family:var(--mono);}
   .gauge-track{position:relative;height:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:3px;overflow:hidden;}
   .gauge-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px 0 0 3px;}
   .gauge-marker{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.5);}
-  .gauge-status{font-size:11px;margin-top:3px;letter-spacing:0.03em;}
 
   .section-title{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;}
   .section-title:first-child{margin-top:0;}
@@ -260,8 +265,6 @@
     border:1px solid var(--warn);padding:8px 10px;border-radius:4px;margin-bottom:12px;
   }
   .results-grid-view .min-warning-banner{grid-column:1/-1;}
-  .min-status-note{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:3px;letter-spacing:0.02em;}
-  .min-status-note.met{color:var(--good);background:var(--good-bg);border:1px solid var(--good);}
   .result-card details{margin-top:10px;}
   .result-card summary{cursor:pointer;font-size:11.5px;color:var(--accent);letter-spacing:0.03em;margin-bottom:6px;}
   .result-card details[open] summary{margin-bottom:10px;}
@@ -399,7 +402,6 @@
   }
   .view-btn.active{background:var(--accent-dim);border-color:var(--accent-dim);color:var(--text);}
   .price-filter-group{display:flex;align-items:center;gap:5px;}
-  .price-filter-label{font-size:10px;color:var(--muted);letter-spacing:0.03em;}
   .price-filter-group:not(:last-child){padding-right:8px;border-right:1px solid var(--border);}
   .price-filter-btn{
     background:none;border:1px solid var(--border);color:var(--muted);
@@ -427,6 +429,14 @@
   .popover-maxcopies-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .popover-maxcopies-row .lbl{font-size:12px;color:var(--muted);}
   .popover-maxcopies-val{font-family:var(--mono);font-size:13px;color:var(--accent);}
+  .favcount-row{display:flex;align-items:stretch;gap:6px;}
+  .favcount-row input[type=number]{width:auto;flex:1;text-align:center;}
+  .favcount-btn{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    border-radius:4px;font-family:var(--mono);font-size:15px;line-height:1;
+    cursor:pointer;flex-shrink:0;width:30px;
+  }
+  .favcount-btn:hover{border-color:var(--accent-dim);background:rgba(201,137,63,0.08);}
   .popover-maxcopies input[type=range]{
     width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
     background:var(--panel-2);border:1px solid var(--border);accent-color:var(--accent);
@@ -555,6 +565,11 @@
         <button class="primary danger" id="resetAllBtn" style="margin:0;width:auto;padding-left:18px;padding-right:18px;">Reset</button>
       </div>
 
+      <div class="mode-toggle" id="modeToggle">
+        <button type="button" class="mode-toggle-btn active" data-mode="basic">Basic</button>
+        <button type="button" class="mode-toggle-btn" data-mode="advanced">Advanced</button>
+      </div>
+
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h2 style="margin:0;">Container</h2>
@@ -571,11 +586,13 @@
           <select id="compareSelect1" style="margin-bottom:6px;"><option value="none" selected style="color:var(--text);">-- None --</option></select>
           <select id="compareSelect2"><option value="none" selected style="color:var(--text);">-- None --</option></select>
         </div>
+        <div class="advanced-wrap"><div class="advanced-inner">
         <label class="field" style="margin-bottom:4px;">
           <span class="lbl">Armor (Optional)</span>
           <select id="armorSelect"><option value="none" selected style="color:var(--text);">None</option></select>
         </label>
         <div class="note" id="armorBonusNote" style="display:none;margin-top:-2px;margin-bottom:14px;"></div>
+        </div></div>
         <div class="row-inline">
           <!-- Hidden; set display:block + remove lvl-toggle div below to revert -->
           <label class="field" style="display:none;">
@@ -604,6 +621,12 @@
         </div>
         <!-- Outside the row so it doesn't affect toggle/select height alignment -->
         <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
+        <div class="debuff-toggle-label" style="margin-top:14px;">Search these price ranges:</div>
+        <div class="price-range-slider-row">
+          <input type="range" id="priceRangeSlider" min="1" max="5" step="1" value="5">
+          <span class="price-range-slider-label" id="priceRangeSliderLabel"></span>
+        </div>
+        <div class="advanced-wrap"><div class="advanced-inner">
         <div class="check-group-hdr" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Extra Options</div>
         <!-- Hidden, driven by level toggle; restore display:flex to revert -->
         <label class="check-item" style="display:none;margin-bottom:4px;">
@@ -624,11 +647,7 @@
         </label>
         <div class="debuff-toggle-label">Avoid builds with these debuffs:</div>
         <div class="debuff-toggle-row" id="debuffToggleRow"></div>
-        <div class="debuff-toggle-label" style="margin-top:14px;">Search these price ranges:</div>
-        <div class="price-range-slider-row">
-          <input type="range" id="priceRangeSlider" min="1" max="5" step="1" value="5">
-          <span class="price-range-slider-label" id="priceRangeSliderLabel"></span>
-        </div>
+        </div></div>
       </div>
 
       <div class="panel">
@@ -654,7 +673,7 @@
           <span class="name">Only use my loadout for next search</span>
         </label>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-          <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Favorited</span>
+          <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">In Loadout</span>
           <span style="display:flex;gap:10px;">
             <button type="button" id="expandLoadoutBtn" class="loadout-action-btn" style="color:var(--accent);">expand</button>
             <button type="button" id="clearLoadoutBtn" class="loadout-action-btn" style="color:var(--bad);">clear</button>
@@ -678,6 +697,7 @@
           <button type="button" id="loadoutAddBtn" class="primary" style="width:auto;margin:0;padding:8px 16px;flex-shrink:0;">Add</button>
         </div>
 
+        <div class="advanced-wrap"><div class="advanced-inner">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">My Builds</span>
           <span style="display:flex;gap:10px;">
@@ -737,6 +757,7 @@
             <button type="button" id="buildSaveBtn" class="primary" style="flex:1;margin:0;">Save build</button>
           </div>
         </div>
+        </div></div>
 
       </div>
 
@@ -1298,7 +1319,11 @@ function saveExcludedNames(){
 function loadMaxCopies(){
   try {
     const raw = localStorage.getItem(LS_MAXCOPIES);
-    return raw ? JSON.parse(raw) : {};
+    // JSON.parse('null') is null and the string "null" is truthy, so an unvalidated
+    // return here yields MAX_COPIES === null - which throws in the top-level
+    // ARTIFACTS.forEach below and aborts the rest of the script.
+    const v = raw ? JSON.parse(raw) : null;
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e){ return {}; }
 }
 function saveMaxCopies(){
@@ -1307,7 +1332,11 @@ function saveMaxCopies(){
 function loadPinnedNames(){
   try {
     const raw = localStorage.getItem(LS_PINNED);
-    return raw ? JSON.parse(raw) : null;
+    // savePinnedNames writes an array. Anything else that is truthy (number, string,
+    // object) would pass the caller's `if (savedPinNames)` guard and then throw on
+    // .forEach at top level, taking down the rest of the script.
+    const v = raw ? JSON.parse(raw) : null;
+    return Array.isArray(v) ? v : null;
   } catch(e){ return null; }
 }
 function savePinnedNames(){
@@ -1318,8 +1347,17 @@ function loadOwned(){
     const raw = localStorage.getItem(LS_OWNED);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
+    // OWNED is index-keyed, so any ARTIFACTS edit can leave saved indices dangling.
+    // Drop unplaceable entries here rather than letting renderOwnedList() throw at
+    // top level. Same validation the import path uses (see importLoadoutFile).
+    const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
     const out = {};
-    Object.keys(parsed).forEach(k => out[parseInt(k)] = parsed[k]);
+    Object.keys(parsed).forEach(k => {
+      const i = parseInt(k);
+      if (!ARTIFACTS[i] || !Array.isArray(parsed[k])) return;
+      const qs = parsed[k].filter(q => validQ.has(q));
+      if (qs.length) out[i] = qs;
+    });
     return out;
   } catch(e){ return {}; }
 }
@@ -1347,7 +1385,13 @@ function loadBuilds(){
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(b => b && typeof b.name === 'string' && typeof b.container === 'string').map(migrateBuildEntry);
+    // Only the write paths enforce unique names, so hand-edited storage can hold
+    // duplicates - and the compare view resolves panels by name (findIndex), which
+    // would then always hit the first match. Map keeps file order; later entry wins.
+    const byName = new Map();
+    parsed.filter(b => b && typeof b.name === 'string' && typeof b.container === 'string')
+          .forEach(b => byName.set(b.name, migrateBuildEntry(b)));
+    return [...byName.values()];
   } catch(e){ return []; }
 }
 function saveBuilds(){
@@ -1402,6 +1446,7 @@ artifactListEl.addEventListener('click', e=>{
     if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
     savePinnedNames();
     updateLockState(idx);
+    updateOwnedPinState(idx);
     return;
   }
   const heart = e.target.closest('.art-heart');
@@ -1415,6 +1460,8 @@ artifactListEl.addEventListener('click', e=>{
     popoverOpenIdx = idx;
     popoverAnchorEl = heart;
     popoverOpenedViaHover = false;
+    popoverHideExclude = false;
+    popoverBesidePanel = false;
     renderPopoverHeartAdd(idx);
     positionPopover(heart);
     chipPopoverEl.classList.add('open');
@@ -1444,9 +1491,10 @@ artifactListEl.addEventListener('mouseover', e=>{
     popoverOpenedViaHover = true; // already open (e.g. re-entering) - keep it under hover control
     return;
   }
-  openChipPopover(name, idx);
+  openChipPopover(name, idx, true);
   positionPopoverBesidePanel(name); // overrides default anchor placement, which overlapped neighboring rows here
   popoverOpenedViaHover = true;
+  popoverBesidePanel = true;
 });
 artifactListEl.addEventListener('mouseout', e=>{
   const name = e.target.closest('.name');
@@ -1507,7 +1555,7 @@ expandLoadoutBtnEl.addEventListener('click', ()=>{
 function renderOwnedList(){
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
   if (indices.length === 0){
-    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts favorited yet</div>';
+    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts in your Loadout yet</div>';
     applyOwnedListHeight();
     return;
   }
@@ -1517,7 +1565,7 @@ function renderOwnedList(){
     // Sort by quality for display but preserve original array index so splice targets the right unit.
     const sorted = OWNED[idx].map((q,origQi)=>({q,origQi})).sort((a,b)=>a.q-b.q);
     const pills = sorted.map(({q,origQi})=>
-      `<span class="quality-pill ${QUALITY_CLASS[q]}" data-idx="${idx}" data-qi="${origQi}" style="cursor:pointer;">${ARTIFACTS[idx].name}</span>`
+      `<span class="quality-pill ${QUALITY_CLASS[q]}${PINNED.has(idx) ? ' pinned' : ''}" data-idx="${idx}" data-qi="${origQi}" style="cursor:pointer;">${ARTIFACTS[idx].name}</span>`
     ).join('');
     html += `<div class="check-item owned-row" data-idx="${idx}" style="cursor:pointer;">
       <span class="owned-pills">${pills}</span>
@@ -1526,7 +1574,8 @@ function renderOwnedList(){
   ownedListEl.innerHTML = html;
   applyOwnedListHeight();
 }
-renderOwnedList();
+// Backstop - top-level throw here would abort every later declaration.
+try { renderOwnedList(); } catch(e){ console.error('renderOwnedList failed during init:', e); }
 ownedListEl.addEventListener('click', e=>{
   // Pill click → unit-specific "remove this unit" popover
   const pill = e.target.closest('.quality-pill[data-qi]');
@@ -1537,8 +1586,9 @@ ownedListEl.addEventListener('click', e=>{
       closeChipPopover(); return;
     }
     popoverOpenIdx = idx; popoverOpenQi = qi; popoverAnchorEl = pill;
+    popoverBesidePanel = true;
     renderPopoverRemoveUnit(idx, qi);
-    positionPopover(pill);
+    positionPopoverBesidePanel(pill);
     chipPopoverEl.classList.add('open');
     return;
   }
@@ -1547,6 +1597,8 @@ ownedListEl.addEventListener('click', e=>{
   if (!row) return;
   popoverOpenQi = null;
   openChipPopover(row, parseInt(row.dataset.idx));
+  popoverBesidePanel = true;
+  positionPopoverBesidePanel(row);
 });
 
 const chipPopoverEl = document.createElement('div');
@@ -1562,6 +1614,8 @@ let popoverOpenIdx = null;
 let popoverAnchorEl = null;
 let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
 let popoverOpenedViaHover = false; // hover-opened popovers only; gates auto-close on mouseout
+let popoverHideExclude = false; // true when opened via Available Artefacts hover - Exclude is redundant there (untick checkbox instead)
+let popoverBesidePanel = false; // true when opened via Available Artefacts hover - re-renders must keep using positionPopoverBesidePanel, not the generic anchor formula, or the popover jumps away from the cursor
 
 function closeChipPopover(){
   chipPopoverEl.classList.remove('open');
@@ -1569,6 +1623,8 @@ function closeChipPopover(){
   popoverAnchorEl = null;
   popoverOpenQi = null;
   popoverOpenedViaHover = false;
+  popoverHideExclude = false;
+  popoverBesidePanel = false;
 }
 // Measures the popover's actual size and clamps inside viewport. Re-call on content/height change.
 function positionPopover(anchorEl){
@@ -1584,8 +1640,9 @@ function positionPopover(anchorEl){
   chipPopoverEl.style.left = left + 'px';
   chipPopoverEl.style.top = top + 'px';
 }
-// Available artefacts hover tooltip only: row-anchoring (like positionPopover) overlapped
-// neighboring names, so this pins the popup outside the panel's right edge, tracking row y.
+// Available artefacts hover tooltip and My Loadout click popovers: row-anchoring (like
+// positionPopover) overlapped neighboring rows, so this pins the popup outside the panel's
+// right edge, tracking row y.
 const availableArtefactsPanelEl = document.getElementById('availableArtefactsPanel');
 function positionPopoverBesidePanel(anchorEl){
   const panelRect = availableArtefactsPanelEl.getBoundingClientRect();
@@ -1600,12 +1657,25 @@ function positionPopoverBesidePanel(anchorEl){
   chipPopoverEl.style.left = left + 'px';
   chipPopoverEl.style.top = top + 'px';
 }
+// Re-renders (favorite/back/favCount) must keep using whichever positioning formula
+// originally opened the popover, or it jumps to a different spot on content change.
+function repositionPopover(){
+  if (!popoverAnchorEl) return;
+  if (popoverBesidePanel) positionPopoverBesidePanel(popoverAnchorEl);
+  else positionPopover(popoverAnchorEl);
+}
 function qualitySelectHtml(q, i){
   return `<select class="fav-quality" data-i="${i}">
-    ${Object.keys(QUALITY_LABELS).map(val=>`<option value="${val}" ${parseInt(val)===q?'selected':''}>${QUALITY_LABELS[val]}</option>`).join('')}
+    ${Object.keys(QUALITY_LABELS).map(val=>`<option value="${val}" ${parseInt(val)===q?'selected':''} style="color:${QUALITY_COLORS[val]};">${QUALITY_LABELS[val]} - ${val}%</option>`).join('')}
   </select>`;
 }
-function renderPopoverMain(idx){
+// Colors the select's own text to match the selected tier (mirrors qualityInput/
+// loadoutQualitySelect via colorQualitySelect) and keeps it in sync on change.
+function initFavQualitySelect(sel){
+  colorQualitySelect(sel);
+  sel.addEventListener('change', ()=>colorQualitySelect(sel));
+}
+function renderPopoverMain(idx, hideExclude){
   const isOwned = !!(OWNED[idx] && OWNED[idx].length);
   const isPinned = PINNED.has(idx);
   const cap = MAX_COPIES[ARTIFACTS[idx].name]; // undefined = unlimited (slider at 6)
@@ -1630,10 +1700,10 @@ function renderPopoverMain(idx){
       </div>
       <input type="range" min="1" max="6" step="1" id="maxCopiesSlider" value="${cap || 6}" title="Limits how many copies of this artefact the default search can use per build">
     </div>
-    <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Favorite' : 'Favorite'}</button>
-    ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Favorites</button>' : ''}
+    <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Loadout' : 'Add to Loadout'}</button>
+    ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Loadout</button>' : ''}
     <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
-    <button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>
+    ${hideExclude ? '' : '<button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>'}
   `;
   const slider = document.getElementById('maxCopiesSlider');
   const valEl = document.getElementById('maxCopiesVal');
@@ -1653,28 +1723,42 @@ function renderPopoverFavorite(idx){
   const count = Math.max(1, existing.length || 1);
   while (existing.length < count) existing.push(100);
   chipPopoverEl.innerHTML = `
-    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name} - Favorite</div>
+    <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:8px;">${ARTIFACTS[idx].name} - Loadout</div>
     <label class="field" style="margin-bottom:8px;">
       <span class="lbl">How many do you own?</span>
-      <input type="number" min="1" max="20" id="favCount" value="${count}">
+      <div class="favcount-row">
+        <button type="button" class="favcount-btn" id="favCountDec">\u2212</button>
+        <input type="number" min="1" max="20" id="favCount" value="${count}">
+        <button type="button" class="favcount-btn" id="favCountInc">+</button>
+      </div>
     </label>
     <div id="favQualityRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
       ${existing.map((q,i)=>qualitySelectHtml(q,i)).join('')}
     </div>
     <button type="button" class="popover-btn" data-act="save-favorite">Save</button>
-    <button type="button" class="popover-btn" data-act="back">Back</button>
   `;
-  document.getElementById('favCount').addEventListener('input', e=>{
-    const n = Math.max(1, Math.min(20, parseInt(e.target.value) || 1));
+  const favCountInput = document.getElementById('favCount');
+  chipPopoverEl.querySelectorAll('select.fav-quality').forEach(initFavQualitySelect);
+  // Shared by typing in the field and by the +/- buttons, so quality-row sync/reposition
+  // logic only lives in one place.
+  function applyFavCount(n){
+    n = Math.max(1, Math.min(20, n || 1));
+    favCountInput.value = n;
     const rows = document.getElementById('favQualityRows');
     const current = rows.querySelectorAll('select.fav-quality').length;
     if (n > current){
-      for (let i = current; i < n; i++) rows.insertAdjacentHTML('beforeend', qualitySelectHtml(100, i));
+      for (let i = current; i < n; i++){
+        rows.insertAdjacentHTML('beforeend', qualitySelectHtml(100, i));
+        initFavQualitySelect(rows.lastElementChild);
+      }
     } else if (n < current){
       Array.from(rows.querySelectorAll('select.fav-quality')).slice(n).forEach(el => el.remove());
     }
-    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
-  });
+    if (popoverAnchorEl) repositionPopover();
+  }
+  favCountInput.addEventListener('input', ()=> applyFavCount(parseInt(favCountInput.value)));
+  document.getElementById('favCountDec').addEventListener('click', ()=> applyFavCount(parseInt(favCountInput.value || 1) - 1));
+  document.getElementById('favCountInc').addEventListener('click', ()=> applyFavCount(parseInt(favCountInput.value || 1) + 1));
 }
 function renderPopoverHeartAdd(idx){
   chipPopoverEl.innerHTML = `
@@ -1685,7 +1769,7 @@ function renderPopoverHeartAdd(idx){
         ${Object.entries(QUALITY_LABELS).map(([val,label])=>`<option value="${val}">${label} - ${val}%</option>`).join('')}
       </select>
     </label>
-    <button type="button" class="popover-btn" data-act="heart-add">Add to Favorites</button>
+    <button type="button" class="popover-btn" data-act="heart-add">Add to Loadout</button>
   `;
 }
 function renderPopoverRemoveUnit(idx, qi){
@@ -1727,6 +1811,16 @@ function updateAllLockStates(){
     l.classList.toggle('pinned', pinned);
   });
 }
+function updateOwnedPinState(idx){
+  ownedListEl.querySelectorAll(`.quality-pill[data-idx="${idx}"]`).forEach(p=>{
+    p.classList.toggle('pinned', PINNED.has(idx));
+  });
+}
+function updateAllOwnedPinStates(){
+  ownedListEl.querySelectorAll('.quality-pill[data-idx]').forEach(p=>{
+    p.classList.toggle('pinned', PINNED.has(parseInt(p.dataset.idx)));
+  });
+}
 function updateMaxCopiesBadge(idx){
   const cap = MAX_COPIES[ARTIFACTS[idx].name];
   artifactListEl.querySelectorAll(`.art-maxcap[data-idx="${idx}"]`).forEach(b=>{
@@ -1748,11 +1842,13 @@ chipPopoverEl.addEventListener('click', e=>{
                         // outside-click listener's contains() check doesn't fail
   const idx = popoverOpenIdx;
   if (idx == null) return;
+  popoverOpenedViaHover = false; // a real click means active use, not passive hover - stop the mouseout auto-close timer from firing mid-interaction
   const act = btn.dataset.act;
   if (act === 'toggle-pin'){
     if (PINNED.has(idx)) PINNED.delete(idx); else PINNED.add(idx);
     savePinnedNames();
     updateLockState(idx);
+    updateOwnedPinState(idx);
     closeChipPopover();
   } else if (act === 'exclude'){
     const input = artifactListEl.querySelector(`input[data-idx="${idx}"]`);
@@ -1761,10 +1857,7 @@ chipPopoverEl.addEventListener('click', e=>{
     closeChipPopover();
   } else if (act === 'favorite'){
     renderPopoverFavorite(idx);
-    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
-  } else if (act === 'back'){
-    renderPopoverMain(idx);
-    if (popoverAnchorEl) positionPopover(popoverAnchorEl);
+    repositionPopover();
   } else if (act === 'unfavorite'){
     delete OWNED[idx];
     saveOwned();
@@ -1798,11 +1891,13 @@ chipPopoverEl.addEventListener('click', e=>{
     closeChipPopover();
   }
 });
-function openChipPopover(anchorEl, idx){
+function openChipPopover(anchorEl, idx, hideExclude){
   popoverOpenIdx = idx;
   popoverAnchorEl = anchorEl;
   popoverOpenedViaHover = false;
-  renderPopoverMain(idx);
+  popoverHideExclude = !!hideExclude;
+  popoverBesidePanel = false;
+  renderPopoverMain(idx, popoverHideExclude);
   positionPopover(anchorEl);
   chipPopoverEl.classList.add('open');
 }
@@ -1841,6 +1936,7 @@ document.getElementById('artUnpinBtn').onclick = ()=>{
   PINNED.clear();
   savePinnedNames();
   updateAllLockStates();
+  updateAllOwnedPinStates();
 };
 document.getElementById('clearLoadoutBtn').onclick = ()=>{
   OWNED = {};
@@ -2027,6 +2123,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   PINNED.clear();
   savePinnedNames();
   updateAllLockStates();
+  updateAllOwnedPinStates();
   MAX_COPIES = {};
   saveMaxCopies();
   updateAllMaxCopiesBadges();
@@ -2155,11 +2252,8 @@ compareSelectEls.forEach(sel=>{
   });
 });
 
-/* ---------- Custom hoverable dropdown for Backpack/Container + Compare selects ----------
-   Native <option> can't show a rich hover tooltip, so this wraps the <select> with a custom
-   trigger+panel. The <select> stays intact (hidden) as source of truth - reads
-   populateContainerSelect's structure, writes back via .value + a dispatched 'change' event.
-   Uses a separate containerPopoverEl since chipPopoverEl's clicks are artefact-specific. */
+// Custom hover trigger+panel wrapping <select> (native <option> can't do rich tooltips).
+// <select> stays hidden as source of truth; separate popover from chipPopoverEl (artefact-specific).
 const containerPopoverEl = document.createElement('div');
 containerPopoverEl.className = 'artchip-popover container-popover';
 document.body.appendChild(containerPopoverEl);
@@ -2302,13 +2396,19 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
     triggerLabel.textContent = opt ? opt.textContent : '';
     trigger.style.color = (opt && opt.style.color) || '';
   }
+  // Only set for selects nested inside a collapsible Advanced section (e.g. armor
+  // select) - null for backpack/compare selects, which aren't wrapped in one.
+  const advInner = wrapper.closest('.advanced-inner');
   function closePanel(){
     panel.classList.remove('open');
+    if (advInner) advInner.classList.remove('dd-panel-open');
     document.removeEventListener('mousedown', onDocClick);
+    cancelContainerHoverClose(); // don't leave a pending timer outliving this panel
     closeContainerPopover();
   }
   function openPanel(){
     panel.classList.add('open');
+    if (advInner) advInner.classList.add('dd-panel-open');
     document.addEventListener('mousedown', onDocClick);
     searchInput.value = '';
     applyFilter('');
@@ -2337,6 +2437,11 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
     const idx = parseInt(row.dataset.value);
     if (isNaN(idx)) return; // "-- None --" rows (compare only) have no stats
     cancelContainerHoverClose();
+    // The `.open` check is load-bearing, NOT redundant: containerPopoverOpenIdx is a
+    // single global shared by all six enhanced dropdowns, and its index namespace differs
+    // (CONTAINERS[i] for five of them, ARMORS[i] for the armor select). Without the class
+    // check, a stale index from one namespace could suppress a render in the other.
+    // closePanel() nulls the index, which is the other half of what keeps this safe.
     if (containerPopoverOpenIdx === idx && containerPopoverEl.classList.contains('open')) return;
     renderFn(idx);
     positionContainerPopover(row, panel);
@@ -2351,7 +2456,7 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
   });
 }
 enhanceContainerSelect(backpackSelectEl);
-compareSelectEls.forEach(enhanceContainerSelect);
+compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
 
 /* ---------- My Builds: create / save / list / edit / delete + export / import ---------- */
 (function(){
@@ -2676,7 +2781,7 @@ compareSelectEls.forEach(enhanceContainerSelect);
   function importBuildsData(buildsArr){
     const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
     const artNames = new Set(ARTIFACTS.map(a => a.name));
-    const byName = {}; // later duplicate name wins, per file order
+    const byName = new Map(); // later duplicate name wins, per file order
     let skipped = 0;
     buildsArr.forEach(entry=>{
       const name = entry && typeof entry.name === 'string' ? entry.name.trim() : '';
@@ -2688,9 +2793,9 @@ compareSelectEls.forEach(enhanceContainerSelect);
       const slots = migrated.slots
         .filter(s => artNames.has(s.artifact) && validQ.has(s.quality))
         .slice(0, cap);
-      byName[name] = { name, container: containerObj.name, level: migrated.level, slots };
+      byName.set(name, { name, container: containerObj.name, level: migrated.level, slots });
     });
-    BUILDS = Object.values(byName);
+    BUILDS = [...byName.values()];
     saveBuilds();
     renderBuildsList();
     return skipped;
@@ -2757,7 +2862,7 @@ backpackSelectEl.addEventListener('change', ()=>{
   backpackSelectEl.style.color = CONTAINER_TIER_META[c.tier].color;
   updateBackpackBonusNote();
 });
-// Default container for load/Reset - if 'MBSS Backpack' is renamed in CONTAINERS, update this too.
+// If 'MBSS Backpack' is renamed in CONTAINERS, update here too.
 function selectDefaultContainer(){
   backpackSelectEl.value = CONTAINERS.findIndex(c => c.name === 'MBSS Backpack');
   backpackSelectEl.dispatchEvent(new Event('change'));
@@ -2775,6 +2880,16 @@ compareModeBtnEl.addEventListener('click', ()=>{
   if (on) document.getElementById('backpackBonusNote').style.display = 'none';
   else updateBackpackBonusNote(); // restore note to whatever it should show for the current selection
   document.getElementById('compareContainersBlock').style.display = on ? '' : 'none';
+});
+
+// Basic/Advanced mode toggle (session-only).
+document.querySelectorAll('.mode-toggle-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const advanced = btn.dataset.mode === 'advanced';
+    document.querySelectorAll('.mode-toggle-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    if (!advanced && compareModeBtnEl.classList.contains('active')) compareModeBtnEl.click();
+    document.body.classList.toggle('advanced-mode', advanced);
+  });
 });
 
 const ARMOR_BR_OVERRIDE = {
@@ -2904,9 +3019,7 @@ const armorSelectEl = document.getElementById('armorSelect');
   armorSelectEl.appendChild(group);
 });
 
-// Hover-popover for the armor dropdown - same visual structure as renderContainerPopover,
-// pulling from ARMORS instead of CONTAINERS. Shares containerPopoverEl/positioning/hover-close
-// machinery via enhanceContainerSelect's renderFn param.
+// Mirrors renderContainerPopover but reads ARMORS.
 function renderArmorPopover(idx){
   const a = ARMORS[idx];
   const meta = ARMOR_TIER_META[a.tier];
@@ -3019,16 +3132,7 @@ function buildPoolModeB(includeAdditional, effectiveness, level){
   return {poolVecs, poolMax, poolMeta};
 }
 
-/* ---------- Per-container search payload builder ----------
-   Builds the worker payload for a single search, parameterized by containerCfg =
-   {name, slots, protection, effectiveness, bonus}. Shared by normal single-search and
-   Compare-containers mode (one call per named CONTAINERS entry).
-
-   sharedCtx = fields that don't vary per container: targetStats, includedIdx,
-   includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx.
-
-   Returns {error} or {payload, meta}. Global validation (empty targetStats/pool/loadout)
-   happens once in the caller - see calcBtn.onclick and runComparisonSearch. */
+// Returns {error} or {payload, meta}. Global validation happens once in the caller.
 function buildContainerSearchPayload(containerCfg, sharedCtx){
   const { slots, protection, effectiveness, bonus } = containerCfg;
   const { targetStats, includedIdx, includeAdditional, level, quality,
@@ -3070,8 +3174,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     const totalUnits = poolMax.reduce((s,m)=>s+m, 0);
     if (totalUnits < slots){
       const msg = containerCfg.name
-        ? `Only ${totalUnits} favorited unit${totalUnits===1?'':'s'} - not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
-        : `You only own ${totalUnits} favorited artefact${totalUnits===1?'':'s'}, not enough to fill ${slots} slot${slots===1?'':'s'}. Favorite more or lower the slot count.`;
+        ? `Only ${totalUnits} unit${totalUnits===1?'':'s'} in your Loadout - not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
+        : `You only have ${totalUnits} artefact${totalUnits===1?'':'s'} in your Loadout, not enough to fill ${slots} slot${slots===1?'':'s'}. Add more to your Loadout or lower the slot count.`;
       return { error: msg };
     }
     // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum. Falls
@@ -3079,7 +3183,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     if (pinnedIdx.length > 0) {
       for (const pi of pinnedIdx) {
         if (!OWNED[pi] || OWNED[pi].length === 0) {
-          return { error: `Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Favorite it first, or unpin it.` };
+          return { error: `Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Add it to your Loadout first, or unpin it.` };
         }
       }
       for (const pi of pinnedIdx) {
@@ -3090,7 +3194,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
           }
         }
         if (bestLocalIdx === -1) {
-          return { error: `Not enough owned units of \u201c${ARTIFACTS[pi].name}\u201d to satisfy the pin. Favorite another copy, or unpin.` };
+          return { error: `Not enough owned units of \u201c${ARTIFACTS[pi].name}\u201d to satisfy the pin. Add another copy to your Loadout, or unpin.` };
         }
         for (let k = 0; k < NS; k++) lockedSum[k] += poolVecs[bestLocalIdx][k];
         poolMax[bestLocalIdx]--;
@@ -3159,16 +3263,19 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       return combinationCount(poolVecs.length - i, freeSlots - 1);
     };
     const numBins = Math.min(navigator.hardwareConcurrency || 4, 8);
+    // Precomputed: subtreeSize runs a DP (plus an array copy) for bounded pools, so
+    // calling it from inside the comparator repeats that work n log n times.
+    const sizes = poolVecs.map((_, i) => subtreeSize(i));
     const order = poolVecs.map((_, i) => i)
       .filter(i => poolMax[i] !== 0)
-      .sort((a, b) => subtreeSize(b) - subtreeSize(a));
+      .sort((a, b) => sizes[b] - sizes[a]);
     const binTotals = new Array(numBins).fill(0);
     bins = Array.from({length: numBins}, () => []);
     order.forEach(i => {
       let best = 0;
       for (let b = 1; b < numBins; b++) if (binTotals[b] < binTotals[best]) best = b;
       bins[best].push(i);
-      binTotals[best] += subtreeSize(i);
+      binTotals[best] += sizes[i];
     });
     bins = bins.filter(b => b.length > 0);
     // Empty pool (n===0): every bin ends up empty above. Still need exactly one worker to
@@ -3260,10 +3367,8 @@ self.onmessage = function(e){
   var sum = new Float64Array(activeIdx.length);
   if(d.lockedSum){ for(var k=0;k<activeIdx.length;k++) sum[k]=d.lockedSum[activeIdx[k]]; }
 
-  // merged: hard-cap and extended-cap checks share the same per-threshold eff
-  // computation, so compute both in one pass instead of two separate loops
-  // (passesExtended previously only ever ran on leaves that already failed
-  // the hard cap).
+  // Merged: hard-cap and extended-cap checks share the same per-threshold eff computation
+  // (previously two separate loops, extPasses only ran on leaves that already failed cap).
   function checkThresholds(){
     var passes=true, extPasses=true;
     for(var i=0;i<thresholds.length;i++){
@@ -3486,10 +3591,8 @@ self.onmessage = function(e){
     return true;
   }
 
-  // Reconstructs the full 34-stat line for a leaf's bucket entry: seeds from d.lockedSum
-  // (full-width, untouched), then adds VECS[i] once per repeat, i ascending, repeats
-  // consecutive - replicates today's exact incremental accumulation order so results stay
-  // bit-identical (not counts[i]*VECS[i][k] in one multiply).
+  // Seeds from d.lockedSum, adds VECS[i] once per repeat (i ascending, repeats consecutive)
+  // to match the incremental accumulation order - keeps results bit-identical.
   function fullSumSnapshot(){
     var full = new Float64Array(ns);
     if(d.lockedSum){ for(var fi=0; fi<ns; fi++) full[fi]=d.lockedSum[fi]; }
@@ -3569,8 +3672,9 @@ self.onmessage = function(e){
   function recurse(start,remaining){
     if(remaining===0){considerLeaf();return;}
     if(shouldPrune(start,remaining)){
-      // count the skipped subtree exactly, so checked/total stays honest
-      var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start),remaining):combinationCount(n-start,remaining);
+      // Count from remaining capacity, not original caps - items at index >= start
+      // may already be partly consumed by the current path (would overshoot total).
+      var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start).map(function(m,j){return m-counts[start+j];}),remaining):combinationCount(n-start,remaining);
       checked+=skipped;
       if(checked>=nextReport){
         self.postMessage({type:'progress',done:checked,total:total});
@@ -3594,12 +3698,10 @@ self.onmessage = function(e){
       counts[i]--;
     }
   }
-  // ---- Multi-worker split: this worker only explores subtrees started by its assigned
-  // top-level picks (d.assignedIndices, a partition of 0..n-1 computed by the main thread's
-  // bin-packing). Inlines recurse's own for(i=start;i<n;i++) loop body verbatim, restricted
-  // to the assigned indices - recurse/shouldPrune/considerLeaf/beats/beatsFallback above are
-  // otherwise untouched. All-pinned (topRemaining===0) has no top-level pick to loop over
-  // (today's recurse(0,0) is a single direct leaf), so it's handled directly.
+  // This worker only explores subtrees under its assigned top-level picks
+  // (d.assignedIndices, from the main thread's bin-packing). Inlines recurse's own
+  // for(i=start;i<n;i++) loop body, restricted to those indices. All-pinned
+  // (topRemaining===0) has no top-level pick to loop over, so handled directly.
   var topRemaining = d.slots-(d.lockedSlots||0);
   if(topRemaining===0){
     considerLeaf();
@@ -3626,13 +3728,10 @@ self.onmessage = function(e){
 `;
 
 /* ---------- Search ---------- */
-// Keep in sync with WORKER_SRC's own COVERAGE_EPS (isolated blob scope can't share it).
-// Also marks target pills with no real benefit in a coverage-fallback build.
+// Mirrors WORKER_SRC's COVERAGE_EPS - keep in sync. Also flags no-benefit pills in coverage-fallback builds.
 const COVERAGE_EPS = 0.006;
-// Keep in sync with WORKER_SRC's own beats()/beatsFallback() (isolated blob scope can't
-// share it) - third duplication, alongside COVERAGE_EPS and combinationCount/
-// boundedCombinationCount above. Used by runSplitSearch to merge each worker's
-// top/top_ext/topMinFallback/topCoverageFallback buckets back into single-thread order.
+// Mirrors WORKER_SRC's beats()/beatsFallback() (isolated blob scope) - keep in sync.
+// Used by runSplitSearch to merge worker buckets back into single-thread order.
 function beats(a,b){
   if(a.cov!==b.cov) return a.cov>b.cov;
   if(Math.abs(a.ts.h-b.ts.h)>1e-6) return a.ts.h>b.ts.h;
@@ -3846,7 +3945,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
     // Bar always spans 0 to 2x this stat's own cap, so the cap marker sits at a fixed 50%
     // regardless of whether cap is 0.5 (Radiation/Temp/Bio/Psy) or 1 (Frost).
-    const widthPct = Math.min(eff / (2 * cap), 1) * 100;
+    const widthPct = Math.max(0, Math.min(eff / (2 * cap), 1)) * 100;
     const markerPct = 50;
     gaugeCells.push(`<div style="padding:3px 0 5px;">
       <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
@@ -3926,7 +4025,12 @@ function equalizeGridCardChips(resultsEl){
   if (!gridEl) return;
   const cards = Array.from(gridEl.querySelectorAll('.result-card'));
   if (cards.length < 2) return;
-  const cols = getComputedStyle(gridEl).gridTemplateColumns.trim().split(/\s+/).length || 3;
+  // On a laid-out grid this resolves to used px values ("420px 420px 420px"). If the grid
+  // is unlaid-out or display:none it stays unresolved ("repeat(3, 1fr)"), which splits into
+  // 2 tokens and would silently group cards wrong - `.split()` never returns [], so a plain
+  // `|| 3` fallback can never fire. Only trust the count when every token is a real length.
+  const tracks = getComputedStyle(gridEl).gridTemplateColumns.trim().split(/\s+/);
+  const cols = tracks.every(t => /px$|fr$|%$/.test(t)) ? tracks.length : 3;
   // Step 1: pin every chip to the same height.
   // getBoundingClientRect forces a reflow so we read accurate natural heights first.
   const allChips = Array.from(gridEl.querySelectorAll('.loadout-chip'));
@@ -3999,9 +4103,7 @@ function wireCompareDetailsRealign(resultsEl){
 // Total cards shown in the main list - must match the worker's TOP_N.
 const RESULTS_DISPLAY_CAP = 10;
 
-// Shared by renderResults and renderComparisonResults - disables tiers above
-// lastSearchedMaxPriceTier (mirroring visiblePriceTiers itself, read directly).
-// Every tier button is independently toggled: "active" = currently shown.
+// Shared by renderResults and renderComparisonResults.
 function priceFilterGroupHtml(){
   let tierBtns = '';
   for (let t=1;t<=5;t++){
@@ -4349,7 +4451,7 @@ document.getElementById('calcBtn').onclick = async ()=>{
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
-      el.innerHTML = '<h2>Result</h2><div class="msg-error">Favorite at least one artefact first (click a chip on a result card \u2192 Favorite), or untick "Use My Loadout".</div>';
+      el.innerHTML = '<h2>Result</h2><div class="msg-error">Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".</div>';
       return;
     }
   }
@@ -4431,33 +4533,14 @@ document.getElementById('calcBtn').onclick = async ()=>{
   }
 };
 
-/* ---------- Compare-containers mode: sequential orchestration + rendering ----------
-   Sequential by design (keeps memory bounded to one pool/worker at a time). Each container
-   still gets its own stacked progress block (runComparisonSearch builds it, runOneWorker's
-   idx param updates it) so earlier containers' bars stay visible - "stacked" is a rendering
-   choice only, not parallel workers. */
-
-// Set while a compare-mode search is in flight; lets the Stop button (in calcBtn.onclick
-// above) resolve the pending promise with null instead of leaving it hanging.
+// Stop button resolves this with null instead of leaving the search promise hanging.
 let pendingWorkerResolve = null;
 
-// ---- 2.5: Shared worker-pool runner ----
-// Spawns one worker per bin in meta.bins (computed by buildContainerSearchPayload's
-// bin-packing - see 2.1), tracks aggregate progress across the pool, and on completion
-// merges each worker's top/top_ext/topMinFallback/topCoverageFallback buckets back into
-// the same order a single unsplit search would have produced (see mergeCompare below).
-// Used by both calcBtn.onclick's direct-search path and runOneWorker() (compare mode) -
-// one shared implementation instead of two copies; this converts calcBtn.onclick's
-// direct-search path to the same promise-based shape runOneWorker already used
-// (Step 2.5 - an intentional, request-driven change, not scope creep).
-//
-// opts.idx: '' for the plain, non-suffixed progress block IDs (progFill/progPct/progCount/
-// progStatus) calcBtn.onclick's direct search uses, or a number (0,1,2...) for compare
-// mode's stacked per-container blocks (progFill0/progPct0/...) - same suffix convention
-// runOneWorker already used.
-// Resolves with the merged {top,top_ext,top_fallback,top_coverage_fallback,
-// failedCoverageOnly} payload (same shape a single worker's 'done' message had), null if
-// Stop was pressed mid-search, or {__workerError} if a worker errored.
+// Shared by calcBtn.onclick and runOneWorker (compare mode) - one split-search runner
+// instead of two copies. opts.idx: '' for plain progFill/progPct/progCount/progStatus
+// ids, or 0/1/2... for compare mode's per-container progFill0/progPct0/... Resolves with
+// merged {top,top_ext,top_fallback,top_coverage_fallback,failedCoverageOnly}, null if
+// Stop was pressed, or {__workerError} on worker error.
 function runSplitSearch(payload, meta, opts){
   opts = opts || {};
   const idx = opts.idx !== undefined ? opts.idx : '';
@@ -4605,10 +4688,7 @@ function runSplitSearch(payload, meta, opts){
   });
 }
 
-// Thin wrapper around runSplitSearch, kept as its own function for compare mode's call
-// site/comment below. `idx` selects which stacked progress block
-// (#progFill{idx}/#progPct{idx}/#progCount{idx}/#progStatus{idx}, built by
-// runComparisonSearch) this call updates, so earlier containers' bars stay visible.
+// Thin wrapper around runSplitSearch - idx selects which stacked progress block to update.
 function runOneWorker(payload, meta, idx){
   return runSplitSearch(payload, meta, { idx });
 }
@@ -4674,7 +4754,7 @@ async function runComparisonSearch(){
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
-      el.innerHTML = '<h2>Result</h2><div class="msg-error">Favorite at least one artefact first (click a chip on a result card \u2192 Favorite), or untick "Use My Loadout".</div>';
+      el.innerHTML = '<h2>Result</h2><div class="msg-error">Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".</div>';
       return;
     }
   }
@@ -4700,9 +4780,8 @@ async function runComparisonSearch(){
       continue;
     }
 
-    // Append this container's own block below any earlier ones instead of overwriting
-    // them, so each container's progress bar stays on screen (frozen at 100%/DONE by
-    // runSplitSearch's mergeAndFinish()) once it completes. Color cycles by column position.
+    // Appends below earlier blocks rather than overwriting, so completed containers'
+    // bars stay visible (frozen at 100%/DONE by mergeAndFinish()).
     progWrap.insertAdjacentHTML('beforeend', `
       <div class="compare-prog-block compare-prog-color-${i % 3}" id="progBlock${i}">
         <p class="prog-tagline">Container ${i+1} of ${selects.length} - ${containerCfg.name}: checking <b>${built.meta.totalFmt}</b> possible combinations</p>
