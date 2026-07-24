@@ -121,7 +121,11 @@
     cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:left;
   }
   .container-dd-trigger:focus{outline:1px solid var(--accent-dim);}
-  .container-dd-caret{color:#8a8f97;font-size:10px;margin-left:8px;}
+  .container-dd-caret{
+    width:10px;height:6px;margin-left:8px;flex-shrink:0;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8f97'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:center;
+  }
   .container-dd-panel{
     position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
     background:var(--panel);border:1px solid var(--border);border-radius:4px;
@@ -621,7 +625,7 @@
         </div>
         <!-- Outside the row so it doesn't affect toggle/select height alignment -->
         <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
-        <div class="debuff-toggle-label" style="margin-top:14px;">Search these price ranges:</div>
+        <div class="debuff-toggle-label" style="margin-top:14px;">Price range:</div>
         <div class="price-range-slider-row">
           <input type="range" id="priceRangeSlider" min="1" max="5" step="1" value="5">
           <span class="price-range-slider-label" id="priceRangeSliderLabel"></span>
@@ -2326,7 +2330,6 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
   trigger.appendChild(triggerLabel);
   const caret = document.createElement('span');
   caret.className = 'container-dd-caret';
-  caret.textContent = '\u25BE';
   trigger.appendChild(caret);
   wrapper.appendChild(trigger);
 
@@ -4441,7 +4444,7 @@ document.getElementById('calcBtn').onclick = async ()=>{
   // Global validation: these three don't depend on which container is being searched
   // (mirrored below in runComparisonSearch - keep both in sync).
   if (targetStats.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to optimize.</div>';
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to search.</div>';
     return;
   }
   if (!useLoadout && includedIdx.length === 0){
@@ -4744,7 +4747,7 @@ async function runComparisonSearch(){
   // container is being searched, unlike the pin/loadout-capacity checks inside
   // buildContainerSearchPayload). Mirrored in calcBtn.onclick above - keep both in sync.
   if (targetStats.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to optimize.</div>';
+    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to search.</div>';
     return;
   }
   if (!useLoadout && includedIdx.length === 0){
