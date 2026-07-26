@@ -620,6 +620,18 @@
     box-shadow:inset 0 0 0 2px var(--panel-3);
   }
 
+  /* Threshold input seated inside the toggle box. It's a sibling of the button, not a
+     child - an <input> inside a <button> is invalid and would swallow the click - and is
+     overlaid on the button's reserved right padding. Being later in DOM order and
+     positioned, it paints above the button, so clicking it focuses the field instead of
+     toggling the gate. */
+  .eh-gate-row{position:relative;}
+  .eh-gate-row .loadout-toggle-btn{padding-right:70px;}
+  .eh-gate-row input.stat-min-input{
+    position:absolute;right:9px;top:50%;transform:translateY(-50%);
+    border-color:var(--accent-dim);
+  }
+
   /* ---------- modals + toasts (z-index above the popovers) ---------- */
   .modal-backdrop{
     position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;
@@ -1188,6 +1200,18 @@
           <button type="button" id="statClearBtn">clear</button>
         </div>
         <div class="check-list" id="statList"></div>
+        <!-- Standalone viability gate, not a searchable stat - deliberately outside #statList
+             so it can't be reached by the stat/tier/min queries that sweep that list. -->
+        <div class="advanced-wrap">
+          <div class="advanced-inner">
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+              <div class="eh-gate-row">
+                <button type="button" id="ehMinBtn" class="loadout-toggle-btn">Minimum EHP (experimental)</button>
+                <input type="text" inputmode="decimal" class="stat-min-input" id="ehMinInput" title="Reject builds below this Effective Health. Counts the selected armor and container, so an armor must be selected to search with it.">
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
 
@@ -1229,7 +1253,6 @@
           <button type="button" id="loadoutAddBtn" class="primary" style="width:auto;margin:0;padding:8px 16px;flex-shrink:0;">Add</button>
         </div>
 
-        <div class="advanced-wrap"><div class="advanced-inner">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:6px;">
           <span style="font-size:11px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">My Builds</span>
           <span style="display:flex;gap:10px;">
@@ -1289,7 +1312,6 @@
             <button type="button" id="buildSaveBtn" class="primary" style="flex:1;margin:0;">Save build</button>
           </div>
         </div>
-        </div></div>
 
       </div>
 
@@ -1739,6 +1761,17 @@ STAT_CATEGORIES.forEach((cat, ci)=>{
   cat.names.forEach(addStatItem);
 });
 
+/* Minimum Effective Health: a viability gate, not a scoring stat. It lives outside
+   #statList entirely, so it can never be picked up as a targetStat. Advanced-only in both
+   directions - the row is hidden by .advanced-wrap and readSharedSearchInputs re-checks the
+   mode before reading it, so a gate armed in Advanced can't keep filtering after a switch
+   to Basic. */
+const EH_MIN_DEFAULT = 500;
+const ehMinBtnEl = document.getElementById('ehMinBtn');
+const ehMinInputEl = document.getElementById('ehMinInput');
+ehMinInputEl.value = EH_MIN_DEFAULT;
+ehMinBtnEl.addEventListener('click', ()=>ehMinBtnEl.classList.toggle('active'));
+
 statListEl.addEventListener('click', e=>{
   const btn = e.target.closest('.tier-btn');
   if (!btn) return;
@@ -1829,7 +1862,8 @@ function setBuffToggle(id, on){
   el.dispatchEvent(new Event('change'));
 }
 
-// Filtered by name, never deleted from ARTIFACTS: index-keyed OWNED needs stable indices.
+// Filtered by name rather than deleted from ARTIFACTS, so every in-memory index-keyed
+// structure (OWNED, PINNED) stays valid for the session without a remap pass.
 const REMOVED_ARTIFACTS = new Set([
   "Snares"
 ]);
@@ -1880,26 +1914,44 @@ function loadPinnedNames(){
 function savePinnedNames(){
   try { localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(PINNED).map(i => ARTIFACTS[i].name))); } catch(e){}
 }
+// Stored name-keyed, held index-keyed in memory - same split as PINNED and MAX_COPIES.
+// Keys are resolved by name on load, so reordering or editing ARTIFACTS can no longer
+// reassign a user's units to a different artefact.
 function loadOwned(){
   try {
     const raw = localStorage.getItem(LS_OWNED);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    // Index-keyed, so an ARTIFACTS edit leaves dangling indices - drop them here rather
-    // than letting renderOwnedList() throw at top level. Mirrors importLoadoutFile.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const validQ = new Set(Object.keys(QUALITY_LABELS).map(Number));
+    const byName = {};
+    ARTIFACTS.forEach((a, i) => { byName[a.name] = i; });
     const out = {};
     Object.keys(parsed).forEach(k => {
-      const i = parseInt(k);
-      if (!ARTIFACTS[i] || !Array.isArray(parsed[k])) return;
+      // Name first; a bare numeric key is a pre-2026-07-26 save, read positionally this
+      // once and rewritten by name on the next save. Unresolvable keys are dropped rather
+      // than left to throw at top level, same as importLoadoutFile.
+      let i;
+      if (Object.prototype.hasOwnProperty.call(byName, k)) i = byName[k];
+      else if (/^\d+$/.test(k) && ARTIFACTS[+k]) i = +k;
+      else return;
+      if (!Array.isArray(parsed[k])) return;
       const qs = parsed[k].filter(q => validQ.has(q));
-      if (qs.length) out[i] = qs;
+      // concat, not assign: a legacy numeric key and a name key can land on the same index.
+      if (qs.length) out[i] = (out[i] || []).concat(qs);
     });
     return out;
   } catch(e){ return {}; }
 }
 function saveOwned(){
-  try { localStorage.setItem(LS_OWNED, JSON.stringify(OWNED)); } catch(e){}
+  try {
+    const out = {};
+    Object.keys(OWNED).forEach(i => {
+      const a = ARTIFACTS[i];
+      if (a && OWNED[i] && OWNED[i].length) out[a.name] = OWNED[i].slice();
+    });
+    localStorage.setItem(LS_OWNED, JSON.stringify(out));
+  } catch(e){}
 }
 function migrateBuildEntry(entry){
   const rawSlots = Array.isArray(entry.slots) ? entry.slots : [];
@@ -2454,6 +2506,11 @@ document.addEventListener('click', e=>{
 
 document.getElementById('statClearBtn').onclick = ()=>{
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
+  // Priorities go back to the Medium default too, so "clear" leaves the panel in the same
+  // state Reset does rather than keeping tiers from stats that are no longer selected.
+  statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
+  // Disarms like any other selection; the threshold value stays, same as the min inputs do.
+  ehMinBtnEl.classList.remove('active');
 };
 document.getElementById('artAllBtn').onclick = ()=>{
   artifactListEl.querySelectorAll('input').forEach(c=>{
@@ -2751,6 +2808,9 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
   statListEl.querySelectorAll('.stat-min-input').forEach(i=>i.value='');
+  // Outside #statList, so the .stat-min-input sweep above doesn't reach it.
+  ehMinBtnEl.classList.remove('active');
+  ehMinInputEl.value = EH_MIN_DEFAULT;
   // Restore DEFAULT_OFF, overwriting any saved customization.
   artifactListEl.querySelectorAll('input').forEach(c=>{
     c.checked = !DEFAULT_OFF.has(ARTIFACTS[parseInt(c.dataset.idx)].name);
@@ -3934,6 +3994,18 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   const workerMinStats = targetStats
     .filter(t=>t.min !== null)
     .map(t=>({idx: STAT_IDX[t.name], dir: STAT_META[t.name].good ? 1 : -1, min: t.min, statMax: statMaxMap[t.name]}));
+  /* Effective Health is derived (BR x Vitality), so it can't be a minStats entry keyed on a
+     sum index. The worker gets the constant part plus the two indices and recomputes it per
+     leaf. containerBaseVec seeds threshold stats only, so sum[brIdx]/sum[vitIdx] are
+     artefact-only and the container's own BR/Vitality bonus belongs here in base/vitBonus -
+     the same split computeEffectiveHealth uses. */
+  const ehGate = sharedCtx.ehMin == null ? null : {
+    min: sharedCtx.ehMin,
+    base: 100 + sharedCtx.ehArmorBR + (containerBonusMap['Bullet resistance'] || 0),
+    vitBonus: containerBonusMap['Vitality'] || 0,
+    brIdx: STAT_IDX['Bullet resistance'],
+    vitIdx: STAT_IDX['Vitality']
+  };
   const workerThresholds = THRESHOLD_STATS.map(s=>({
     idx: STAT_IDX[s],
     isFrost: s === 'Frost',
@@ -3948,7 +4020,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       protection, targetStats: workerTargetStats, thresholds: workerThresholds,
       minStats: workerMinStats, ns: NS, total, noDebuffIdx,
       lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length,
-      poolPriceTier, lockedPriceTierSum, lockedPriceMissing, priceCategoryAllowed
+      poolPriceTier, lockedPriceTierSum, lockedPriceMissing, priceCategoryAllowed, ehGate
     },
     meta: {
       poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
@@ -3981,6 +4053,7 @@ self.onmessage = function(e){
   var priceCategoryAllowed = d.priceCategoryAllowed || null;
   var priceTierSum = d.lockedPriceTierSum;
   var priceMissingCount = d.lockedPriceMissing ? 1 : 0;
+  var ehGate = d.ehGate || null;
   // keep in sync with main thread's COVERAGE_EPS (blob scope can't share it)
   var COVERAGE_EPS = 0.006;
 
@@ -4004,6 +4077,12 @@ self.onmessage = function(e){
     var oi=minStats[ai].idx;
     if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
   }
+  // sum only carries activeIdx entries, so the EH gate has to register its two stats
+  // whether or not the user targeted them.
+  if(ehGate){
+    if(idxMap[ehGate.brIdx]===undefined){ idxMap[ehGate.brIdx]=activeIdx.length; activeIdx.push(ehGate.brIdx); }
+    if(idxMap[ehGate.vitIdx]===undefined){ idxMap[ehGate.vitIdx]=activeIdx.length; activeIdx.push(ehGate.vitIdx); }
+  }
 
   var sum = new Float64Array(activeIdx.length);
   if(d.lockedSum){ for(var k=0;k<activeIdx.length;k++) sum[k]=d.lockedSum[activeIdx[k]]; }
@@ -4022,11 +4101,17 @@ self.onmessage = function(e){
     }
     return {passes:passes, extPasses:extPasses};
   }
+  // Mirrors the main thread's computeEffectiveHealth; armor and container BR/Vitality are
+  // already folded into ehGate.base/vitBonus.
+  function effectiveHealth(){
+    return (ehGate.base + sum[ehGate.brIdx]) * (1 + (sum[ehGate.vitIdx] + ehGate.vitBonus)/100);
+  }
   function passesMinStats(){
     for(var i=0;i<minStats.length;i++){
       var m=minStats[i];
       if(sum[m.idx]*m.dir < m.min - 1e-6) return false;
     }
+    if(ehGate && effectiveHealth() < ehGate.min - 1e-6) return false;
     return true;
   }
   function tierScores(){
@@ -4069,6 +4154,10 @@ self.onmessage = function(e){
         count++;
         crit += m.statMax>1e-12 ? val/m.statMax : 0;
       }
+    }
+    if(ehGate){
+      var eh=effectiveHealth();
+      if(eh < ehGate.min - 1e-6){ count++; crit += eh/ehGate.min; }
     }
     return {count:count, crit:crit};
   }
@@ -4153,6 +4242,19 @@ self.onmessage = function(e){
     for(var ndi2=0; ndi2<nND; ndi2++) suffixMinND[ndi2][k]=Math.min(soloNDRaw[ndi2][k],suffixMinND[ndi2][k+1]);
   }
 
+  // EH's bound needs per-item BR/Vitality maxima of its own: suffixMaxDirAdj only covers
+  // chosen target stats, and the gate works whether or not either stat was chosen.
+  // Built here, before the remap below, because it indexes full-width VECS like the rest.
+  var suffixMaxBR=null, suffixMaxVit=null;
+  if(ehGate){
+    suffixMaxBR=new Float64Array(n+1); suffixMaxVit=new Float64Array(n+1);
+    suffixMaxBR[n]=-Infinity; suffixMaxVit[n]=-Infinity;
+    for(var ek=n-1;ek>=0;ek--){
+      suffixMaxBR[ek]=Math.max(VECS[ek][ehGate.brIdx],suffixMaxBR[ek+1]);
+      suffixMaxVit[ek]=Math.max(VECS[ek][ehGate.vitIdx],suffixMaxVit[ek+1]);
+    }
+  }
+
   // map each minStat to its targetStats position, to reuse the 1d suffix arrays
   var minStatTargetPos = minStats.map(function(m){
     for(var mti=0; mti<nT; mti++){ if(targetStats[mti].idx===m.idx) return mti; }
@@ -4165,6 +4267,7 @@ self.onmessage = function(e){
   for(var ri=0; ri<targetStats.length; ri++) targetStats[ri].idx = idxMap[targetStats[ri].idx];
   for(var ri=0; ri<noDebuffIdx.length; ri++) noDebuffIdx[ri].idx = idxMap[noDebuffIdx[ri].idx];
   for(var ri=0; ri<minStats.length; ri++) minStats[ri].idx = idxMap[minStats[ri].idx];
+  if(ehGate){ ehGate.brIdx = idxMap[ehGate.brIdx]; ehGate.vitIdx = idxMap[ehGate.vitIdx]; }
 
   // prune only if every applicable bucket (top, top_ext, topMinFallback when in use) is
   // proven unreachable from this subtree
@@ -4190,7 +4293,9 @@ self.onmessage = function(e){
     // buckets below only prove anything once full
     if(top.length!==TOP_N) return false;
     if(top_ext.length!==TOP_EXT) return false;
-    if(minStats.length>0 && topMinFallback.length!==TOP_N) return false;
+    // ehGate feeds topMinFallback too, so an EH-only search still has to wait for that
+    // bucket to fill - keyed on minStats.length alone it would prune away better fallbacks.
+    if((minStats.length>0||ehGate) && topMinFallback.length!==TOP_N) return false;
     if(topCoverageFallback.length!==TOP_N) return false;
 
     // shared optimistic (cov,H,M,L) bound for top/top_ext/topMinFallback
@@ -4212,7 +4317,7 @@ self.onmessage = function(e){
     if(beats({cov:covBound,ts:tsBound},top_ext[top_ext.length-1])) return false;
     if(beats({cov:covBound,ts:tsBound},topCoverageFallback[topCoverageFallback.length-1])) return false;
 
-    if(minStats.length>0){
+    if(minStats.length>0||ehGate){
       var unmetCount=0, critBound=0;
       for(var mi=0; mi<minStats.length; mi++){
         var m=minStats[mi];
@@ -4221,6 +4326,21 @@ self.onmessage = function(e){
         if(bestCase<m.min-1e-6){
           unmetCount++;
           critBound+=m.statMax>1e-12?bestCase/m.statMax:0;
+        }
+      }
+      // Must be included, not skipped: crit only accumulates for UNMET entries and higher
+      // is better, so leaving EH out understates the bound and prunes subtrees that would
+      // have produced a better fallback.
+      if(ehGate){
+        var brBound=ehGate.base+sum[ehGate.brIdx]+remaining*suffixMaxBR[start];
+        var vitBound=1+(sum[ehGate.vitIdx]+ehGate.vitBonus+remaining*suffixMaxVit[start])/100;
+        // EH is monotone in both terms, so the product of independent maxima is an upper
+        // bound - but only while both factors are positive, or the sign flips. Unreachable
+        // in practice (base is 100 + armor), so the degenerate branch stays optimistic.
+        var bestEH=(brBound>0&&vitBound>0)?brBound*vitBound:Infinity;
+        if(bestEH<ehGate.min-1e-6){
+          unmetCount++;
+          critBound+=bestEH/ehGate.min;
         }
       }
       var fbound={unmetCount:unmetCount,crit:critBound,cov:covBound,ts:tsBound};
@@ -4408,17 +4528,23 @@ function fmt(name, val){
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}${pct}`;
 }
-// Threshold stats show the final effective value - only the figure vs the cap matters.
-// Non-threshold bonus is display-only, gated by its own toggle.
-function fmtWithBonus(name, totalVal, containerBonus, protection){
+// The single definition of "the number on the card". Threshold stats show the final
+// effective value - only the figure vs the cap matters - and fold the bonus in via
+// thresholdEffValue, which already expects it to be part of totalVal. Non-threshold bonus
+// is display-only, gated by its own toggle. Everything that prints, colours or ranks a
+// displayed stat goes through here, so the three can't drift apart.
+function displayValue(name, totalVal, containerBonus, protection){
   const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
   if (STAT_META[name].threshold){
-    return fmt(name, thresholdEffValue(totalVal, bonus, name, protection));
+    return thresholdEffValue(totalVal, bonus, name, protection);
   }
   const armorBonus = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[name] || 0) : 0;
   const containerPart = includeContainerBuffs ? bonus : 0;
-  if (!containerPart && !armorBonus) return fmt(name, totalVal);
-  return fmt(name, totalVal + containerPart + armorBonus);
+  if (!containerPart && !armorBonus) return totalVal;
+  return totalVal + containerPart + armorBonus;
+}
+function fmtWithBonus(name, totalVal, containerBonus, protection){
+  return fmt(name, displayValue(name, totalVal, containerBonus, protection));
 }
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
@@ -4426,36 +4552,53 @@ function isGoodValue(name, val){
 // Colors off the same merged total fmtWithBonus prints, not the raw artefact-only sum -
 // otherwise a stat that's a buff only via container/armor bonus would miscolor.
 function displayGoodValue(name, sumVal, containerBonus, protection){
-  const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
-  if (STAT_META[name].threshold){
-    return isGoodValue(name, thresholdEffValue(sumVal, bonus, name, protection));
-  }
-  const armorBonus = (selectedArmor && includeArmorBuffs) ? (selectedArmor.bonus[name] || 0) : 0;
-  const containerPart = includeContainerBuffs ? bonus : 0;
-  return isGoodValue(name, sumVal + containerPart + armorBonus);
+  return isGoodValue(name, displayValue(name, sumVal, containerBonus, protection));
 }
 // "Stat (min N), Stat2 (min N2) and Stat3 (min N3)" label for the min-threshold banners.
 function minCriteriaLabel(targetStats){
   const mins = targetStats
     .filter(t => t.min !== null && t.min !== undefined)
     .map(t => `${t.name} (min ${t.min}${PERCENT_STATS.has(t.name) ? '%' : ''})`);
+  // Not a targetStat, so it isn't in the list above; read from the last search's state.
+  if (lastSearchedEhMin !== null) mins.push(`Effective Health (min ${lastSearchedEhMin})`);
   if (mins.length === 0) return '';
   if (mins.length === 1) return mins[0];
   return mins.slice(0, -1).join(', ') + ' and ' + mins[mins.length - 1];
 }
+// How far behind the leader a card may sit and still count as a top stat, as a fraction of
+// the leader's magnitude. Direction-adjusted, so it reads the same for "lower is better"
+// stats. Measured against the leader rather than the spread of the visible list on purpose:
+// the spread moves when a Compare column is added or the price filter shrinks the list, so
+// a spread-relative bar would let unrelated cards change whether this one is highlighted.
+const TOP_STAT_MAX_GAP = 0.10;
+
 // Top 2 per target stat by that stat's beneficial direction, so "lower is better" stats
 // rank most-negative first. Ties at the 2nd-place cutoff are all included.
-function computeTopStatSets(results, targetStats){
+// Ranks on the DISPLAYED value, not the raw sum, so the highlight always marks the highest
+// number actually on screen. Matters in Compare Containers, where each column has its own
+// container bonus and protection: ranking on `sum` could highlight a card while a visibly
+// higher one beside it went unmarked. cardMeta[i] carries the {containerBonus, protection}
+// that card was rendered with - one shared pair in normal search, per-column when compared.
+function computeTopStatSets(results, targetStats, cardMeta){
   const topSets = {};
   targetStats.forEach(t=>{
     const dir = STAT_META[t.name].good ? 1 : -1;
     const idx = STAT_IDX[t.name];
-    const scored = results.map((r,i)=>({i, val: r.sum[idx]*dir}));
+    const scored = results.map((r,i)=>{
+      const m = cardMeta[i] || {};
+      return {i, val: displayValue(t.name, r.sum[idx], m.containerBonus, m.protection)*dir};
+    });
     scored.sort((a,b)=>b.val-a.val);
     const set = new Set();
     if (scored.length){
       const cutoff = scored[Math.min(1, scored.length-1)].val;
-      scored.forEach(s=>{ if (s.val >= cutoff - 1e-6) set.add(s.i); });
+      // The positional cutoff alone marks 2nd place however far behind it is. Gate it on
+      // proximity to the leader as well, so a runaway winner is highlighted on its own.
+      // Taking the higher of the two bars means both conditions have to hold; the leader
+      // always clears its own bar, so something is always highlighted.
+      const lead = scored[0].val;
+      const bar = Math.max(cutoff, lead - TOP_STAT_MAX_GAP * Math.abs(lead));
+      scored.forEach(s=>{ if (s.val >= bar - 1e-6) set.add(s.i); });
     }
     topSets[t.name] = set;
   });
@@ -4741,7 +4884,9 @@ function priceFilterGroupHtml(){
 
 function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel){
   lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel};
-  const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined);
+  // The EH gate populates topMinFallback the same way a per-stat min does, so it has to
+  // count here or an EH-only search would show an empty list instead of the closest builds.
+  const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined) || lastSearchedEhMin !== null;
 
   // Backfilled with min-stat fallbacks when fewer than RESULTS_DISPLAY_CAP meet every
   // minimum. The first metCount are labelled "meets thresholds", the rest "next best"
@@ -4796,7 +4941,10 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     }
     return;
   }
-  const topSets = topStatHighlightOn ? computeTopStatSets(displayResults, targetStats) : null;
+  // One container and one armor for the whole list, so every card shares the same pair.
+  const topSets = topStatHighlightOn
+    ? computeTopStatSets(displayResults, targetStats, displayResults.map(()=>({containerBonus, protection})))
+    : null;
 
   const viewToggleHtml = `<div class="results-view-toggle">
         <button type="button" class="view-btn${!gridView ? ' active' : ''}" data-view="list">List</button>
@@ -4886,6 +5034,9 @@ let ownedHighlightOn = true;    // user toggle: green-highlight owned chips (gat
 let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
 let visiblePriceTiers = new Set([1,2,3,4,5]); // shown price tiers; all on by default
 let lastSearchedMaxPriceTier = 5; // max tier the last search covered; disables higher filter buttons
+// EH threshold the last search ran with, or null. Same in-memory-only pattern as the line
+// above: it lets renderResults and minCriteriaLabel see the gate without a 12th positional arg.
+let lastSearchedEhMin = null;
 // Merges non-threshold container bonus into the displayed total. Display only: re-renders
 // cached results, never re-searches. Off by default, auto-on with compare-containers mode.
 let includeContainerBuffs = false;
@@ -5089,6 +5240,17 @@ function readSharedSearchInputs(){
   const useLoadout = document.getElementById('useLoadoutBtn').classList.contains('active');
   showOwnedHighlight = !useLoadout;
 
+  // Advanced-only by design: unlike every other Advanced control, this one does NOT keep
+  // silently applying its setting in Basic mode - a Basic user has no way to see or clear it.
+  const ehAdvanced = document.body.classList.contains('advanced-mode');
+  const ehRaw = ehMinInputEl.value.replace(',', '.');
+  const ehParsed = parseFloat(ehRaw);
+  const ehMin = (ehAdvanced && ehMinBtnEl.classList.contains('active') && ehRaw !== '' && !isNaN(ehParsed)) ? ehParsed : null;
+  // Armor is the only source big enough to reach a late-game threshold, so it counts
+  // unconditionally rather than behind the display toggle - see the guard below.
+  const ehArmorBR = selectedArmor ? armorEffectiveBR(selectedArmor) : 0;
+  lastSearchedEhMin = ehMin;
+
   const priceMaxTier = parseInt(document.getElementById('priceRangeSlider').value);
   const priceCategoryAllowed = priceMaxTier === 5
     ? null
@@ -5107,6 +5269,11 @@ function readSharedSearchInputs(){
   // pin/loadout-capacity checks inside buildContainerSearchPayload.
   if (targetStats.length === 0) return {error: 'Select at least one stat to search.'};
   if (!useLoadout && includedIdx.length === 0) return {error: 'Include at least one artefact.'};
+  // Artefacts alone top out far below a late-game threshold, so without an armor every
+  // build would fail the gate and the whole result list would be fallbacks.
+  if (ehMin !== null && !selectedArmor){
+    return {error: 'Select an armor to search with a minimum Effective Health - that range is not reachable from artefacts alone.'};
+  }
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
@@ -5114,7 +5281,7 @@ function readSharedSearchInputs(){
     }
   }
 
-  return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed }};
+  return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed, ehMin, ehArmorBR }};
 }
 
 // Maps a worker result's pool-local counts back to artefact indices, folding in the pinned
@@ -5497,7 +5664,11 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   // stat across ALL columns combined, so a card needs its global flatIdx resolved against
   // the complete list before any card is rendered.
   const flatResults = filteredColumnResults.flatMap(col => col.results || []);
-  const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats) : null;
+  // Parallel to flatResults, kept alongside rather than attached to the result objects,
+  // which are shared with col.results and the copy button.
+  const flatMeta = filteredColumnResults.flatMap(col =>
+    (col.results || []).map(()=>({ containerBonus: col.meta.containerBonusMap, protection: col.meta.protection })));
+  const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats, flatMeta) : null;
   let flatIdx = 0;
 
   // Row = same rank across all columns, computed once so every card in a row shares one
