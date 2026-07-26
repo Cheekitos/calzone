@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Artefact Loadout Calculator</title>
 <style>
-  /* Visual system: graphite housing, violet signal accent, warm = hazard.
-     Selectors match the markup the JS already emits - renames nothing. */
   :root{
     /* housing */
     --bg: #0A0E14;
@@ -22,17 +20,14 @@
     --text-dim: #A9B4C2;
     --muted: #778799;
 
-    /* signal: UI state only, never a game reading.
-       Chroma deliberately held around 40, well below a fully saturated violet,
-       so it reads as UI chrome rather than as another rarity colour. */
-    --accent: #9084C9;
-    --accent-hi: #A79CD8;
-    --accent-dim: #443C7E;
-    --accent-soft: rgba(144,132,201,0.14);
-    --accent-glow: rgba(144,132,201,0.35);
+    /* signal: the default theme, so it sits on bare :root with no [data-theme] block */
+    --accent: #AEBED8;
+    --accent-hi: #C9D4E6;
+    --accent-dim: #4C5668;
+    --accent-soft: rgba(174,190,216,0.12);
+    --accent-glow: rgba(174,190,216,0.28);
 
-    /* readings: warm = hazard, green = safe. Kept far from --accent
-       so a gauge never competes with UI chrome for attention. */
+    /* readings: warm = hazard, green = safe */
     --good: #46C97D;
     --good-bg: rgba(70,201,125,0.13);
     --bad: #F0565F;
@@ -40,12 +35,11 @@
     --warn: #E9A73C;
     --warn-bg: rgba(233,167,60,0.13);
 
-    /* Gauge fills only: --good at full strength reads as neon across a wide bar.
-       Yellow fills use --warn directly. */
+    /* gauge fills only; yellow fills use --warn directly */
     --gauge-good: #359463;
 
     /* second signal, used only on live progress instrumentation */
-    --live: #43D9E0;
+    --live: #7FB4FF;
 
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, "Roboto Mono", monospace;
     --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -63,33 +57,25 @@
     --q-legendary: #FFA800; --q-legendary-bg: rgba(255,168,0,0.16);
   }
   /* ---------- themes: accent family only ---------- */
+  /* was the default until 2026-07-26 */
+  :root[data-theme="violet"]{
+    --accent:#9084C9; --accent-hi:#A79CD8; --accent-dim:#443C7E;
+    --accent-soft:rgba(144,132,201,0.14); --accent-glow:rgba(144,132,201,0.35);
+    --live:#43D9E0;
+  }
   :root[data-theme="ice"]{
     --accent:#7FB4FF; --accent-hi:#A3CBFF; --accent-dim:#2F5B99;
     --accent-soft:rgba(127,180,255,0.14); --accent-glow:rgba(127,180,255,0.40);
     --live:#3FD9C6;
   }
-  /* Instrument-dial yellow. Pulled down in lightness and up in chroma versus a
-     washed-out pale yellow, so it reads as a definite colour instead of an
-     off-white, while staying ~29 deltaE clear of the caution amber. */
   :root[data-theme="lume"]{
     --accent:#DCCE78; --accent-hi:#E9DE9A; --accent-dim:#6B6124;
     --accent-soft:rgba(220,206,120,0.13); --accent-glow:rgba(220,206,120,0.32);
     --live:#7FB4FF;
   }
-  /* Pale sage. The hardest colour in the set to place: it has to clear both the
-     safe-reading green (--good) and the Uncommon rarity green. Low chroma and
-     high lightness put it ~35 and ~50 deltaE away respectively. */
   :root[data-theme="sage"]{
     --accent:#B4DCB0; --accent-hi:#CDE9CA; --accent-dim:#3F6A3C;
     --accent-soft:rgba(180,220,176,0.12); --accent-glow:rgba(180,220,176,0.30);
-    --live:#7FB4FF;
-  }
-  /* Muted cool grey. Measured by CIE76 distance: a dead-neutral grey lands only
-     ~10 from the Common rarity grey (#9E9E9E). A slight cool cast lifts that to
-     ~19 while a* stays at 0, so it still reads as grey rather than blue. */
-  :root[data-theme="grey"]{
-    --accent:#AEBED8; --accent-hi:#C9D4E6; --accent-dim:#4C5668;
-    --accent-soft:rgba(174,190,216,0.12); --accent-glow:rgba(174,190,216,0.28);
     --live:#7FB4FF;
   }
 
@@ -845,6 +831,15 @@
   .result-card summary:hover{color:var(--accent-hi);}
   .result-card details[open] summary{margin-bottom:10px;}
   .result-card details[open] summary::before{transform:rotate(90deg);}
+  /* <details> has no transitionable state of its own, so the body sits in a grid whose row
+     track animates 0fr <-> 1fr - the same trick .advanced-wrap uses. The inner wrapper's
+     overflow:hidden is what clips it; without it the track collapses but content overflows. */
+  .result-card .details-anim{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.26s ease;}
+  .result-card details[open] .details-anim{grid-template-rows:1fr;}
+  .result-card .details-anim-inner{overflow:hidden;min-width:0;min-height:0;}
+  @media (prefers-reduced-motion: reduce){
+    .result-card .details-anim{transition:none;}
+  }
 
   /* Two independent column stacks (see renderResultCard). */
   .details-cols{display:flex;gap:0 26px;margin-top:8px;}
@@ -928,14 +923,29 @@
   /* ---------- compare containers ---------- */
   /* Distinct from .results-grid-view above. Three columns is the point of this
      mode - the rank row compacts below rather than the grid stepping down. */
-  .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
-  @media(max-width:700px){.compare-grid{grid-template-columns:1fr;}}
+  /* grid-template-rows is set inline per render: `auto` for the header row, then one row
+     per rank. Columns subgrid onto those rows, so rank N is a single shared track across
+     all three columns and expanding any card moves every column below it as one block. */
+  .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);column-gap:16px;row-gap:10px;}
+  .compare-column{display:grid;grid-template-rows:subgrid;grid-row:1/-1;row-gap:10px;min-width:0;align-items:start;}
+  /* One column: shared tracks are meaningless and would stack all three columns on top of
+     each other, so fall back to plain block flow in DOM order. */
+  @media(max-width:700px){
+    .compare-grid{display:block;}
+    .compare-column{display:flex;flex-direction:column;gap:10px;}
+    .compare-column + .compare-column{margin-top:16px;}
+  }
+  /* Pre-subgrid engines: columns stay independent stacks. Ranks won't line up across
+     columns, but nothing overlaps and every card is still readable. */
+  @supports not (grid-template-rows: subgrid){
+    .compare-grid{align-items:start;}
+    .compare-column{display:flex;flex-direction:column;gap:10px;grid-row:auto;}
+  }
   /* Grid columns too narrow for side-by-side gauges/stats - stack instead. */
   .results-grid-view .details-cols,
   .compare-grid .details-cols{flex-direction:column;}
   .results-grid-view .details-col + .details-col,
   .compare-grid .details-col + .details-col{margin-top:12px;}
-  .compare-column{display:flex;flex-direction:column;gap:10px;min-width:0;}
   /* Inline `color:` carries the container's tier colour; currentColor ties the whole column to it. */
   .compare-col-header{
     font-family:var(--mono);font-size:12.5px;font-weight:700;
@@ -1045,7 +1055,7 @@
 (function(){
   try{
     var t = localStorage.getItem('artiCalc_theme');
-    if (typeof t === 'string' && /^(ice|lume|sage|grey)$/.test(t)){
+    if (typeof t === 'string' && /^(ice|lume|sage|violet)$/.test(t)){
       document.documentElement.setAttribute('data-theme', t);
     }
   }catch(e){}
@@ -1063,11 +1073,11 @@
       </div>
       <div class="theme-switch">
         <div class="theme-btns" id="themeBtns" role="group" aria-label="Colour theme">
-          <button type="button" class="theme-btn" data-theme="violet" title="Violet" aria-label="Violet theme" aria-pressed="true"><span class="theme-swatch"></span></button>
+          <button type="button" class="theme-btn" data-theme="violet" title="Violet" aria-label="Violet theme" aria-pressed="false"><span class="theme-swatch"></span></button>
           <button type="button" class="theme-btn" data-theme="ice" title="Ice blue" aria-label="Ice blue theme" aria-pressed="false"><span class="theme-swatch"></span></button>
           <button type="button" class="theme-btn" data-theme="lume" title="Pale yellow" aria-label="Pale yellow theme" aria-pressed="false"><span class="theme-swatch"></span></button>
           <button type="button" class="theme-btn" data-theme="sage" title="Pale green" aria-label="Pale green theme" aria-pressed="false"><span class="theme-swatch"></span></button>
-          <button type="button" class="theme-btn" data-theme="grey" title="Light grey" aria-label="Light grey theme" aria-pressed="false"><span class="theme-swatch"></span></button>
+          <button type="button" class="theme-btn" data-theme="grey" title="Light grey" aria-label="Light grey theme" aria-pressed="true"><span class="theme-swatch"></span></button>
         </div>
       </div>
     </div>
@@ -1693,7 +1703,6 @@ const STAT_CATEGORIES = [
   { label: 'Combat',  names: ["Bullet resistance","Vitality","Healing effectiveness","Health regeneration","Periodic healing","Laceration protection"] },
   { label: 'Misc',    names: ["Radiation","Radiation protection","Psyonics","Psy-emission protection","Biological infection","Bioinfection protection","Burning","Temperature","Thermal protection","Bleeding","Bleeding protection","Reaction to burns","Reaction to chemical burns","Reaction to electricity","Reaction to laceration","Resistance to chemicals","Resistance to electricity","Resistance to fire","Explosion protection","Frost","Stability","Recoil","Sway"] },
 ];
-const CATEGORIZED = new Set(STAT_CATEGORIES.flatMap(c => c.names));
 
 function addStatItem(name){
   const good = STAT_META[name].good;
@@ -2717,6 +2726,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   compareModeActive = false;
   compareBuildsActive = false;
   lastComparisonRenderArgs = null;
+  openDetailsState.clear();
   armorSelectEl.value = 'none';
   armorSelectEl.style.color = '';
   selectedArmor = null;
@@ -3849,7 +3859,9 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       const dir = STAT_META[t.name].good ? 1 : -1;
       return s + v[STAT_IDX[t.name]] * dir * t.weight;
     }, 0);
-    const order = poolVecs.map((_,i)=>i).sort((a,b) => soloScore(poolVecs[b]) - soloScore(poolVecs[a]));
+    // Precomputed: the comparator would otherwise re-score both operands on every compare.
+    const scores = poolVecs.map(soloScore);
+    const order = poolVecs.map((_,i)=>i).sort((a,b) => scores[b] - scores[a]);
     poolVecs = order.map(i=>poolVecs[i]);
     poolMax  = order.map(i=>poolMax[i]);
     poolMeta = order.map(i=>poolMeta[i]);
@@ -4486,7 +4498,7 @@ function sortChosenForDisplay(chosen){
   });
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats){
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats, cardScope){
   rowSharedStats = rowSharedStats || new Set();
   const {chosen, sum} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
@@ -4526,8 +4538,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
 
   html += '<div class="loadout-list">';
+  // Constant for the whole card; the select can't change mid-render.
+  const globalQuality = parseInt(document.getElementById('qualityInput').value) || 100;
   sortChosenForDisplay(chosen).forEach(c=>{
-    const effectiveQuality = c.quality != null ? c.quality : (parseInt(document.getElementById('qualityInput').value) || 100);
+    const effectiveQuality = c.quality != null ? c.quality : globalQuality;
     const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
     html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}"><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span></button>`;
   });
@@ -4549,7 +4563,16 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   });
   html += '</div>';
 
-  html += '<details' + (isTop ? ' open' : '') + '><summary>Damage thresholds &amp; full stat breakdown</summary>';
+  // Keyed on the build itself, not on rank, so a re-render that reorders or filters the list
+  // keeps each card's own open/closed state. protection separates identical builds appearing
+  // in two Compare Containers columns.
+  // cardScope separates Compare Containers columns: two containers can share protection and
+  // bonus stats and still return the same winning build, which would otherwise share a key
+  // and expand together.
+  const detailsKey = (isExtended ? 'x' : 'r') + '|' + (cardScope || '') + '|' +
+    chosen.map(c => c.idx + 'x' + c.count + (c.quality != null ? 'q' + c.quality : '')).sort().join(',');
+  const detailsOpen = openDetailsState.has(detailsKey) ? openDetailsState.get(detailsKey) : isTop;
+  html += '<details' + (detailsOpen ? ' open' : '') + ' data-dkey="' + detailsKey + '"><summary>Damage thresholds &amp; full stat breakdown</summary>';
 
   // Build gauge and stat cells as two independent column stacks (see below).
   const gaugeCells = [];
@@ -4604,10 +4627,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   const statCells = [...targetOrder, ...sharedOrder, ...restOrder].map(s => statCellsByName[s]);
 
   // Independent lists of different lengths: separate columns keep the border rhythm even.
-  let gridHtml = '<div class="details-cols">';
+  let gridHtml = '<div class="details-anim"><div class="details-anim-inner"><div class="details-cols">';
   gridHtml += '<div class="details-col">' + gaugeCells.join('') + '</div>';
   gridHtml += '<div class="details-col">' + statCells.join('') + '</div>';
-  gridHtml += '</div>';
+  gridHtml += '</div></div></div>';
   html += gridHtml;
 
   html += '</details></div>';
@@ -4679,35 +4702,26 @@ function equalizeCompareCardChips(resultsEl){
   // cards (or none), so skip any with no card at a given rank instead of assuming a full row.
   const columnCards = columns.map(col => Array.from(col.querySelectorAll('.result-card')));
   const maxRank = Math.max(...columnCards.map(cards => cards.length));
+  const ranks = [];
   for (let rank = 0; rank < maxRank; rank++){
     const cardsAtRank = columnCards.map(cards => cards[rank]).filter(Boolean);
-    if (cardsAtRank.length < 2) continue;
-
-    const chipDivs = cardsAtRank.map(c => c.querySelector('.loadout-list')).filter(Boolean);
-    const maxChipH = Math.max(...chipDivs.map(d => d.getBoundingClientRect().height));
-    chipDivs.forEach(d => { d.style.minHeight = maxChipH + 'px'; });
-
-    const targetLines = cardsAtRank.map(c => c.querySelector('.target-line')).filter(Boolean);
-    const maxTargetH = Math.max(...targetLines.map(d => d.getBoundingClientRect().height));
-    targetLines.forEach(d => { d.style.minHeight = maxTargetH + 'px'; });
-
-    // compare-grid columns are independent flex stacks with no shared row track, so row
-    // sizing is emulated with margin-bottom. Reset first, or re-runs measure prior padding.
-    cardsAtRank.forEach(c => { c.style.marginBottom = ''; });
-    const baseMargins = cardsAtRank.map(c => parseFloat(getComputedStyle(c).marginBottom) || 0);
-    const cardHeights = cardsAtRank.map(c => c.getBoundingClientRect().height);
-    const maxCardH = Math.max(...cardHeights);
-    cardsAtRank.forEach((c, i) => { c.style.marginBottom = (baseMargins[i] + maxCardH - cardHeights[i]) + 'px'; });
+    if (cardsAtRank.length < 2) continue; // nothing to align against
+    ranks.push({
+      cards: cardsAtRank,
+      chipDivs: cardsAtRank.map(c => c.querySelector('.loadout-list')).filter(Boolean),
+      targetLines: cardsAtRank.map(c => c.querySelector('.target-line')).filter(Boolean)
+    });
   }
-}
 
-// Re-realigns on <details> toggle (native, not render-driven); event doesn't bubble
-// so each <details> needs its own listener, no delegating from the grid.
-function wireCompareDetailsRealign(resultsEl){
-  const gridEl = resultsEl.querySelector('.compare-grid');
-  if (!gridEl) return;
-  gridEl.querySelectorAll('.result-card details').forEach(d=>{
-    d.addEventListener('toggle', ()=> equalizeCompareCardChips(resultsEl));
+  // Card heights are the grid's problem now, not ours. All that's left is lining up the
+  // sections inside a rank so the stat pills sit on the same line: reads first, then writes,
+  // one layout flush for the lot. Chip rows and target lines are siblings, so neither
+  // resize affects the other's measurement.
+  const chipMax = ranks.map(r => Math.max(...r.chipDivs.map(d => d.getBoundingClientRect().height)));
+  const targetMax = ranks.map(r => Math.max(...r.targetLines.map(d => d.getBoundingClientRect().height)));
+  ranks.forEach((r, i) => {
+    r.chipDivs.forEach(d => { d.style.minHeight = chipMax[i] + 'px'; });
+    r.targetLines.forEach(d => { d.style.minHeight = targetMax[i] + 'px'; });
   });
 }
 
@@ -4879,6 +4893,64 @@ let includeContainerBuffs = false;
 // affecting Effective Health. Off by default, auto-on when an armor is picked.
 let includeArmorBuffs = false;
 let showConsumableZone = false; // user toggle: shows/hides the already-computed consumable zone
+// Per-build open/closed state for the result-card disclosures, keyed by data-dkey. Survives
+// every display-only re-render (buff toggles, price filter, Owned/Top stats, List/Grid);
+// cleared when a new search starts and by Reset All.
+const openDetailsState = new Map();
+
+// <details> can't animate on its own: removing `open` stops the content rendering instantly,
+// so the collapse never gets a chance to play. The summary click is intercepted and the
+// attribute removed only once the track has finished animating shut.
+function setDetailsOpen(details, open){
+  const key = details.dataset.dkey;
+  if (key) openDetailsState.set(key, open);
+  const anim = details.querySelector('.details-anim');
+  const done = ()=>{
+    if (!open) details.open = false;   // order matters: clearing the inline value first
+    if (anim) anim.style.gridTemplateRows = '';  // would snap back to 1fr for one frame
+    details.dispatchEvent(new CustomEvent('details-animated', {bubbles:true}));
+  };
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!anim || reduced){
+    details.open = open;
+    done();
+    return;
+  }
+  if (details.__animCleanup) details.__animCleanup();
+  if (open) details.open = true;       // content has to render before it can be measured
+
+  // Nothing else needs syncing: in Compare Containers the rank is a real grid row, so the
+  // browser carries every column below it along with this card as the track resizes.
+  anim.style.gridTemplateRows = open ? '0fr' : '1fr';
+  anim.getBoundingClientRect();        // forces the start value to be committed
+  anim.style.gridTemplateRows = open ? '1fr' : '0fr';
+  // .gauge-fill transitions width inside this subtree and those events bubble here, so the
+  // handler has to check both target and property.
+  const onEnd = e=>{
+    if (e.target !== anim || e.propertyName !== 'grid-template-rows') return;
+    details.__animCleanup();
+    done();
+  };
+  const timer = setTimeout(()=>{ details.__animCleanup(); done(); }, 500); // transitionend can be skipped entirely
+  details.__animCleanup = ()=>{
+    clearTimeout(timer);
+    anim.removeEventListener('transitionend', onEnd);
+    details.__animCleanup = null;
+  };
+  anim.addEventListener('transitionend', onEnd);
+}
+
+// Delegated: result cards are replaced wholesale on every render, so per-card wiring would
+// have to be redone each time.
+document.addEventListener('click', e=>{
+  const summary = e.target.closest && e.target.closest('.result-card details > summary');
+  if (!summary) return;
+  const details = summary.parentElement;
+  if (!details.querySelector('.details-anim')) return; // no wrapper: leave native behaviour alone
+  e.preventDefault();
+  setDetailsOpen(details, !details.open);
+});
+
 let lastRenderArgs = null;      // cached for view-toggle re-render without re-searching
 // {columnResults, flatResults, targetStats} - columnResults lets the container-bonus toggle
 // live-redraw the compare grid; flatResults is for the copy button in compare mode.
@@ -4991,27 +5063,11 @@ document.getElementById('results').addEventListener('click', async e=>{
   }
 });
 
-document.getElementById('calcBtn').onclick = async ()=>{
-  if (activeWorkers.length){
-    activeWorkers.forEach(w=>w.terminate());
-    activeWorkers = [];
-    // If a compare-mode search is mid-container, its runOneWorker() promise awaits this
-    // resolve - fire null so the loop aborts instead of hanging (terminate() fires no event).
-    if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
-    const btn = document.getElementById('calcBtn');
-    btn.classList.remove('stop-mode');
-    btn.textContent = 'Find best combination';
-    document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Search stopped.</div>';
-    return;
-  }
-
-  if (document.getElementById('compareModeBtn').classList.contains('active')){
-    runComparisonSearch();
-    return;
-  }
-
-  const selectedContainer = CONTAINERS[parseInt(backpackSelectEl.value)];
-  const { slots, protection, effectiveness } = selectedContainer;
+/* Search fields that don't vary by container, read once per search click. Both search
+   paths (single and Compare Containers) call this, so the reads, the three global
+   validations and the showOwnedHighlight/price-tier writes can't drift apart.
+   Returns {error} or {sharedCtx}; side effects happen before validation, as before. */
+function readSharedSearchInputs(){
   const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
   const quality = parseInt(document.getElementById('qualityInput').value) || 100;
 
@@ -5047,30 +5103,72 @@ document.getElementById('calcBtn').onclick = async ()=>{
     pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
   }
 
-  const el = document.getElementById('results');
-  const btn = document.getElementById('calcBtn');
-
-  // Global validation: these three don't depend on which container is being searched
-  // (mirrored below in runComparisonSearch - keep both in sync).
-  if (targetStats.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to search.</div>';
-    return;
-  }
-  if (!useLoadout && includedIdx.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
-    return;
-  }
+  // These three don't depend on which container is being searched, unlike the
+  // pin/loadout-capacity checks inside buildContainerSearchPayload.
+  if (targetStats.length === 0) return {error: 'Select at least one stat to search.'};
+  if (!useLoadout && includedIdx.length === 0) return {error: 'Include at least one artefact.'};
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
-      el.innerHTML = '<h2>Result</h2><div class="msg-error">Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".</div>';
-      return;
+      return {error: 'Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".'};
     }
   }
 
+  return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed }};
+}
+
+// Maps a worker result's pool-local counts back to artefact indices, folding in the pinned
+// copies that never entered the pool. Built once per container, used for every bucket.
+function makeMergeChosen(meta, useLoadout){
+  const pinnedMerge = [];
+  const pc = {};
+  meta.pinnedIdx.forEach(pi => { pc[pi] = (pc[pi]||0) + 1; });
+  Object.entries(pc).forEach(([pi,cnt]) => pinnedMerge.push({idx:+pi, count:cnt, quality: useLoadout ? (meta.pinnedQuality[+pi] ?? null) : null}));
+  return function(best){
+    const chosen = [];
+    best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: meta.poolMeta[localI].artifactIdx, count: c, quality: meta.poolMeta[localI].quality}); });
+    pinnedMerge.forEach(p => {
+      const ex = chosen.find(c => c.idx === p.idx);
+      if (ex) ex.count += p.count; else chosen.push({idx:p.idx, count:p.count, quality:p.quality});
+    });
+    return chosen;
+  };
+}
+
+document.getElementById('calcBtn').onclick = async ()=>{
+  if (activeWorkers.length){
+    activeWorkers.forEach(w=>w.terminate());
+    activeWorkers = [];
+    // If a compare-mode search is mid-container, its runOneWorker() promise awaits this
+    // resolve - fire null so the loop aborts instead of hanging (terminate() fires no event).
+    if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
+    const btn = document.getElementById('calcBtn');
+    btn.classList.remove('stop-mode');
+    btn.textContent = 'Find best combination';
+    document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Search stopped.</div>';
+    return;
+  }
+
+  if (document.getElementById('compareModeBtn').classList.contains('active')){
+    runComparisonSearch();
+    return;
+  }
+
+  const selectedContainer = CONTAINERS[parseInt(backpackSelectEl.value)];
+  const { slots, protection, effectiveness } = selectedContainer;
+
+  const el = document.getElementById('results');
+  const btn = document.getElementById('calcBtn');
+
+  const read = readSharedSearchInputs();
+  if (read.error){
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${read.error}</div>`;
+    return;
+  }
   // Built from a containerCfg + sharedCtx pair via buildContainerSearchPayload - the same
   // function Compare-containers mode calls once per container.
-  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed };
+  const sharedCtx = read.sharedCtx;
+  const { targetStats, level, quality, useLoadout, pinnedIdx } = sharedCtx;
   const containerCfg = { name: selectedContainer.name, slots, protection, effectiveness, bonus: getEffectiveContainerBonus() };
   const built = buildContainerSearchPayload(containerCfg, sharedCtx);
   if (built.error){
@@ -5078,13 +5176,14 @@ document.getElementById('calcBtn').onclick = async ()=>{
     return;
   }
   const { payload, meta } = built;
-  const { poolMeta, pinnedQuality, containerBonusMap, containerBaseVec, totalFmt } = meta;
+  const { containerBonusMap, totalFmt } = meta;
 
   if (activeWorkers.length){ activeWorkers.forEach(w=>w.terminate()); activeWorkers = []; }
   document.getElementById('consumableZone').innerHTML = '';
 
   btn.classList.add('stop-mode');
   btn.textContent = 'STOP';
+  openDetailsState.clear(); // new results: back to every card collapsed
   el.innerHTML = `
     <h2>Scanning</h2>
     <p class="prog-tagline">checking <b>${totalFmt}</b> possible combinations</p>
@@ -5121,21 +5220,7 @@ document.getElementById('calcBtn').onclick = async ()=>{
       btn.textContent = 'Find best combination';
 
       // Build the pinned-artefact base once and merge it into every worker result.
-      const pinnedMerge = [];
-      {
-        const pc = {};
-        pinnedIdx.forEach(pi => { pc[pi] = (pc[pi]||0) + 1; });
-        Object.entries(pc).forEach(([pi,cnt]) => pinnedMerge.push({idx:+pi, count:cnt, quality: useLoadout ? (pinnedQuality[+pi] ?? null) : null}));
-      }
-      function mergeChosen(best){
-        const chosen = [];
-        best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: poolMeta[localI].artifactIdx, count: c, quality: poolMeta[localI].quality}); });
-        pinnedMerge.forEach(pc => {
-          const ex = chosen.find(c => c.idx === pc.idx);
-          if (ex) ex.count += pc.count; else chosen.push({idx:pc.idx, count:pc.count, quality:pc.quality});
-        });
-        return chosen;
-      }
+      const mergeChosen = makeMergeChosen(meta, useLoadout);
       const results = data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
@@ -5315,64 +5400,23 @@ async function runComparisonSearch(){
     return;
   }
 
-  const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
-  const quality = parseInt(document.getElementById('qualityInput').value) || 100;
-  const targetStats = Array.from(statListEl.querySelectorAll('input[data-stat]:checked')).map(chk=>{
-    const item = chk.closest('.check-item');
-    const activeBtn = item.querySelector('.tier-btn.active');
-    const tier = activeBtn ? activeBtn.dataset.tier : 'med';
-    const weight = tier === 'high' ? 3 : tier === 'low' ? 1 : 2;
-    const minInput = item.querySelector('.stat-min-input');
-    const min = minInput && minInput.value !== '' ? parseFloat(minInput.value.replace(',', '.')) : null;
-    return {name: chk.dataset.stat, weight, tier, min: (min !== null && !isNaN(min)) ? min : null};
-  });
-  const includedIdx = Array.from(artifactListEl.querySelectorAll('input:checked')).map(c=>parseInt(c.dataset.idx));
-  const includeAdditional = document.getElementById('includeAdditionalChk').checked;
-  const noDebuffIdx = NO_DEBUFF_FILTERS
-    .filter(f=>document.getElementById(f.btn).classList.contains('active'))
-    .map(f=>({idx: STAT_IDX[f.stat], dir: STAT_META[f.stat].good ? 1 : -1}));
-  const useLoadout = document.getElementById('useLoadoutBtn').classList.contains('active');
-  showOwnedHighlight = !useLoadout;
-
-  const priceMaxTier = parseInt(document.getElementById('priceRangeSlider').value);
-  const priceCategoryAllowed = priceMaxTier === 5
-    ? null
-    : [1,2,3,4,5].map(cat => cat <= priceMaxTier);
-  lastSearchedMaxPriceTier = priceMaxTier;
-  if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4,5]);
-
-  const pinnedIdx = Array.from(PINNED);
-  if (!useLoadout) {
-    pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
-  }
-
-  // Validated once, not per container, unlike the pin/loadout-capacity checks inside
-  // buildContainerSearchPayload. Mirrors calcBtn.onclick above - keep both in sync.
-  if (targetStats.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Select at least one stat to search.</div>';
+  const read = readSharedSearchInputs();
+  if (read.error){
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${read.error}</div>`;
     return;
-  }
-  if (!useLoadout && includedIdx.length === 0){
-    el.innerHTML = '<h2>Result</h2><div class="msg-error">Include at least one artefact.</div>';
-    return;
-  }
-  if (useLoadout){
-    const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
-    if (totalOwnedUnits === 0){
-      el.innerHTML = '<h2>Result</h2><div class="msg-error">Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".</div>';
-      return;
-    }
   }
 
   document.getElementById('consumableZone').innerHTML = '';
 
-  const sharedCtx = { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed };
+  const sharedCtx = read.sharedCtx;
+  const { targetStats, level, quality, useLoadout } = sharedCtx;
 
   btn.classList.add('stop-mode');
   btn.textContent = 'STOP';
 
   const columnResults = [];
 
+  openDetailsState.clear(); // new results: back to every card collapsed
   el.innerHTML = '<h2>Scanning</h2><div id="compareProgWrap"></div>';
   const progWrap = document.getElementById('compareProgWrap');
 
@@ -5417,21 +5461,7 @@ async function runComparisonSearch(){
       continue;
     }
 
-    const pinnedMerge = [];
-    {
-      const pc = {};
-      built.meta.pinnedIdx.forEach(pi => { pc[pi] = (pc[pi]||0) + 1; });
-      Object.entries(pc).forEach(([pi,cnt]) => pinnedMerge.push({idx:+pi, count:cnt, quality: useLoadout ? (built.meta.pinnedQuality[+pi] ?? null) : null}));
-    }
-    const mergeChosen = (best) => {
-      const chosen = [];
-      best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: built.meta.poolMeta[localI].artifactIdx, count: c, quality: built.meta.poolMeta[localI].quality}); });
-      pinnedMerge.forEach(pc => {
-        const ex = chosen.find(c => c.idx === pc.idx);
-        if (ex) ex.count += pc.count; else chosen.push({idx:pc.idx, count:pc.count, quality:pc.quality});
-      });
-      return chosen;
-    };
+    const mergeChosen = makeMergeChosen(built.meta, useLoadout);
     // Compare mode shows the plain top-5 only, no Extended or fallback variants.
     const top5 = (data.top || []).slice(0, 5).map(best => ({
       chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts
@@ -5503,7 +5533,8 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
     col.results.forEach((r, i) => {
       cardsHtml += renderResultCard(
         r, targetStats, col.meta.protection, i + 1, false,
-        topSets, flatIdx, false, null, null, col.meta.containerBonusMap, rowSharedByRank[i]
+        topSets, flatIdx, false, null, null, col.meta.containerBonusMap, rowSharedByRank[i],
+        'c' + colI
       );
       flatIdx++;
     });
@@ -5524,9 +5555,9 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
 
   const resultsEl = document.getElementById('results');
   resultsEl.innerHTML =
-    `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${priceFilterHtml}${hlToggleHtml}</div></div><div class="compare-grid">${columnsHtml}</div>`;
+    `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${priceFilterHtml}${hlToggleHtml}</div></div>` +
+    `<div class="compare-grid" style="grid-template-rows:auto${maxRank > 0 ? ` repeat(${maxRank},auto)` : ''};">${columnsHtml}</div>`;
   equalizeCompareCardChips(resultsEl);
-  wireCompareDetailsRealign(resultsEl);
 
   lastComparisonRenderArgs = { columnResults, filteredColumnResults, flatResults, targetStats, level, quality };
 
@@ -5845,7 +5876,7 @@ document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
 
 <script>
 /* Theme, part 2 of 2: wires the switcher. Kept out of the main script block on purpose.
-   Violet is the default, represented by the absence of the attribute. */
+   Light grey is the default, represented by the absence of the attribute. */
 (function(){
   var VALID = ['violet','ice','lume','sage','grey'];
   var group = document.getElementById('themeBtns');
@@ -5853,8 +5884,8 @@ document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
   var btns = Array.prototype.slice.call(group.querySelectorAll('.theme-btn'));
 
   function apply(name, persist){
-    if (VALID.indexOf(name) === -1) name = 'violet';
-    if (name === 'violet') document.documentElement.removeAttribute('data-theme');
+    if (VALID.indexOf(name) === -1) name = 'grey';
+    if (name === 'grey') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', name);
     btns.forEach(function(b){
       b.setAttribute('aria-pressed', b.dataset.theme === name ? 'true' : 'false');
@@ -5869,7 +5900,7 @@ document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
   });
 
   // Sync the pressed state with whatever part 1 already applied.
-  apply(document.documentElement.getAttribute('data-theme') || 'violet', false);
+  apply(document.documentElement.getAttribute('data-theme') || 'grey', false);
 })();
 </script>
 </body>
