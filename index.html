@@ -142,9 +142,8 @@
     display:flex;gap:4px;padding:4px;border-radius:99px;
     background:var(--panel);border:1px solid var(--border);
   }
-  /* Even geometry (26px / 14px): an odd dot size lands the ring gap on a half
-     pixel and reads off-centre at 1x. Ring is inset box-shadow, not a border, so
-     it stays concentric and out of layout. */
+  /* Even sizes (26/14): an odd dot lands the ring gap on a half pixel. Ring is
+     inset box-shadow, not a border, so it stays concentric and out of layout. */
   .theme-btn{
     width:26px;height:26px;padding:0;border-radius:50%;cursor:pointer;
     background:none;border:none;
@@ -218,8 +217,7 @@
     transition:background 0.16s ease,color 0.16s ease,box-shadow 0.16s ease;
   }
   .mode-toggle-btn:hover{color:var(--text-dim);background:rgba(255,255,255,0.03);}
-  /* Ring + tint, not a solid fill: it sits under the primary Find button and a
-     filled segment read as a second call to action. */
+  /* Ring + tint, not a fill: sits under Find, and a filled segment reads as a second CTA. */
   .mode-toggle-btn.active{
     background:var(--accent-soft);
     color:var(--accent-hi);
@@ -354,6 +352,14 @@
     background:var(--accent-soft);border-color:var(--accent-dim);
   }
   .check-item.used-highlight:hover{background:rgba(143,123,255,0.2);}
+  /* NOT .used-highlight: that class is wiped on every highlightUsedArtifacts() call.
+     Ring, not fill, so both can show on one row. */
+  .check-item.search-hit{
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent-soft),0 0 10px var(--accent-glow);
+  }
+  .art-search-wrap{margin-bottom:9px;}
+  .art-search-wrap input{padding:7px 10px;font-size:12.5px;}
   .artifact-used-hdr{
     font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);
     font-family:var(--mono);
@@ -385,8 +391,7 @@
     box-shadow:inset 0 0 0 1px var(--accent);
   }
   .tier-btn.active:hover{color:var(--accent-hi);background:var(--accent-soft);}
-  /* Height pinned to .tier-group next to it - re-measure if the tier buttons'
-     font-size or padding changes. */
+  /* Height pinned to .tier-group - re-measure if tier button font-size/padding changes. */
   input.stat-min-input{
     width:52px;background:var(--panel-3);border:1px solid var(--border-soft);
     color:var(--text);padding:0 5px;border-radius:5px;font-family:var(--mono);
@@ -443,9 +448,8 @@
   .hl-toggle-btn.active.toggle-owned{border-color:var(--good);background:var(--good-bg);color:var(--good);}
   .hl-toggle-btn.active.toggle-topstat{border-color:var(--warn);background:var(--warn-bg);color:var(--warn);}
 
-  /* .loadout-action-btn takes its colour from an inline style in the markup; the
-     rest set theirs below. Border and hover fill follow currentColor, so each is
-     tinted by its own text colour. */
+  /* .loadout-action-btn's colour comes from inline style in the markup; border and
+     hover fill follow currentColor. */
   .loadout-action-btn,#statClearBtn,#artAllBtn,#artNoneBtn,#artUnpinBtn{
     background:var(--panel-2);
     border:1px solid color-mix(in srgb, currentColor 38%, transparent);
@@ -474,8 +478,7 @@
     font-family:var(--mono);letter-spacing:0.15em;text-transform:uppercase;
   }
   .debuff-toggle-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:4px;}
-  /* Tinted segment + accent ring, like the LVL and H/M/L controls. In a grid, not a
-     shared track, so each keeps its own resting face and border. */
+  /* Grid, not a shared track, so each keeps its own resting face and border. */
   .debuff-toggle-btn{
     background:var(--panel-2);border:1px solid var(--border-soft);color:var(--muted);
     font-size:10.5px;cursor:pointer;padding:7px 4px;border-radius:var(--r-sm);
@@ -595,8 +598,7 @@
   button.quality-pill.active{box-shadow:0 0 0 1px currentColor;filter:brightness(1.25);}
   .owned-pills .quality-pill.pinned{outline:1px solid var(--q-legendary);outline-offset:2px;}
 
-  /* Sibling-less, so the muted off-state reads as a label: hence the checkbox-style
-     indicator and stronger resting border. */
+  /* Sibling-less, so the muted off-state needs the checkbox cue to read as a control. */
   .loadout-toggle-btn{
     display:flex;align-items:center;gap:9px;width:100%;text-align:left;
     background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
@@ -620,11 +622,9 @@
     box-shadow:inset 0 0 0 2px var(--panel-3);
   }
 
-  /* Threshold input seated inside the toggle box. It's a sibling of the button, not a
-     child - an <input> inside a <button> is invalid and would swallow the click - and is
-     overlaid on the button's reserved right padding. Being later in DOM order and
-     positioned, it paints above the button, so clicking it focuses the field instead of
-     toggling the gate. */
+  /* Input is a sibling of the button, not a child - inside a <button> it would be invalid
+     and swallow the click. Overlays the button's reserved right padding; later in DOM
+     order and positioned, so it paints above and takes the click. */
   .eh-gate-row{position:relative;}
   .eh-gate-row .loadout-toggle-btn{padding-right:70px;}
   .eh-gate-row input.stat-min-input{
@@ -739,9 +739,8 @@
   .val.good{color:var(--good);}
   .val.bad{color:var(--bad);}
 
-  /* Dosimeter scale: every gauge spans 0 .. 2x its own cap, so the cap lands at
-     50% and the hatched half is "over cap" for all five threshold stats. Mirrors
-     renderResultCard's markerPct = 50 - keep in sync. */
+  /* Gauge spans 0 .. 2x its own cap, so the cap lands at 50% for every threshold stat.
+     Mirrors renderResultCard's markerPct = 50 - keep in sync. */
   .gauge-track{
     position:relative;height:13px;background:var(--panel-3);
     border:1px solid var(--border-soft);border-radius:99px;overflow:hidden;
@@ -805,9 +804,7 @@
   /* Tinted background, not just tinted text; good/bad reads across a whole grid at a glance. */
   .target-pill.good{color:var(--good);background:var(--good-bg);border-color:rgba(70,201,125,0.3);}
   .target-pill.bad{color:var(--bad);background:var(--bad-bg);border-color:rgba(240,86,95,0.3);}
-  /* Fixed warn yellow, not the theme accent - the highlight has to stay recognisable as
-     "top stat" whatever colour the theme is set to, same as Owned's fixed green. Border
-     swap only, no glow: same clean treatment as the owned-match chips. */
+  /* Fixed warn yellow, not the accent - has to stay recognisable under every theme. */
   .target-pill.top-stat{
     border-color:var(--warn);
   }
@@ -843,9 +840,8 @@
   .result-card summary:hover{color:var(--accent-hi);}
   .result-card details[open] summary{margin-bottom:10px;}
   .result-card details[open] summary::before{transform:rotate(90deg);}
-  /* <details> has no transitionable state of its own, so the body sits in a grid whose row
-     track animates 0fr <-> 1fr - the same trick .advanced-wrap uses. The inner wrapper's
-     overflow:hidden is what clips it; without it the track collapses but content overflows. */
+  /* Row track animates 0fr <-> 1fr; the inner wrapper's overflow:hidden is what clips it.
+     Without that, the track collapses but the content still overflows. */
   .result-card .details-anim{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.26s ease;}
   .result-card details[open] .details-anim{grid-template-rows:1fr;}
   .result-card .details-anim-inner{overflow:hidden;min-width:0;min-height:0;}
@@ -872,7 +868,7 @@
 
   .results-grid-view{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start;}
   .results-grid-view .result-card{margin-bottom:0;}
-  /* 3-up, as originally. Cards stay wide enough because the rank row compacts. */
+  /* Cards stay wide enough at 3-up because the rank row compacts. */
   @media(max-width:1180px){.results-grid-view{grid-template-columns:repeat(2,1fr);}}
   /* min-width:0 on name span enables ellipsis for long names. */
   .results-grid-view .loadout-chip{white-space:nowrap;max-width:100%;}
@@ -884,8 +880,8 @@
   .results-grid-view .target-line,
   .compare-grid .target-line{border-top:1px solid var(--border-soft);padding-top:9px;margin-top:5px;}
 
-  /* Rank row is the tightest thing in a card; dropping padding/tracking here buys
-     back ~40px, the difference between fitting and overflowing. */
+  /* Tightest row in a card; dropping padding/tracking buys back ~40px, the difference
+     between fitting and overflowing. */
   .results-grid-view .rank-row,
   .compare-grid .rank-row,
   .build-compare-strip .rank-row{gap:6px;}
@@ -905,9 +901,8 @@
   .compare-grid .copy-result-btn,
   .build-compare-strip .copy-result-btn{padding:2px 6px;letter-spacing:0.01em;font-size:9.5px;}
 
-  /* Saved-build rank badges hold user-typed names, so they must shrink.
-     min-width:0 is load-bearing: grid tracks default to min-width:auto, so without
-     it a long name widens the track and the page instead of ellipsising. */
+  /* Load-bearing: tracks default to min-width:auto, so a long user-typed build name
+     widens the track and the page instead of ellipsising. */
   .results-grid-view .result-card,
   .build-compare-strip .build-compare-panel{min-width:0;}
   .build-compare-strip .rank-row{min-width:0;}
@@ -915,9 +910,8 @@
     flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
   }
 
-  /* Below this a 3-up column can't hold the full rank row, so copy/save clip to
-     their icon (title attributes carry the meaning) rather than the layout dropping
-     to fewer columns. Tied to the 378px left rail - re-measure if that changes. */
+  /* Below this a 3-up column can't hold the full rank row; copy/save clip to their icon
+     (title carries the meaning). Tied to the 378px left rail - re-measure if it changes. */
   @media(max-width:1260px){
     .results-grid-view .rank-badge,
     .compare-grid .rank-badge,
@@ -933,22 +927,18 @@
   }
 
   /* ---------- compare containers ---------- */
-  /* Distinct from .results-grid-view above. Three columns is the point of this
-     mode - the rank row compacts below rather than the grid stepping down. */
-  /* grid-template-rows is set inline per render: `auto` for the header row, then one row
-     per rank. Columns subgrid onto those rows, so rank N is a single shared track across
-     all three columns and expanding any card moves every column below it as one block. */
+  /* Stays 3-up: the rank row compacts rather than the grid stepping down.
+     grid-template-rows is set inline per render (auto header + one row per rank); columns
+     subgrid onto it, so expanding a card moves every column below as one block. */
   .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);column-gap:16px;row-gap:10px;}
   .compare-column{display:grid;grid-template-rows:subgrid;grid-row:1/-1;row-gap:10px;min-width:0;align-items:start;}
-  /* One column: shared tracks are meaningless and would stack all three columns on top of
-     each other, so fall back to plain block flow in DOM order. */
+  /* One column: shared tracks would stack all three columns on top of each other. */
   @media(max-width:700px){
     .compare-grid{display:block;}
     .compare-column{display:flex;flex-direction:column;gap:10px;}
     .compare-column + .compare-column{margin-top:16px;}
   }
-  /* Pre-subgrid engines: columns stay independent stacks. Ranks won't line up across
-     columns, but nothing overlaps and every card is still readable. */
+  /* Pre-subgrid engines: independent stacks. Ranks stop lining up, nothing overlaps. */
   @supports not (grid-template-rows: subgrid){
     .compare-grid{align-items:start;}
     .compare-column{display:flex;flex-direction:column;gap:10px;grid-row:auto;}
@@ -1014,8 +1004,7 @@
   .compare-prog-block.errored .prog-scan{display:none;}
   .compare-prog-block.errored .prog-status{color:var(--bad);}
   .compare-prog-color-0 .prog-fill{background:linear-gradient(90deg,var(--accent-dim),var(--accent));box-shadow:0 0 18px -2px var(--accent-glow);}
-  /* Columns 2 and 3 identify a container, so they stay fixed when the theme
-     changes. Column 1 tracks the accent. */
+  /* Hard-coded, not themed: columns 2 and 3 identify a container. Column 1 tracks the accent. */
   .compare-prog-color-1 .prog-fill{background:linear-gradient(90deg,#12707A,#43D9E0);box-shadow:0 0 18px -2px rgba(67,217,224,0.45);}
   .compare-prog-color-2 .prog-fill{background:linear-gradient(90deg,#8A2E72,#E86FC4);box-shadow:0 0 18px -2px rgba(232,111,196,0.45);}
 
@@ -1062,8 +1051,8 @@
 </style>
 
 <script>
-/* Theme, part 1 of 2 (part 2 sits before </body>). Must stay standalone and
-   guarded: it runs pre-paint, and a throw here would abort the page. */
+/* Theme, part 1 of 2 (part 2 sits before </body>) - keep the two in sync.
+   Standalone and try/catch guarded: runs pre-paint, and a throw aborts the page. */
 (function(){
   try{
     var t = localStorage.getItem('artiCalc_theme');
@@ -1200,8 +1189,8 @@
           <button type="button" id="statClearBtn">clear</button>
         </div>
         <div class="check-list" id="statList"></div>
-        <!-- Standalone viability gate, not a searchable stat - deliberately outside #statList
-             so it can't be reached by the stat/tier/min queries that sweep that list. -->
+        <!-- Outside #statList on purpose: the stat/tier/min queries sweep that list and
+             would read this as a target stat. -->
         <div class="advanced-wrap">
           <div class="advanced-inner">
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -1322,6 +1311,9 @@
           <button type="button" id="artAllBtn">select all</button>
           <button type="button" id="artNoneBtn">unselect all</button>
           <button type="button" id="artUnpinBtn">unpin all</button>
+        </div>
+        <div class="art-search-wrap">
+          <input type="text" id="artSearchInput" placeholder="Search artefact" autocomplete="off" spellcheck="false">
         </div>
         <div class="check-list" id="artifactList"></div>
       </div>
@@ -1761,11 +1753,9 @@ STAT_CATEGORIES.forEach((cat, ci)=>{
   cat.names.forEach(addStatItem);
 });
 
-/* Minimum Effective Health: a viability gate, not a scoring stat. It lives outside
-   #statList entirely, so it can never be picked up as a targetStat. Advanced-only in both
-   directions - the row is hidden by .advanced-wrap and readSharedSearchInputs re-checks the
-   mode before reading it, so a gate armed in Advanced can't keep filtering after a switch
-   to Basic. */
+/* Viability gate, not a scoring stat: outside #statList so it can never be read as a
+   targetStat. Advanced-only in both directions - .advanced-wrap hides the row and
+   readSharedSearchInputs re-checks the mode, so it can't keep filtering in Basic. */
 const EH_MIN_DEFAULT = 500;
 const ehMinBtnEl = document.getElementById('ehMinBtn');
 const ehMinInputEl = document.getElementById('ehMinInput');
@@ -1893,8 +1883,7 @@ function saveExcludedNames(){
 function loadMaxCopies(){
   try {
     const raw = localStorage.getItem(LS_MAXCOPIES);
-    // A stored "null" is truthy but parses to null; unvalidated, that throws in the
-    // top-level ARTIFACTS.forEach below and aborts the rest of the script.
+    // A stored "null" is truthy but parses to null; unvalidated it throws at top level.
     const v = raw ? JSON.parse(raw) : null;
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e){ return {}; }
@@ -1905,8 +1894,7 @@ function saveMaxCopies(){
 function loadPinnedNames(){
   try {
     const raw = localStorage.getItem(LS_PINNED);
-    // Any truthy non-array passes the caller's `if (savedPinNames)` guard and then
-    // throws on .forEach at top level, taking down the rest of the script.
+    // Any truthy non-array clears the caller's guard, then throws on .forEach at top level.
     const v = raw ? JSON.parse(raw) : null;
     return Array.isArray(v) ? v : null;
   } catch(e){ return null; }
@@ -1914,9 +1902,8 @@ function loadPinnedNames(){
 function savePinnedNames(){
   try { localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(PINNED).map(i => ARTIFACTS[i].name))); } catch(e){}
 }
-// Stored name-keyed, held index-keyed in memory - same split as PINNED and MAX_COPIES.
-// Keys are resolved by name on load, so reordering or editing ARTIFACTS can no longer
-// reassign a user's units to a different artefact.
+// Stored name-keyed, held index-keyed - same split as PINNED and MAX_COPIES, so reordering
+// or editing ARTIFACTS can't reassign a user's units to a different artefact.
 function loadOwned(){
   try {
     const raw = localStorage.getItem(LS_OWNED);
@@ -1928,9 +1915,8 @@ function loadOwned(){
     ARTIFACTS.forEach((a, i) => { byName[a.name] = i; });
     const out = {};
     Object.keys(parsed).forEach(k => {
-      // Name first; a bare numeric key is a pre-2026-07-26 save, read positionally this
-      // once and rewritten by name on the next save. Unresolvable keys are dropped rather
-      // than left to throw at top level, same as importLoadoutFile.
+      // Name first; a bare numeric key is a pre-2026-07-26 save, read positionally once
+      // and rewritten by name on the next save. Unresolvable keys are dropped, not thrown.
       let i;
       if (Object.prototype.hasOwnProperty.call(byName, k)) i = byName[k];
       else if (/^\d+$/.test(k) && ARTIFACTS[+k]) i = +k;
@@ -2020,6 +2006,40 @@ ARTIFACTS.forEach((a,i)=>{
     <button type="button" class="art-lock" data-idx="${i}" title="Pin: must include in results">🔓</button>`;
   artifactListEl.appendChild(div);
 });
+
+/* Type-to-locate: rings the first matching row, hides nothing. That keeps "select all" /
+   "unselect all" / "unpin all" global in scope, and leaves DOM order alone so it composes
+   with highlightUsedArtifacts()' reordering. */
+const artSearchInputEl = document.getElementById('artSearchInput');
+function clearArtSearchHit(){
+  const prev = artifactListEl.querySelector('.check-item.search-hit');
+  if (prev) prev.classList.remove('search-hit');
+}
+function findArtefactInList(){
+  clearArtSearchHit();
+  const q = artSearchInputEl.value.trim().toLowerCase();
+  if (!q) return;
+  // Matches in current DOM order, not ARTIFACTS order, so the hit is the first one the
+  // user would actually scroll to even while used artefacts are hoisted to the top.
+  const item = Array.from(artifactListEl.querySelectorAll('.check-item'))
+    .find(el => el.querySelector('.name').textContent.toLowerCase().includes(q));
+  if (!item) return;
+  item.classList.add('search-hit');
+  /* scrollTop, not scrollIntoView(): that walks every scrollable ancestor and scrolls the
+     page too. Measured from rect deltas because .check-list isn't positioned, so offsetTop
+     would resolve against some ancestor further up. Browser clamps the assignment. */
+  const listRect = artifactListEl.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  artifactListEl.scrollTop += (itemRect.top - listRect.top) - (listRect.height - itemRect.height) / 2;
+}
+artSearchInputEl.addEventListener('input', findArtefactInList);
+artSearchInputEl.addEventListener('keydown', e=>{
+  if (e.key !== 'Escape') return;
+  artSearchInputEl.value = '';
+  clearArtSearchHit();
+  artSearchInputEl.blur();
+});
+
 artifactListEl.addEventListener('change', e=>{
   if (e.target.matches('input[type=checkbox]')) saveExcludedNames();
 });
@@ -2202,7 +2222,7 @@ let popoverAnchorEl = null;
 let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
 let popoverOpenedViaHover = false; // hover-opened popovers only; gates auto-close on mouseout
 let popoverHideExclude = false; // Available Artefacts hover: the checkbox is right there
-let popoverBesidePanel = false; // re-renders must reuse positionPopoverBesidePanel, or the popover jumps out from under the cursor
+let popoverBesidePanel = false; // re-renders must reuse positionPopoverBesidePanel or it jumps
 
 function closeChipPopover(){
   chipPopoverEl.classList.remove('open');
@@ -2324,8 +2344,7 @@ function renderPopoverFavorite(idx){
   `;
   const favCountInput = document.getElementById('favCount');
   chipPopoverEl.querySelectorAll('select.fav-quality').forEach(initFavQualitySelect);
-  // Shared by typing in the field and by the +/- buttons, so quality-row sync/reposition
-  // logic only lives in one place.
+  // Shared by the field and the +/- buttons, so sync/reposition lives in one place.
   function applyFavCount(n){
     n = Math.max(1, Math.min(20, n || 1));
     favCountInput.value = n;
@@ -2423,8 +2442,8 @@ function updateAllMaxCopiesBadges(){
 chipPopoverEl.addEventListener('click', e=>{
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
-  e.stopPropagation(); // innerHTML swaps below detach e.target mid-bubble; needed so the
-                        // outside-click listener's contains() check doesn't fail
+  e.stopPropagation(); // innerHTML swaps below detach e.target mid-bubble, breaking the
+                        // outside-click listener's contains() check
   const idx = popoverOpenIdx;
   if (idx == null) return;
   popoverOpenedViaHover = false; // a click means active use - stop the mouseout auto-close timer
@@ -2506,8 +2525,7 @@ document.addEventListener('click', e=>{
 
 document.getElementById('statClearBtn').onclick = ()=>{
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
-  // Priorities go back to the Medium default too, so "clear" leaves the panel in the same
-  // state Reset does rather than keeping tiers from stats that are no longer selected.
+  // Tiers back to Medium too, so "clear" leaves the panel where Reset would.
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
   // Disarms like any other selection; the threshold value stays, same as the min inputs do.
   ehMinBtnEl.classList.remove('active');
@@ -2770,8 +2788,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
   });
 })();
 document.getElementById('resetAllBtn').onclick = ()=>{
-  // Cancel any running search (including compare mode) - resolve its pending runOneWorker()
-  // promise so it doesn't fire into a page state that just got reset.
+  // Resolve the pending runOneWorker() promise too, or it fires into the reset page state.
   if (activeWorkers.length){ activeWorkers.forEach(w=>w.terminate()); activeWorkers = []; }
   if (pendingWorkerResolve){ const r = pendingWorkerResolve; pendingWorkerResolve = null; r(null); }
   selectDefaultContainer();
@@ -2816,6 +2833,8 @@ document.getElementById('resetAllBtn').onclick = ()=>{
     c.checked = !DEFAULT_OFF.has(ARTIFACTS[parseInt(c.dataset.idx)].name);
   });
   saveExcludedNames();
+  artSearchInputEl.value = '';
+  clearArtSearchHit();
   highlightUsedArtifacts([]);
   PINNED.clear();
   savePinnedNames();
@@ -3039,9 +3058,8 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
     row.dataset.value = opt.value;
     return row;
   }
-  // Built once - CONTAINERS is static at runtime. The optgroup branch is inert since
-  // headers were dropped (every row lands in the header:null section); kept so re-adding
-  // them stays a two-line change.
+  // Built once - CONTAINERS is static. The optgroup branch is inert (headers dropped, so
+  // every row lands in header:null); kept so re-adding them stays a two-line change.
   let currentSection = { header: null, items: [] };
   const sections = [currentSection];
   Array.from(selectEl.children).forEach(child=>{
@@ -3124,11 +3142,10 @@ function enhanceContainerSelect(selectEl, renderFn = renderContainerPopover){
     const idx = parseInt(row.dataset.value);
     if (isNaN(idx)) return; // "-- None --" rows (compare only) have no stats
     cancelContainerHoverClose();
-    // The `.open` check is load-bearing, NOT redundant: containerPopoverOpenIdx is one
-    // global shared by all six dropdowns, and its index namespace differs (CONTAINERS[i]
-    // for five, ARMORS[i] for the armor select), so a stale index from one namespace could
-    // otherwise suppress a render in the other. closePanel() nulling the index is the
-    // other half - don't simplify either piece alone.
+    // `.open` check is load-bearing, NOT redundant: containerPopoverOpenIdx is one global
+    // across all six dropdowns with two index namespaces (CONTAINERS[i], ARMORS[i]), so a
+    // stale index from one can suppress a render in the other. closePanel() nulling the
+    // index is the other half - don't simplify either alone.
     if (containerPopoverOpenIdx === idx && containerPopoverEl.classList.contains('open')) return;
     renderFn(idx);
     positionContainerPopover(row, panel);
@@ -3486,8 +3503,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     renderBuildsList();
     return skipped;
   }
-  // Same push/persist path as the form's Save button, but auto-suffixes a colliding name
-  // ("Name (2)") instead of rejecting it.
+  // Same push/persist path as the form's Save, but auto-suffixes a collision ("Name (2)").
   function saveBuildFromResult(name, containerName, level, slots){
     const containerObj = CONTAINERS.find(c => c.name === containerName);
     if (!containerObj) return null;
@@ -3581,9 +3597,8 @@ document.querySelectorAll('.mode-toggle-btn').forEach(btn=>{
     document.querySelectorAll('.mode-toggle-btn').forEach(b=>b.classList.toggle('active', b===btn));
     if (!advanced && compareModeBtnEl.classList.contains('active')) compareModeBtnEl.click();
     document.body.classList.toggle('advanced-mode', advanced);
-    // Basic hides the controls these serve, so it forces both off; Advanced re-derives from
-    // what is still selected. Re-derived, not restored: a manual override doesn't survive
-    // the round trip, which is intended.
+    // Basic hides the controls, so it forces both off; Advanced re-derives from what's
+    // still selected. Re-derived, not restored - a manual override intentionally doesn't survive.
     if (advanced){
       setBuffToggle('includeArmorBuffsChk', armorSelectEl.value !== 'none');
       setBuffToggle('includeContainerBuffsChk', compareModeBtnEl.classList.contains('active'));
@@ -3944,13 +3959,11 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   const totalFmt = total.toLocaleString();
 
   // ---- Multi-worker split: greedily bin-pack top-level pool indices by estimated subtree
-  // size. One bin per worker to spawn, consumed as runSplitSearch's `assignedIndices`.
-  // Estimate only; approximate is fine.
+  // size (estimate is fine). One bin per worker, consumed as runSplitSearch's `assignedIndices`.
   let bins;
   if (freeSlots <= 0) {
-    // All slots pinned: today's recurse(0,0) is a single direct leaf, no top-level pick
-    // exists to split. Single worker, nothing assigned - WORKER_SRC's topRemaining===0
-    // branch calls considerLeaf() directly for this case.
+    // All slots pinned: recurse(0,0) is one direct leaf, no top-level pick to split. One
+    // worker, nothing assigned - WORKER_SRC's topRemaining===0 branch calls considerLeaf().
     bins = [[]];
   } else {
     const subtreeSize = i => {
@@ -3964,8 +3977,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       return combinationCount(poolVecs.length - i, freeSlots - 1);
     };
     const numBins = Math.min(navigator.hardwareConcurrency || 4, 8);
-    // Precomputed: subtreeSize runs a DP plus an array copy, so calling it from inside the
-    // comparator repeats that per comparison.
+    // Precomputed: subtreeSize is a DP plus an array copy, repeated per comparison otherwise.
     const sizes = poolVecs.map((_, i) => subtreeSize(i));
     const order = poolVecs.map((_, i) => i)
       .filter(i => poolMax[i] !== 0)
@@ -3979,8 +3991,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       binTotals[best] += sizes[i];
     });
     bins = bins.filter(b => b.length > 0);
-    // Empty pool (n===0): every bin ends up empty above. Still need exactly one worker to
-    // get a 'done' message and render (empty) results, same as today.
+    // Empty pool (n===0) leaves every bin empty; still need one worker to send 'done' and
+    // render empty results.
     if (bins.length === 0) bins = [[]];
   }
 
@@ -4077,8 +4089,8 @@ self.onmessage = function(e){
     var oi=minStats[ai].idx;
     if(idxMap[oi]===undefined){ idxMap[oi]=activeIdx.length; activeIdx.push(oi); }
   }
-  // sum only carries activeIdx entries, so the EH gate has to register its two stats
-  // whether or not the user targeted them.
+  // sum carries only activeIdx entries, so the EH gate registers its two stats even when
+  // the user didn't target them.
   if(ehGate){
     if(idxMap[ehGate.brIdx]===undefined){ idxMap[ehGate.brIdx]=activeIdx.length; activeIdx.push(ehGate.brIdx); }
     if(idxMap[ehGate.vitIdx]===undefined){ idxMap[ehGate.vitIdx]=activeIdx.length; activeIdx.push(ehGate.vitIdx); }
@@ -4242,9 +4254,9 @@ self.onmessage = function(e){
     for(var ndi2=0; ndi2<nND; ndi2++) suffixMinND[ndi2][k]=Math.min(soloNDRaw[ndi2][k],suffixMinND[ndi2][k+1]);
   }
 
-  // EH's bound needs per-item BR/Vitality maxima of its own: suffixMaxDirAdj only covers
-  // chosen target stats, and the gate works whether or not either stat was chosen.
-  // Built here, before the remap below, because it indexes full-width VECS like the rest.
+  // EH's bound needs its own per-item BR/Vitality maxima: suffixMaxDirAdj covers only chosen
+  // target stats, and the gate works whether or not either was chosen. Built before the remap,
+  // because it indexes full-width VECS.
   var suffixMaxBR=null, suffixMaxVit=null;
   if(ehGate){
     suffixMaxBR=new Float64Array(n+1); suffixMaxVit=new Float64Array(n+1);
@@ -4261,8 +4273,8 @@ self.onmessage = function(e){
     return -1;
   });
 
-  // Remap .idx fields to short-list positions now that the precomputation above (which
-  // needed original indices against full-width VECS) is done. Must happen before recurse().
+  // Remap .idx to short-list positions, now the precomputation that needed full-width VECS
+  // indices is done. Must happen before recurse().
   for(var ri=0; ri<thresholds.length; ri++) thresholds[ri].idx = idxMap[thresholds[ri].idx];
   for(var ri=0; ri<targetStats.length; ri++) targetStats[ri].idx = idxMap[targetStats[ri].idx];
   for(var ri=0; ri<noDebuffIdx.length; ri++) noDebuffIdx[ri].idx = idxMap[noDebuffIdx[ri].idx];
@@ -4328,14 +4340,13 @@ self.onmessage = function(e){
           critBound+=m.statMax>1e-12?bestCase/m.statMax:0;
         }
       }
-      // Must be included, not skipped: crit only accumulates for UNMET entries and higher
-      // is better, so leaving EH out understates the bound and prunes subtrees that would
-      // have produced a better fallback.
+      // Must be included, not skipped: crit accumulates only for UNMET entries and higher is
+      // better, so omitting EH understates the bound and prunes better fallbacks.
       if(ehGate){
         var brBound=ehGate.base+sum[ehGate.brIdx]+remaining*suffixMaxBR[start];
         var vitBound=1+(sum[ehGate.vitIdx]+ehGate.vitBonus+remaining*suffixMaxVit[start])/100;
         // EH is monotone in both terms, so the product of independent maxima is an upper
-        // bound - but only while both factors are positive, or the sign flips. Unreachable
+        // bound - but only while both factors are positive, else the sign flips. Unreachable
         // in practice (base is 100 + armor), so the degenerate branch stays optimistic.
         var bestEH=(brBound>0&&vitBound>0)?brBound*vitBound:Infinity;
         if(bestEH<ehGate.min-1e-6){
@@ -4431,8 +4442,8 @@ self.onmessage = function(e){
   function recurse(start,remaining){
     if(remaining===0){considerLeaf();return;}
     if(shouldPrune(start,remaining)){
-      // Count from remaining capacity, not original caps - items at index >= start
-      // may already be partly consumed by the current path (would overshoot total).
+      // Count from remaining capacity, not original caps - items at index >= start may
+      // already be partly consumed by the current path, which would overshoot the total.
       var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start).map(function(m,j){return m-counts[start+j];}),remaining):combinationCount(n-start,remaining);
       checked+=skipped;
       if(checked>=nextReport){
@@ -4528,11 +4539,10 @@ function fmt(name, val){
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}${pct}`;
 }
-// The single definition of "the number on the card". Threshold stats show the final
-// effective value - only the figure vs the cap matters - and fold the bonus in via
-// thresholdEffValue, which already expects it to be part of totalVal. Non-threshold bonus
-// is display-only, gated by its own toggle. Everything that prints, colours or ranks a
-// displayed stat goes through here, so the three can't drift apart.
+// The single definition of "the number on the card" - everything that prints, colours or
+// ranks a displayed stat goes through here, so the three can't drift. Threshold stats show
+// the effective value and fold the bonus in via thresholdEffValue (which expects it in
+// totalVal); non-threshold bonus is display-only, gated by its own toggle.
 function displayValue(name, totalVal, containerBonus, protection){
   const bonus = containerBonus ? (containerBonus[name] || 0) : 0;
   if (STAT_META[name].threshold){
@@ -4566,19 +4576,17 @@ function minCriteriaLabel(targetStats){
   return mins.slice(0, -1).join(', ') + ' and ' + mins[mins.length - 1];
 }
 // How far behind the leader a card may sit and still count as a top stat, as a fraction of
-// the leader's magnitude. Direction-adjusted, so it reads the same for "lower is better"
-// stats. Measured against the leader rather than the spread of the visible list on purpose:
-// the spread moves when a Compare column is added or the price filter shrinks the list, so
-// a spread-relative bar would let unrelated cards change whether this one is highlighted.
+// the leader's magnitude. Direction-adjusted, so "lower is better" stats read the same.
+// Leader-relative, not spread-relative: the spread moves when a Compare column is added or
+// the price filter shrinks the list, which would let unrelated cards flip this highlight.
 const TOP_STAT_MAX_GAP = 0.10;
 
-// Top 2 per target stat by that stat's beneficial direction, so "lower is better" stats
-// rank most-negative first. Ties at the 2nd-place cutoff are all included.
-// Ranks on the DISPLAYED value, not the raw sum, so the highlight always marks the highest
-// number actually on screen. Matters in Compare Containers, where each column has its own
-// container bonus and protection: ranking on `sum` could highlight a card while a visibly
-// higher one beside it went unmarked. cardMeta[i] carries the {containerBonus, protection}
-// that card was rendered with - one shared pair in normal search, per-column when compared.
+// Top 2 per target stat by that stat's beneficial direction, so "lower is better" stats rank
+// most-negative first. Ties at the 2nd-place cutoff are all included.
+// Ranks on the DISPLAYED value, not the raw sum, so the highlight marks the highest number
+// actually on screen: in Compare Containers each column has its own bonus and protection, and
+// ranking on `sum` could mark a card while a visibly higher one beside it went unmarked.
+// cardMeta[i] holds the {containerBonus, protection} that card was rendered with.
 function computeTopStatSets(results, targetStats, cardMeta){
   const topSets = {};
   targetStats.forEach(t=>{
@@ -4592,9 +4600,8 @@ function computeTopStatSets(results, targetStats, cardMeta){
     const set = new Set();
     if (scored.length){
       const cutoff = scored[Math.min(1, scored.length-1)].val;
-      // The positional cutoff alone marks 2nd place however far behind it is. Gate it on
-      // proximity to the leader as well, so a runaway winner is highlighted on its own.
-      // Taking the higher of the two bars means both conditions have to hold; the leader
+      // The positional cutoff alone marks 2nd place however far behind it is, so gate it on
+      // proximity to the leader too. Taking the higher bar means both must hold; the leader
       // always clears its own bar, so something is always highlighted.
       const lead = scored[0].val;
       const bar = Math.max(cutoff, lead - TOP_STAT_MAX_GAP * Math.abs(lead));
@@ -4706,12 +4713,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   });
   html += '</div>';
 
-  // Keyed on the build itself, not on rank, so a re-render that reorders or filters the list
-  // keeps each card's own open/closed state. protection separates identical builds appearing
-  // in two Compare Containers columns.
-  // cardScope separates Compare Containers columns: two containers can share protection and
-  // bonus stats and still return the same winning build, which would otherwise share a key
-  // and expand together.
+  // Keyed on the build itself, not on rank, so a re-render that reorders or filters keeps each
+  // card's open/closed state. protection and cardScope both separate Compare Containers
+  // columns: two containers can share protection and bonus stats and still return the same
+  // winning build, which would otherwise share a key and expand together.
   const detailsKey = (isExtended ? 'x' : 'r') + '|' + (cardScope || '') + '|' +
     chosen.map(c => c.idx + 'x' + c.count + (c.quality != null ? 'q' + c.quality : '')).sort().join(',');
   const detailsOpen = openDetailsState.has(detailsKey) ? openDetailsState.get(detailsKey) : isTop;
@@ -4730,7 +4735,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     if (eff > extCap + 1e-6){ color='var(--bad)'; statusColor='var(--bad)'; statusText='OVER'; }
     else if (eff > cap + 1e-6){ color='var(--bad)'; statusColor='var(--warn)'; statusText='consumable'; }
     else if (ratio > 0.8){ color='var(--warn)'; statusColor='var(--warn)'; statusText='caution'; }
-    // Spans 0 to 2x this stat's own cap, so the marker sits at 50% whether cap is 0.5 or 1.
+    // Gauge spans 0 to 2x this stat's own cap, so the marker sits at 50% whether cap is 0.5
+    // or 1. Mirrored by .gauge-track's hatched half in CSS - keep in sync.
     const widthPct = Math.max(0, Math.min(eff / (2 * cap), 1)) * 100;
     const markerPct = 50;
     gaugeCells.push(`<div style="padding:3px 0 5px;">
@@ -4888,17 +4894,15 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   // count here or an EH-only search would show an empty list instead of the closest builds.
   const hasMin = targetStats.some(t => t.min !== null && t.min !== undefined) || lastSearchedEhMin !== null;
 
-  // Backfilled with min-stat fallbacks when fewer than RESULTS_DISPLAY_CAP meet every
-  // minimum. The first metCount are labelled "meets thresholds", the rest "next best"
-  // (or one banner when metCount is 0).
+  // Backfilled with min-stat fallbacks when fewer than RESULTS_DISPLAY_CAP meet every minimum.
+  // First metCount are "meets thresholds", the rest "next best" (one banner when metCount is 0).
   let displayResults = results;
   const metCount = results.length;
   if (hasMin && metCount < RESULTS_DISPLAY_CAP && minFallbackResults && minFallbackResults.length){
     displayResults = results.concat(minFallbackResults.slice(0, RESULTS_DISPLAY_CAP - metCount));
   }
-  // Last resort: nothing gives every selected stat a non-rounding-to-zero value and there's
-  // no min-fallback either. Show the closest instead of a bare error; renderResultCard marks
-  // the pills that got no real benefit.
+  // Last resort: no build gives every selected stat a non-rounding-to-zero value and there's
+  // no min-fallback either. Show the closest; renderResultCard marks the no-benefit pills.
   const showCoverageFallback = displayResults.length === 0 && coverageFallbackResults && coverageFallbackResults.length > 0;
   if (showCoverageFallback){
     displayResults = coverageFallbackResults.slice(0, RESULTS_DISPLAY_CAP);
@@ -5050,8 +5054,8 @@ let showConsumableZone = false; // user toggle: shows/hides the already-computed
 const openDetailsState = new Map();
 
 // <details> can't animate on its own: removing `open` stops the content rendering instantly,
-// so the collapse never gets a chance to play. The summary click is intercepted and the
-// attribute removed only once the track has finished animating shut.
+// so the collapse never plays. The summary click is intercepted and the attribute removed
+// only once the track has finished animating shut.
 function setDetailsOpen(details, open){
   const key = details.dataset.dkey;
   if (key) openDetailsState.set(key, open);
@@ -5214,10 +5218,10 @@ document.getElementById('results').addEventListener('click', async e=>{
   }
 });
 
-/* Search fields that don't vary by container, read once per search click. Both search
-   paths (single and Compare Containers) call this, so the reads, the three global
-   validations and the showOwnedHighlight/price-tier writes can't drift apart.
-   Returns {error} or {sharedCtx}; side effects happen before validation, as before. */
+/* Search fields that don't vary by container, read once per search click. Both paths (single
+   and Compare Containers) call this, so the reads, the three global validations and the
+   showOwnedHighlight/price-tier writes can't drift. Returns {error} or {sharedCtx}; side
+   effects happen before validation. */
 function readSharedSearchInputs(){
   const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
   const quality = parseInt(document.getElementById('qualityInput').value) || 100;
@@ -5471,11 +5475,11 @@ function runSplitSearch(payload, meta, opts){
       }, 50);
     }
 
-    // __srcIdx = the top-level pool index a leaf was first picked from. Bin-packing gives
-    // each top-level index to exactly one worker, so cross-worker leaves always differ here
-    // and this tie-break alone reproduces single-thread order. Same-worker ties were already
-    // ordered by that worker, and a stable Array#sort over worker-by-worker concatenation
-    // carries that through - don't reorder each worker's array before merging.
+    // __srcIdx = the top-level pool index a leaf was first picked from. Bin-packing gives each
+    // top-level index to exactly one worker, so cross-worker leaves always differ here and this
+    // tie-break alone reproduces single-thread order. Same-worker ties were already ordered by
+    // that worker, and a stable sort over worker-by-worker concatenation carries that through -
+    // don't reorder each worker's array before merging.
     function mergeCompare(beatsFn, a, b){
       if (beatsFn(a, b)) return -1;
       if (beatsFn(b, a)) return 1;
@@ -5660,12 +5664,11 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
     results: (col.results && !allPriceTiersVisible) ? col.results.filter(passesPriceFilter) : col.results
   }));
 
-  // Flattened before the render loop, not during it: "Top stats" highlights the top-2 per
-  // stat across ALL columns combined, so a card needs its global flatIdx resolved against
-  // the complete list before any card is rendered.
+  // Flattened before the render loop, not during it: "Top stats" ranks the top-2 per stat
+  // across ALL columns, so each card needs its global flatIdx before any card renders.
   const flatResults = filteredColumnResults.flatMap(col => col.results || []);
-  // Parallel to flatResults, kept alongside rather than attached to the result objects,
-  // which are shared with col.results and the copy button.
+  // Parallel to flatResults, not attached to the result objects, which are shared with
+  // col.results and the copy button.
   const flatMeta = filteredColumnResults.flatMap(col =>
     (col.results || []).map(()=>({ containerBonus: col.meta.containerBonusMap, protection: col.meta.protection })));
   const topSets = topStatHighlightOn ? computeTopStatSets(flatResults, targetStats, flatMeta) : null;
