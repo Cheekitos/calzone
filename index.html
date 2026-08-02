@@ -97,7 +97,6 @@
   ::selection{background:var(--accent-dim);color:#fff;}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
-  /* Thin instrument scrollbars */
   .check-list,.container-dd-panel,.loadout-search-dd,.artchip-popover{
     scrollbar-width:thin;scrollbar-color:var(--border) transparent;
   }
@@ -140,8 +139,8 @@
     display:flex;gap:4px;padding:4px;border-radius:99px;
     background:var(--panel);border:1px solid var(--border);
   }
-  /* Even sizes (26/14): an odd dot lands the ring gap on a half pixel.
-     Inset box-shadow, not a border - stays concentric and out of layout. */
+  /* Even sizes (26/14): odd sizes land the ring gap on a half pixel.
+     Inset shadow, not border - concentric, out of layout. */
   .theme-btn{
     width:26px;height:26px;padding:0;border-radius:50%;cursor:pointer;
     background:none;border:none;
@@ -254,7 +253,7 @@
     box-shadow:0 0 0 3px var(--accent-soft);
   }
   input[type=text]::placeholder{color:var(--muted);font-size:12.5px;}
-  /* Sits alone, so it needs a typeable cue. Stops at :focus, which has its own ring. */
+  /* Sits alone, so it needs a typeable cue; :focus has its own ring. */
   #loadoutSearchInput:hover:not(:focus){
     border-color:var(--accent-dim);background:var(--panel-3);
   }
@@ -445,8 +444,7 @@
   .hl-toggle-btn.active.toggle-owned{border-color:var(--good);background:var(--good-bg);color:var(--good);}
   .hl-toggle-btn.active.toggle-topstat{border-color:var(--warn);background:var(--warn-bg);color:var(--warn);}
 
-  /* .loadout-action-btn's colour comes from inline style in the markup; border and
-     hover fill follow currentColor. */
+  /* .loadout-action-btn colour is inline in the markup; border/hover fill follow currentColor. */
   .loadout-action-btn,#statClearBtn,#artAllBtn,#artNoneBtn,#artUnpinBtn{
     background:var(--panel-2);
     border:1px solid color-mix(in srgb, currentColor 38%, transparent);
@@ -553,8 +551,8 @@
     border:none;cursor:pointer;box-shadow:0 0 0 3px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
   }
   .popover-maxcopies input[type=range]{width:100%;}
-  /* Price slider only: 25% smaller thumb. Overrides the shared rule above by order -
-     the max-copies popover slider keeps the 15px thumb. */
+  /* Price slider only: overrides the shared thumb rule by source order.
+     Max-copies popover slider keeps 15px. */
   .price-range-slider-row input[type=range]::-webkit-slider-thumb{
     width:11px;height:11px;
     box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
@@ -563,8 +561,8 @@
     width:11px;height:11px;
     box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
   }
-  /* Four discrete stops. Legend labels and ticks sit at 0 / 33.3 / 66.7 / 100% -
-     the thumb centres - so the names read as marks on the track, not free text. */
+  /* Four discrete stops. Legend labels and ticks sit at the thumb centres
+     (0 / 33.3 / 66.7 / 100%) so names read as track marks. */
   .price-range-control{margin-top:2px;}
   .price-range-legend{position:relative;height:14px;margin-bottom:7px;}
   .price-range-stop-name{color:var(--warn);letter-spacing:0.15em;}
@@ -648,8 +646,8 @@
     box-shadow:inset 0 0 0 2px var(--panel-3);
   }
 
-  /* Input is a SIBLING of the button, not a child - inside a <button> it would be invalid
-     and swallow the click. Overlays the button's reserved 70px right padding; later in DOM
+  /* Input is a SIBLING of the button, not a child - nesting it in <button> is invalid and
+     swallows the click. Overlays the button's reserved 70px right padding; later in DOM
      order and positioned, so it paints above and takes the click. */
   .eh-gate-row{position:relative;}
   .eh-gate-row .loadout-toggle-btn{padding-right:70px;}
@@ -1175,17 +1173,17 @@
         </div>
         <!-- Outside the row so it doesn't affect toggle/select height alignment -->
         <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
-        <div class="lbl" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:9px;">Price range: <span class="price-range-stop-name" id="priceRangeStopName">No limit</span></div>
+        <div class="lbl" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:9px;">Price range: <span class="price-range-stop-name" id="priceRangeStopName">No Limit</span></div>
         <div class="price-range-control">
           <div class="price-range-legend" id="priceRangeLegend">
             <button type="button" class="price-range-stop" data-stop="1" aria-label="Cheap">$</button>
             <button type="button" class="price-range-stop" data-stop="2" aria-label="Average">$$</button>
             <button type="button" class="price-range-stop" data-stop="3" aria-label="Expensive">$$$</button>
-            <button type="button" class="price-range-stop" data-stop="4" aria-label="No limit">$$$$</button>
+            <button type="button" class="price-range-stop" data-stop="4" aria-label="No Limit">$$$$</button>
           </div>
           <div class="price-range-slider-row">
             <input type="range" id="priceRangeSlider" min="1" max="4" step="1" value="4"
-                   aria-label="Price range" aria-valuetext="No limit">
+                   aria-label="Price range" aria-valuetext="No Limit">
           </div>
         </div>
         <div class="advanced-wrap"><div class="advanced-inner">
@@ -1752,7 +1750,8 @@ function priceBadgeHtml(chosen){
   for (let i = 1; i <= 4; i++){
     signs += `<span class="price-sign${i <= cat ? ' filled' : ''}">$</span>`;
   }
-  const label = ['Cheap','Average','Expensive','Beyond'][cat-1];
+  // PRICE_STOP_NAMES is declared further down; only read at render time, never at load.
+  const label = PRICE_STOP_NAMES[cat-1];
   return `<span class="price-badge" title="${label} (${cat}/4)">${signs}</span>`;
 }
 
@@ -1868,7 +1867,9 @@ function renderDebuffToggles(){
 renderDebuffToggles();
 
 // Mirrors priceBadgeHtml's fill pattern; also paints the track (native range has no filled side).
-const PRICE_STOP_NAMES = ['Cheap','Average','Expensive','No limit'];
+// One array feeds badge, copy text and slider - keep it that way so labels can't drift
+// (earlier "Beyond" vs "No limit" split, dropped by ruling; see DECISIONS.md).
+const PRICE_STOP_NAMES = ['Cheap','Average','Expensive','No Limit'];
 function updatePriceRangeSliderLabel(){
   const slider = document.getElementById('priceRangeSlider');
   const v = parseInt(slider.value);
@@ -3832,9 +3833,8 @@ const ARMORS = [
 
 /* Armor is a display overlay and never enters the caps. That's only safe because no armor
    carries a threshold (damage) stat in its bonus block - so armor can't push a build over or
-   under a legality cap. True by inspection across all 72 today; this assert makes it true by
-   construction, turning a future data edit that breaks it into a loud load-time failure rather
-   than a silent mis-cap. See DECISIONS.md "Armor as a display overlay". */
+   under a legality cap. True by inspection across all 72 today; the assert keeps a future data
+   edit from silently mis-capping. See DECISIONS.md "Armor as a display overlay". */
 (function assertNoArmorThresholdStat(){
   ARMORS.forEach(a=>{
     Object.keys(a.bonus).forEach(stat=>{
@@ -4943,11 +4943,8 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
     // Coverage uses the artefact/pinned total, not the display-merged container bonus. Only
     // reachable on coverage-fallback builds - `top` never holds a stat below this.
-    // Correct-and-odd (see DECISIONS.md): this badge reads raw `sum` while the pill colour below
-    // reads displayValue (armor + container folded in). So a fallback stat that no artefact
-    // provides but an overlaid armor lifts positive can print green AND carry this warning at
-    // once. Intended - coverage deliberately ignores overlay bonuses; the colour shows in-game
-    // truth. Pre-existing for the container bonus; armor just widens when it shows.
+    // Intended mismatch (see DECISIONS.md): this badge reads raw `sum`, the pill colour below
+    // reads displayValue, so a stat can print green and still carry the warning.
     const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
     const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
     html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}${noBenefit ? ' no-benefit' : ''}">${warnBadge}${star}${name}: ${valStr}</span>`;
@@ -5367,33 +5364,45 @@ let compareModeActive = false;       // true = #results shows the compare-grid, 
 let compareBuildsActive = false;     // true = #results shows the Compare My Builds view
 let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory drag order, never persisted
 
-function formatResultForDiscord(result, rank, targetStats, containerName, containerBonus, protection){
+function formatResultForDiscord(result, rank, targetStats, containerName, containerBonus, protection, level, quality){
   const {chosen, sum} = result;
+  // Effective quality per entry, same fallback buildPriceCategory and the card chips use:
+  // Mode B entries carry their own, Mode A entries take the search's global box.
+  const qualities = new Set(chosen.map(c => c.quality ?? quality));
+  const mixedQuality = qualities.size > 1;
   // Line 1: container name (respects compare mode where each column has its own container),
-  // plus the armor when one is actually applied to the numbers below - fmtWithBonus folds the
-  // armor into the totals, so naming it keeps the copied text self-describing. Gated on
-  // includeArmorBuffs as well as selectedArmor, so the line only claims an armor that's really
-  // in the numbers. Reading the two globals directly matches fmtWithBonus -> displayValue.
-  const armorPart = (selectedArmor && includeArmorBuffs) ? `[${selectedArmor.name}]` : '';
-  const headParts = [containerName ? `[${containerName}]` : '', armorPart].filter(Boolean);
-  const containerLine = headParts.length ? `${headParts.join(' + ')}\n` : '';
-  // Line 2: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
+  // then the level/quality the artefact numbers below were computed at. The armor is NOT named
+  // here - it is named on the Effective Health line instead, which prints under exactly the same
+  // gate (selectedArmor && includeArmorBuffs), so text shaped by an armor still always names it.
+  const qualityPart = mixedQuality
+    ? 'mixed quality'
+    : (() => { const q = qualities.values().next().value; return `Quality ${q}% ${QUALITY_LABELS[q] || ''}`.trim(); })();
+  const headParts = [containerName ? `[${containerName}]` : '', `[Artefacts LvL ${level} - ${qualityPart}]`].filter(Boolean);
+  const containerLine = `${headParts.join(' ')}\n`;
+  // Line 2: price band. Unpriceable builds omit the line rather than print a placeholder.
+  const priceCat = buildPriceCategory(chosen, quality);
+  const priceLine = priceCat == null ? '' :
+    `Price: ${'$'.repeat(priceCat)} (${PRICE_STOP_NAMES[priceCat-1]})\n`;
+  // Line 3: Effective Health, matching the card's line - computeEffectiveHealth already respects
+  // both bonus toggles, and the armor is named here when it is actually in the number.
+  const ehArmorNote = (selectedArmor && includeArmorBuffs) ? ` w/ ${selectedArmor.name}` : '';
+  const ehLine = `Effective Health: ${computeEffectiveHealth(sum, containerBonus).toFixed(2)}${ehArmorNote}\n`;
+  // Line 4: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
   const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
   const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
-  // Line 3: artefact list, combined by name. Loadout mode can hold one artefact at two
-  // qualities, and this text never carries quality, so it would read as "1x X, 1x X".
+  // Line 5: artefact list, combined by name. Loadout mode can hold one artefact at two
+  // qualities, so when they differ the key and the label carry the quality too - otherwise the
+  // two entries collapse into an unreadable "2x X" under a header that can't name one quality.
   const artCounts = new Map();
   sortChosenForDisplay(chosen).forEach(c => {
-    const n = ARTIFACTS[c.idx].name;
+    const q = c.quality ?? quality;
+    const n = ARTIFACTS[c.idx].name + (mixedQuality ? ` (${QUALITY_LABELS[q] || q + '%'})` : '');
     artCounts.set(n, (artCounts.get(n) || 0) + c.count);
   });
   const artParts = Array.from(artCounts, ([n, cnt]) => `${cnt}\u00d7 ${n}`);
-  // Line 4: stat totals using fmtWithBonus so container/armor bonus toggles are respected
+  // Line 6: stat totals using fmtWithBonus so container/armor bonus toggles are respected
   const statParts = targetStats.map(t => `${t.name}: ${fmtWithBonus(t.name, sum[STAT_IDX[t.name]], containerBonus, protection)}`);
-  const priceCat = buildPriceCategory(chosen, currentPriceQuality);
-  const priceLine = priceCat == null ? '' :
-    `\n\u{1F4B0} ${'$'.repeat(priceCat)} ${['Cheap','Average','Expensive','Beyond'][priceCat-1]}`;
-  return `${containerLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}${priceLine}`;
+  return `${containerLine}${priceLine}${ehLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
 }
 document.getElementById('results').addEventListener('click', e=>{
   // save-build-btn also carries the copy-result-btn class for shared styling (see CSS) -
@@ -5427,7 +5436,11 @@ document.getElementById('results').addEventListener('click', e=>{
     containerBonus = source.containerBonus;
     protection = source.protection;
   }
-  const text = formatResultForDiscord(result, idx + 1, source.targetStats, containerName, containerBonus, protection);
+  // level/quality come off the search that produced these cards, not the live input boxes, so
+  // the header names what the printed numbers were actually computed at. Both render args
+  // carry them; quality also grades the price line, replacing currentPriceQuality here (same
+  // value on both paths - each render entry point sets it from this very field).
+  const text = formatResultForDiscord(result, idx + 1, source.targetStats, containerName, containerBonus, protection, source.level, source.quality);
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent = '\u2713 copied';
     btn.classList.add('copied');
