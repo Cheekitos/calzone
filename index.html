@@ -586,6 +586,26 @@
   }
 
   .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  /* Container-bonus exclusion marker. CSS tooltip, not native title: shows instantly and
+     reachable by tab/tap. Nothing above .note clips, so the bubble can sit outside it. */
+  .not-included-x{
+    position:relative;display:inline-block;
+    color:var(--bad);font-size:0.85em;cursor:help;
+  }
+  .not-included-x:focus{outline:none;}
+  .not-included-x::after{
+    content:attr(data-tip);
+    position:absolute;top:calc(100% + 5px);left:calc(100% + 4px);
+    background:var(--panel-3);color:var(--text);
+    border:1px solid var(--border);border-radius:var(--r-sm);
+    padding:5px 8px;font-size:11px;line-height:1.3;
+    /* max-content, not nowrap: wraps instead of running off a narrow viewport. */
+    width:max-content;max-width:min(220px,calc(100vw - 24px));
+    box-shadow:var(--shadow);
+    opacity:0;pointer-events:none;transition:opacity 0.12s ease;z-index:300;
+  }
+  /* Delay on show only, so it doesn't fire on a pass-through, but hides immediately. */
+  .not-included-x:hover::after,.not-included-x:focus::after{opacity:1;transition-delay:0.4s;}
   .empty-state{color:var(--muted);font-size:12.5px;padding:34px 12px;text-align:center;}
   .msg-error{
     background:var(--bad-bg);border:1px solid rgba(240,86,95,0.45);color:#FFB9BD;
@@ -3665,7 +3685,7 @@ function updateBackpackBonusNote(){
     let s = formatBonusStat(n,v);
     // Marker lives here, not in formatBonusStat - that helper is shared with both popovers
     // and the armor note, none of which may show it.
-    if (!GROUP1_DEBUFF.has(n) && !buffsOn) s += ' <span style="color:var(--bad);font-size:0.85em;cursor:help;" title="not included in results">\u2715</span>';
+    if (!GROUP1_DEBUFF.has(n) && !buffsOn) s += ' <span class="not-included-x" tabindex="0" data-tip="not included in results" aria-label="not included in results">\u2715</span>';
     return s;
   }).join(', ');
 }
@@ -3696,11 +3716,14 @@ compareModeBtnEl.addEventListener('click', ()=>{
   const on = !compareModeBtnEl.classList.contains('active');
   compareModeBtnEl.classList.toggle('active', on);
   backpackSelectEl.closest('label.field').style.display = on ? 'none' : '';
-  if (on) document.getElementById('backpackBonusNote').style.display = 'none';
-  else updateBackpackBonusNote(); // restore note to whatever it should show for the current selection
   document.getElementById('compareContainersBlock').style.display = on ? '' : 'none';
   // Comparing containers only means something with their bonus stats shown.
   setBuffToggle('includeContainerBuffsChk', on);
+  // Note handled AFTER setBuffToggle, never before: it reads the checkbox live, so running it
+  // first renders against the pre-toggle state, and the change listener's compareModeActive
+  // early-return means nothing re-renders it afterwards.
+  if (on) document.getElementById('backpackBonusNote').style.display = 'none';
+  else updateBackpackBonusNote();
 });
 
 // Basic/Advanced mode toggle (session-only).
