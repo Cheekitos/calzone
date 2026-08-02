@@ -553,9 +553,38 @@
     border:none;cursor:pointer;box-shadow:0 0 0 3px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
   }
   .popover-maxcopies input[type=range]{width:100%;}
-  .price-range-slider-label{
-    font-family:var(--mono);font-size:14px;letter-spacing:0.09em;white-space:nowrap;
-    min-width:52px;text-align:right;
+  /* Price slider only: 25% smaller thumb. Overrides the shared rule above by order -
+     the max-copies popover slider keeps the 15px thumb. */
+  .price-range-slider-row input[type=range]::-webkit-slider-thumb{
+    width:11px;height:11px;
+    box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .price-range-slider-row input[type=range]::-moz-range-thumb{
+    width:11px;height:11px;
+    box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  /* Four discrete stops. Legend labels and ticks sit at 0 / 33.3 / 66.7 / 100% -
+     the thumb centres - so the names read as marks on the track, not free text. */
+  .price-range-control{margin-top:2px;}
+  .price-range-legend{position:relative;height:14px;margin-bottom:7px;}
+  .price-range-stop-name{color:var(--warn);letter-spacing:0.15em;}
+  .price-range-stop{
+    position:absolute;top:0;padding:0;border:0;background:none;cursor:pointer;
+    font-family:var(--mono);font-size:12px;letter-spacing:0.04em;
+    color:var(--muted);opacity:0.45;white-space:nowrap;
+    transition:color 0.12s ease,opacity 0.12s ease;
+  }
+  .price-range-stop:hover{color:var(--text);opacity:1;}
+  .price-range-stop.active{color:var(--warn);opacity:1;}
+  .price-range-stop:focus-visible{outline:1px solid var(--accent);outline-offset:2px;border-radius:2px;}
+  .price-range-stop[data-stop="1"]{left:0;}
+  .price-range-stop[data-stop="2"]{left:33.33%;transform:translateX(-50%);}
+  .price-range-stop[data-stop="3"]{left:66.67%;transform:translateX(-50%);}
+  .price-range-stop[data-stop="4"]{left:100%;transform:translateX(-100%);}
+  /* Ticks are painted into the track's own background, not as sibling elements -
+     a sibling paints above the thumb and the thumb has to cover them. */
+  @media(max-width:700px){
+    .price-range-stop{font-size:11px;letter-spacing:0;}
   }
 
   .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
@@ -1146,10 +1175,18 @@
         </div>
         <!-- Outside the row so it doesn't affect toggle/select height alignment -->
         <div class="lvl-note" id="lvlNote">Additional stats excluded</div>
-        <div class="debuff-toggle-label" style="margin-top:14px;">Price range:</div>
-        <div class="price-range-slider-row">
-          <input type="range" id="priceRangeSlider" min="1" max="5" step="1" value="5">
-          <span class="price-range-slider-label" id="priceRangeSliderLabel"></span>
+        <div class="lbl" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);margin-bottom:9px;">Price range: <span class="price-range-stop-name" id="priceRangeStopName">No limit</span></div>
+        <div class="price-range-control">
+          <div class="price-range-legend" id="priceRangeLegend">
+            <button type="button" class="price-range-stop" data-stop="1" aria-label="Cheap">$</button>
+            <button type="button" class="price-range-stop" data-stop="2" aria-label="Average">$$</button>
+            <button type="button" class="price-range-stop" data-stop="3" aria-label="Expensive">$$$</button>
+            <button type="button" class="price-range-stop" data-stop="4" aria-label="No limit">$$$$</button>
+          </div>
+          <div class="price-range-slider-row">
+            <input type="range" id="priceRangeSlider" min="1" max="4" step="1" value="4"
+                   aria-label="Price range" aria-valuetext="No limit">
+          </div>
         </div>
         <div class="advanced-wrap"><div class="advanced-inner">
         <div class="check-group-hdr" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Extra Options</div>
@@ -1553,133 +1590,170 @@ const ARTIFACTS = [
 
 // --- Build price -----------------------------------------------------------
 // Keys must match ARTIFACTS[].name exactly.
-const ARTIFACT_PRICES = {
-  "Acid Crystal": 1,
-  "Amberite": 2,
-  "Atom": 4,
-  "Battery": 1,
-  "Berry": 1,
-  "Bismuth": 3,
-  "Black Hole": 4,
-  "Bracelet": 4,
-  "Bubblegum": 5,
-  "Burr": 1,
-  "Candlelight": 1,
-  "Chicken God": 2,
-  "Chilly": 5,
-  "Coil": 4,
-  "Colophony": 2,
-  "Comet": 1,
-  "Cone": 3,
-  "Crust": 1,
-  "Cryogen": 1,
-  "Cursed Rose": 2,
-  "Cycle": 4,
-  "Dark Crystal": 1,
-  "Dark Viburnum": 5,
-  "Disintegrator": 2,
-  "Dumbbell": 3,
-  "Egg": 4,
-  "Embryo": 1,
-  "Eye of the Storm": 3,
-  "Fahrenheit": 2,
-  "Firebird": 1,
-  "Flicker": 3,
-  "Fossil": 4,
-  "Frame": 2,
-  "Frost": 1,
-  "Gills": 3,
-  "Golden Prima": 2,
-  "Gum": 2,
-  "Heart": 1,
-  "Hedgehog": 2,
-  "Heel": 3,
-  "Helium": 4,
-  "Hoop": 4,
-  "Ice Hedgehog": 2,
-  "Ilyich Lamp": 2,
-  "Inkwell": 1,
-  "Inside Out Rose": 3,
-  "Jelly": 5,
-  "Kettlebell": 1,
-  "Lard": 1,
-  "Larva": 2,
-  "Leaded Glass": 2,
-  "Leech": 1,
-  "Lemna": 2,
-  "Link": 5,
-  "Lollipop": 1,
-  "Loop": 4,
-  "Magma": 5,
-  "Mirror": 2,
-  "Mug": 3,
-  "Onion": 1,
-  "Opal": 5,
-  "Peg-Top": 4,
-  "Phlegm": 1,
-  "Polyhedron": 3,
-  "Prima": 1,
-  "Prism": 4,
-  "Proto-Onion": 2,
-  "Pumpkin": 4,
-  "Radiator": 2,
-  "Raisin": 5,
-  "Rattle": 1,
-  "Red Crystal": 1,
-  "Retina": 3,
-  "Rime": 2,
-  "Rose": 1,
-  "Scallop": 1,
-  "Scrubber": 3,
-  "Shard": 3,
-  "Shrimp": 1,
-  "Snail": 2,
-  "Snake Eye": 3,
-  "Snares": 1,
-  "Spectral Crystal": 1,
-  "Spiral": 3,
-  "Sponge": 1,
-  "Static": 4,
-  "Steel Hedgehog": 4,
-  "Sticky Burr": 2,
-  "Stress Fest": 3,
-  "Sun": 3,
-  "Swamp Rot": 1,
-  "Tallow": 2,
-  "Timber": 4,
-  "Tiny Key": 3,
-  "Transformer": 2,
-  "Veiner": 1,
-  "Viburnum Branch": 4,
-  "Whirlwind": 4,
-  "White Rose": 1,
-  "Wicked Hedgehog": 4,
-  "Wolf Tears": 1,
+const ARTIFACT_COSTS = {
+  "Acid Crystal": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Amberite": {100: 45000, 115: 90000, 130: 300000, 145: 1000000, 160: 1000000, 175: 1000000},
+  "Atom": {100: 200000, 115: 700000, 130: 3000000, 145: 12000000, 160: 12000000, 175: 12000000},
+  "Battery": {100: 10000, 115: 15000, 130: 30000, 145: 100000, 160: 100000, 175: 100000},
+  "Berry": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Bismuth": {100: 50000, 115: 85000, 130: 250000, 145: 700000, 160: 700000, 175: 700000},
+  "Black Hole": {100: 130000, 115: 500000, 130: 2000000, 145: 12000000, 160: 12000000, 175: 12000000},
+  "Bracelet": {100: 100000, 115: 450000, 130: 3000000, 145: 10000000, 160: 10000000, 175: 10000000},
+  "Bubblegum": {100: 350000, 115: 1500000, 130: 22000000, 145: 70000000, 160: 70000000, 175: 70000000},
+  "Burr": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Candlelight": {100: 10000, 115: 15000, 130: 20000, 145: 35000, 160: 35000, 175: 35000},
+  "Chicken God": {100: 30000, 115: 50000, 130: 200000, 145: 700000, 160: 700000, 175: 700000},
+  "Chilly": {100: 200000, 115: 1000000, 130: 6000000, 145: 30000000, 160: 30000000, 175: 30000000},
+  "Coil": {100: 150000, 115: 500000, 130: 5000000, 145: 15000000, 160: 15000000, 175: 15000000},
+  "Colophony": {100: 50000, 115: 150000, 130: 200000, 145: 1500000, 160: 1500000, 175: 1500000},
+  "Comet": {100: 10000, 115: 15000, 130: 35000, 145: 80000, 160: 80000, 175: 80000},
+  "Cone": {100: 100000, 115: 200000, 130: 500000, 145: 1000000, 160: 1000000, 175: 1000000},
+  "Crust": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Cryogen": {100: 10000, 115: 15000, 130: 40000, 145: 120000, 160: 120000, 175: 120000},
+  "Cursed Rose": {100: 10000, 115: 20000, 130: 120000, 145: 1000000, 160: 1000000, 175: 1000000},
+  "Cycle": {100: 150000, 115: 250000, 130: 2000000, 145: 8000000, 160: 8000000, 175: 8000000},
+  "Dark Crystal": {100: 10000, 115: 15000, 130: 30000, 145: 300000, 160: 300000, 175: 300000},
+  "Dark Viburnum": {100: 170000, 115: 1200000, 130: 8000000, 145: 30000000, 160: 30000000, 175: 30000000},
+  "Disintegrator": {100: 10000, 115: 15000, 130: 50000, 145: 100000, 160: 100000, 175: 100000},
+  "Dumbbell": {100: 40000, 115: 60000, 130: 200000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Egg": {100: 150000, 115: 300000, 130: 800000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Embryo": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Eye of the Storm": {100: 150000, 115: 300000, 130: 500000, 145: 1500000, 160: 1500000, 175: 1500000},
+  "Fahrenheit": {100: 25000, 115: 45000, 130: 200000, 145: 1500000, 160: 1500000, 175: 1500000},
+  "Firebird": {100: 10000, 115: 15000, 130: 30000, 145: 250000, 160: 250000, 175: 250000},
+  "Flicker": {100: 50000, 115: 75000, 130: 300000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Fossil": {100: 150000, 115: 500000, 130: 3000000, 145: 13000000, 160: 13000000, 175: 13000000},
+  "Frame": {100: 60000, 115: 90000, 130: 600000, 145: 1500000, 160: 1500000, 175: 1500000},
+  "Frost": {100: 15000, 115: 25000, 130: 35000, 145: 50000, 160: 50000, 175: 50000},
+  "Gills": {100: 50000, 115: 100000, 130: 500000, 145: 2000000, 160: 2000000, 175: 2000000},
+  "Golden Prima": {100: 15000, 115: 70000, 130: 200000, 145: 850000, 160: 850000, 175: 850000},
+  "Gum": {100: 50000, 115: 100000, 130: 200000, 145: 800000, 160: 800000, 175: 800000},
+  "Heart": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
+  "Hedgehog": {100: 20000, 115: 40000, 130: 100000, 145: 300000, 160: 300000, 175: 300000},
+  "Heel": {100: 60000, 115: 100000, 130: 800000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Helium": {100: 50000, 115: 250000, 130: 1300000, 145: 5000000, 160: 5000000, 175: 5000000},
+  "Hoop": {100: 75000, 115: 250000, 130: 1200000, 145: 4000000, 160: 4000000, 175: 4000000},
+  "Ice Hedgehog": {100: 10000, 115: 40000, 130: 200000, 145: 850000, 160: 850000, 175: 850000},
+  "Ilyich Lamp": {100: 20000, 115: 50000, 130: 150000, 145: 500000, 160: 500000, 175: 500000},
+  "Inkwell": {100: 10000, 115: 20000, 130: 35000, 145: 60000, 160: 60000, 175: 60000},
+  "Inside Out Rose": {100: 40000, 115: 60000, 130: 500000, 145: 5000000, 160: 5000000, 175: 5000000},
+  "Jelly": {100: 40000, 115: 150000, 130: 500000, 145: 1800000, 160: 1800000, 175: 1800000},
+  "Kettlebell": {100: 10000, 115: 20000, 130: 35000, 145: 100000, 160: 100000, 175: 100000},
+  "Lard": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Larva": {100: 60000, 115: 80000, 130: 130000, 145: 600000, 160: 600000, 175: 600000},
+  "Leaded Glass": {100: 15000, 115: 30000, 130: 50000, 145: 100000, 160: 100000, 175: 100000},
+  "Leech": {100: 10000, 115: 12000, 130: 15000, 145: 20000, 160: 20000, 175: 20000},
+  "Lemna": {100: 10000, 115: 30000, 130: 60000, 145: 120000, 160: 120000, 175: 120000},
+  "Link": {100: 150000, 115: 600000, 130: 4000000, 145: 17000000, 160: 17000000, 175: 17000000},
+  "Lollipop": {100: 10000, 115: 12000, 130: 20000, 145: 40000, 160: 40000, 175: 40000},
+  "Loop": {100: 150000, 115: 500000, 130: 1500000, 145: 8000000, 160: 8000000, 175: 8000000},
+  "Magma": {100: 160000, 115: 800000, 130: 8000000, 145: 28000000, 160: 28000000, 175: 28000000},
+  "Mirror": {100: 35000, 115: 55000, 130: 150000, 145: 500000, 160: 500000, 175: 500000},
+  "Mug": {100: 60000, 115: 80000, 130: 200000, 145: 1500000, 160: 1500000, 175: 1500000},
+  "Onion": {100: 10000, 115: 12000, 130: 15000, 145: 20000, 160: 20000, 175: 20000},
+  "Opal": {100: 400000, 115: 2500000, 130: 18000000, 145: 70000000, 160: 70000000, 175: 70000000},
+  "Peg-Top": {100: 90000, 115: 150000, 130: 1200000, 145: 4500000, 160: 4500000, 175: 4500000},
+  "Phlegm": {100: 10000, 115: 12000, 130: 15000, 145: 20000, 160: 20000, 175: 20000},
+  "Polyhedron": {100: 50000, 115: 120000, 130: 400000, 145: 2000000, 160: 2000000, 175: 2000000},
+  "Prima": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Prism": {100: 250000, 115: 850000, 130: 3500000, 145: 14000000, 160: 14000000, 175: 14000000},
+  "Proto-Onion": {100: 15000, 115: 30000, 130: 75000, 145: 300000, 160: 300000, 175: 300000},
+  "Pumpkin": {100: 180000, 115: 350000, 130: 3000000, 145: 8000000, 160: 8000000, 175: 8000000},
+  "Radiator": {100: 50000, 115: 85000, 130: 150000, 145: 750000, 160: 750000, 175: 750000},
+  "Raisin": {100: 500000, 115: 2500000, 130: 18000000, 145: 45000000, 160: 45000000, 175: 45000000},
+  "Rattle": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Red Crystal": {100: 10000, 115: 12000, 130: 15000, 145: 20000, 160: 20000, 175: 20000},
+  "Retina": {100: 50000, 115: 150000, 130: 850000, 145: 5000000, 160: 5000000, 175: 5000000},
+  "Rime": {100: 20000, 115: 50000, 130: 120000, 145: 500000, 160: 500000, 175: 500000},
+  "Rose": {100: 10000, 115: 12000, 130: 20000, 145: 50000, 160: 50000, 175: 50000},
+  "Scallop": {100: 10000, 115: 15000, 130: 25000, 145: 100000, 160: 100000, 175: 100000},
+  "Scrubber": {100: 60000, 115: 100000, 130: 500000, 145: 2500000, 160: 2500000, 175: 2500000},
+  "Shard": {100: 40000, 115: 200000, 130: 500000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Shrimp": {100: 10000, 115: 15000, 130: 100000, 145: 200000, 160: 200000, 175: 200000},
+  "Snail": {100: 12000, 115: 20000, 130: 35000, 145: 80000, 160: 80000, 175: 80000},
+  "Snake Eye": {100: 40000, 115: 180000, 130: 800000, 145: 4500000, 160: 4500000, 175: 4500000},
+  "Snares": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Spectral Crystal": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Spiral": {100: 35000, 115: 180000, 130: 700000, 145: 2000000, 160: 2000000, 175: 2000000},
+  "Sponge": {100: 10000, 115: 12000, 130: 15000, 145: 35000, 160: 35000, 175: 35000},
+  "Static": {100: 80000, 115: 300000, 130: 800000, 145: 5000000, 160: 5000000, 175: 5000000},
+  "Steel Hedgehog": {100: 50000, 115: 200000, 130: 1500000, 145: 8500000, 160: 8500000, 175: 8500000},
+  "Sticky Burr": {100: 10000, 115: 15000, 130: 40000, 145: 75000, 160: 75000, 175: 75000},
+  "Stress Fest": {100: 100000, 115: 300000, 130: 1000000, 145: 2500000, 160: 2500000, 175: 2500000},
+  "Sun": {100: 50000, 115: 85000, 130: 500000, 145: 2500000, 160: 2500000, 175: 2500000},
+  "Swamp Rot": {100: 10000, 115: 12000, 130: 25000, 145: 35000, 160: 35000, 175: 35000},
+  "Tallow": {100: 25000, 115: 50000, 130: 80000, 145: 300000, 160: 300000, 175: 300000},
+  "Timber": {100: 80000, 115: 120000, 130: 1000000, 145: 5000000, 160: 5000000, 175: 5000000},
+  "Tiny Key": {100: 40000, 115: 70000, 130: 500000, 145: 3000000, 160: 3000000, 175: 3000000},
+  "Transformer": {100: 50000, 115: 85000, 130: 300000, 145: 1000000, 160: 1000000, 175: 1000000},
+  "Veiner": {100: 10000, 115: 15000, 130: 65000, 145: 600000, 160: 600000, 175: 600000},
+  "Viburnum Branch": {100: 95000, 115: 400000, 130: 1000000, 145: 7500000, 160: 7500000, 175: 7500000},
+  "Whirlwind": {100: 100000, 115: 450000, 130: 1500000, 145: 6000000, 160: 6000000, 175: 6000000},
+  "White Rose": {100: 10000, 115: 12000, 130: 45000, 145: 100000, 160: 100000, 175: 100000},
+  "Wicked Hedgehog": {100: 70000, 115: 140000, 130: 1200000, 145: 8000000, 160: 8000000, 175: 8000000},
+  "Wolf Tears": {100: 10000, 115: 12000, 130: 15000, 145: 25000, 160: 25000, 175: 25000},
 };
 
-function buildPriceCategory(chosen){
-  let tierSum = 0, slotCount = 0;
+// Calibrated from sampled winning-build costs: quartiles (p25/p50/p75) of the
+// per-slot rouble cost of builds the optimiser actually returns, over 10
+// representative searches x 10 builds at each quality, rounded. 160/175 mirror 145.
+const PRICE_BAND_EDGES = {
+  100: [35_000, 90_000, 130_000],
+  115: [60_000, 200_000, 600_000],
+  130: [200_000, 1_000_000, 4_000_000],
+  145: [550_000, 3_000_000, 18_000_000],
+  160: [550_000, 3_000_000, 18_000_000],
+  175: [550_000, 3_000_000, 18_000_000],
+};
+
+(function assertCostsExhaustive(){
+  const qs = [100,115,130,145,160,175];
+  const missing = ARTIFACTS.map(a => a.name).filter(n => !ARTIFACT_COSTS[n]);
+  if (missing.length) console.error('ARTIFACT_COSTS missing:', missing);
+  for (const n in ARTIFACT_COSTS){
+    const bad = qs.filter(q => typeof ARTIFACT_COSTS[n][q] !== 'number');
+    if (bad.length) console.error('ARTIFACT_COSTS incomplete for', n, bad);
+  }
+  const badQ = qs.filter(q => !Array.isArray(PRICE_BAND_EDGES[q]) || PRICE_BAND_EDGES[q].length !== 3);
+  if (badQ.length) console.error('PRICE_BAND_EDGES incomplete for', badQ);
+})();
+
+
+let currentPriceQuality = 100; // set by each render entry point before cards build
+
+// 1..4, or null if unpriceable. Each entry is priced AND graded at its own
+// quality; `quality` is the fallback for entries carrying null (normal search).
+function buildPriceCategory(chosen, quality){
+  let total = 0, slots = 0;
+  const edgeTotals = [0, 0, 0];
   for (const c of chosen){
-    const tier = ARTIFACT_PRICES[ARTIFACTS[c.idx].name];
-    if (tier == null){
-      console.warn('No price entry for artifact:', ARTIFACTS[c.idx].name);
+    const name = ARTIFACTS[c.idx].name;
+    const q = c.quality ?? quality;
+    const row = ARTIFACT_COSTS[name];
+    const cost = row && row[q];
+    const e = PRICE_BAND_EDGES[q];
+    if (cost == null || !e){
+      console.warn('No cost/edges for artifact:', name, 'at quality', q);
       return null;
     }
-    tierSum += tier * c.count;
-    slotCount += c.count;
+    total += cost * c.count;
+    for (let i = 0; i < 3; i++) edgeTotals[i] += e[i] * c.count;
+    slots += c.count;
   }
-  if (slotCount === 0) return null;
-  return Math.round(tierSum / slotCount);
+  if (slots === 0) return null;
+  for (let i = 0; i < 3; i++) if (total <= edgeTotals[i]) return i + 1;
+  return 4;
 }
 
 function priceBadgeHtml(chosen){
-  const cat = buildPriceCategory(chosen);
+  const cat = buildPriceCategory(chosen, currentPriceQuality);
   if (cat == null) return '';
   let signs = '';
-  for (let i = 1; i <= 5; i++){
+  for (let i = 1; i <= 4; i++){
     signs += `<span class="price-sign${i <= cat ? ' filled' : ''}">$</span>`;
   }
-  return `<span class="price-badge" title="Price category ${cat}/5">${signs}</span>`;
+  const label = ['Cheap','Average','Expensive','Beyond'][cat-1];
+  return `<span class="price-badge" title="${label} (${cat}/4)">${signs}</span>`;
 }
 
 function deriveStatValue(range){
@@ -1794,16 +1868,34 @@ function renderDebuffToggles(){
 renderDebuffToggles();
 
 // Mirrors priceBadgeHtml's fill pattern; also paints the track (native range has no filled side).
+const PRICE_STOP_NAMES = ['Cheap','Average','Expensive','No limit'];
 function updatePriceRangeSliderLabel(){
   const slider = document.getElementById('priceRangeSlider');
   const v = parseInt(slider.value);
-  let signs = '';
-  for (let i=1;i<=5;i++) signs += `<span class="price-sign${i<=v?' filled':''}">$</span>`;
-  document.getElementById('priceRangeSliderLabel').innerHTML = signs;
-  const pct = (v-1)/(5-1)*100;
-  slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--panel-2) ${pct}%)`;
+  document.querySelectorAll('.price-range-stop').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.stop) === v);
+  });
+  document.getElementById('priceRangeStopName').textContent = PRICE_STOP_NAMES[v-1];
+  slider.setAttribute('aria-valuetext', PRICE_STOP_NAMES[v-1]);
+  const pct = (v-1)/(4-1)*100;
+  // Earlier layers paint on top, so the ticks sit over the fill; both sit under the
+  // thumb, which is a pseudo-element of the input itself.
+  const tick = 'linear-gradient(var(--muted),var(--muted))';
+  slider.style.background =
+    `${tick} 0% 0/1px 100% no-repeat,` +
+    `${tick} 33.33% 0/1px 100% no-repeat,` +
+    `${tick} 66.67% 0/1px 100% no-repeat,` +
+    `${tick} 100% 0/1px 100% no-repeat,` +
+    `linear-gradient(to right, var(--accent) ${pct}%, var(--panel-2) ${pct}%)`;
 }
 document.getElementById('priceRangeSlider').addEventListener('input', updatePriceRangeSliderLabel);
+// Clicking a name jumps the slider - the labels are marks, so they should be targets.
+document.getElementById('priceRangeLegend').addEventListener('click', e => {
+  const btn = e.target.closest('.price-range-stop');
+  if (!btn) return;
+  document.getElementById('priceRangeSlider').value = btn.dataset.stop;
+  updatePriceRangeSliderLabel();
+});
 updatePriceRangeSliderLabel();
 
 // Display-only: re-renders cached results instead of re-searching; branches on compareModeActive.
@@ -1824,19 +1916,11 @@ document.getElementById('includeContainerBuffsChk').addEventListener('change', e
   }
 });
 
-// Same display-only treatment as includeContainerBuffsChk above.
+// Same display-only treatment as includeContainerBuffsChk above. Unlike the container handler
+// it has no note to refresh, so it delegates straight to the shared display-only re-render.
 document.getElementById('includeArmorBuffsChk').addEventListener('change', e=>{
   includeArmorBuffs = e.target.checked;
-  if (compareBuildsActive){ renderBuildsCompare(); return; }
-  if (compareModeActive){
-    if (lastComparisonRenderArgs){
-      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
-    }
-    return;
-  }
-  if (lastRenderArgs){
-    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
-  }
+  rerenderDisplayOnly();
 });
 
 // Same display-only treatment as includeContainerBuffsChk/includeArmorBuffsChk above.
@@ -1858,9 +1942,10 @@ document.getElementById('showConsumableZoneChk').addEventListener('change', e=>{
 // 'change' so the listeners above stay the only owners of the state var and the re-render.
 function setBuffToggle(id, on){
   const el = document.getElementById(id);
-  if (el.checked === on) return;
+  if (el.checked === on) return false;  // no state change, so no 'change' event is dispatched
   el.checked = on;
   el.dispatchEvent(new Event('change'));
+  return true;
 }
 
 // Filtered by name rather than deleted from ARTIFACTS, so every in-memory index-keyed
@@ -2825,6 +2910,8 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   updateArmorBonusNote();
   document.getElementById('levelInput').value = 0;
   document.getElementById('qualityInput').value = 100;
+  // Colour is JS-driven, so setting .value alone leaves the old quality's colour on it.
+  colorQualitySelect(document.getElementById('qualityInput'));
   // Default off - driven by the level toggle.
   document.getElementById('includeAdditionalChk').checked = false;
   // Through setBuffToggle, not by hand, or the container note desyncs from the toggle.
@@ -2837,7 +2924,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   lvlNote.textContent = 'Additional stats excluded';
   lvlNote.className = 'lvl-note';
   NO_DEBUFF_FILTERS.forEach(f=>{ document.getElementById(f.btn).classList.toggle('active', f.defaultOn); });
-  document.getElementById('priceRangeSlider').value = 5;
+  document.getElementById('priceRangeSlider').value = 4;
   updatePriceRangeSliderLabel();
   statListEl.querySelectorAll('input[data-stat]').forEach(c=>c.checked=false);
   statListEl.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active', b.dataset.tier==='med'));
@@ -3743,6 +3830,21 @@ const ARMORS = [
   { name:"Voshod Heavy Armored Suit", tier:"rare", br:141, bonus:{"Carry weight":14, "Bleeding protection":45} },
 ];
 
+/* Armor is a display overlay and never enters the caps. That's only safe because no armor
+   carries a threshold (damage) stat in its bonus block - so armor can't push a build over or
+   under a legality cap. True by inspection across all 72 today; this assert makes it true by
+   construction, turning a future data edit that breaks it into a loud load-time failure rather
+   than a silent mis-cap. See DECISIONS.md "Armor as a display overlay". */
+(function assertNoArmorThresholdStat(){
+  ARMORS.forEach(a=>{
+    Object.keys(a.bonus).forEach(stat=>{
+      if (STAT_META[stat] && STAT_META[stat].threshold){
+        throw new Error(`Armor "${a.name}" carries threshold stat "${stat}" - the display-overlay model assumes no armor affects the caps. Fold armor into the cap checks before shipping this data.`);
+      }
+    });
+  });
+})();
+
 const armorSelectEl = document.getElementById('armorSelect');
 // Same as the container selects: rarity order kept, headers dropped, colour carries the tier.
 ['legendary','exclusive','rare'].forEach(tier=>{
@@ -3798,15 +3900,20 @@ armorSelectEl.addEventListener('change', ()=>{
     selectedArmor = null;
     armorSelectEl.style.color = '';
     updateArmorBonusNote();
-    // No armor, nothing for the row to show - switch it back off.
-    setBuffToggle('includeArmorBuffsChk', false);
+    // No armor, nothing for the row to show - switch it back off. If the tick was already off
+    // (user unticked it earlier), setBuffToggle dispatches nothing, so re-render by hand to
+    // drop the previous armor from the cards.
+    if (!setBuffToggle('includeArmorBuffsChk', false)) rerenderDisplayOnly();
     return;
   }
   selectedArmor = ARMORS[parseInt(armorSelectEl.value)];
   armorSelectEl.style.color = ARMOR_TIER_META[selectedArmor.tier].color;
   updateArmorBonusNote();
   // With an armor picked the results are more relevant with its bonus shown, so switch it on.
-  setBuffToggle('includeArmorBuffsChk', true);
+  // When the toggle was already on (swapping armor A -> B) it dispatches nothing and the cards
+  // would keep printing armor A - re-render by hand in exactly that case. selectedArmor is set
+  // above, so both the toggle-driven and manual renders see the new armor.
+  if (!setBuffToggle('includeArmorBuffsChk', true)) rerenderDisplayOnly();
 });
 
 // BR/Vitality gated by their own container/armor buff toggles, same as displayed stats.
@@ -3879,7 +3986,7 @@ function buildPoolModeB(includeAdditional, effectiveness, level){
 function buildContainerSearchPayload(containerCfg, sharedCtx){
   const { slots, protection, effectiveness, bonus } = containerCfg;
   const { targetStats, includedIdx, includeAdditional, level, quality,
-          noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed, includeContainerBuffs } = sharedCtx;
+          noDebuffIdx, useLoadout, pinnedIdx, priceBandIdx, includeContainerBuffs } = sharedCtx;
 
   if (pinnedIdx.length >= slots){
     const msg = containerCfg.name
@@ -3902,12 +4009,6 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
   if (!useLoadout) {
     pinnedIdx.forEach(pi => { for (let k=0;k<NS;k++) lockedSum[k] += VECS[pi][k]; });
   }
-
-  let lockedPriceTierSum = 0, lockedPriceMissing = false;
-  pinnedIdx.forEach(pi => {
-    const tier = ARTIFACT_PRICES[ARTIFACTS[pi].name];
-    if (tier == null) lockedPriceMissing = true; else lockedPriceTierSum += tier;
-  });
 
   const pinnedQuality = {};
   let poolVecs, poolMax, poolMeta;
@@ -3967,7 +4068,24 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     poolMeta = order.map(i=>poolMeta[i]);
   }
 
-  const poolPriceTier = poolMeta.map(m => ARTIFACT_PRICES[ARTIFACTS[m.artifactIdx].name] ?? null);
+  // Index-parallel to the sorted pool - must stay below the soloScore sort above.
+  const poolPriceCost = poolMeta.map(m => {
+    const row = ARTIFACT_COSTS[ARTIFACTS[m.artifactIdx].name];
+    return row ? (row[m.quality ?? quality] ?? null) : null;
+  });
+  const poolPriceEdge = priceBandIdx === null
+    ? null
+    : poolMeta.map(m => PRICE_BAND_EDGES[m.quality ?? quality][priceBandIdx]);
+
+  // Below pool construction: pinnedQuality is only populated by the Mode B branch.
+  let lockedPriceCostSum = 0, lockedPriceEdgeSum = 0, lockedPriceMissing = false;
+  pinnedIdx.forEach(pi => {
+    const q = pinnedQuality[pi] ?? quality;
+    const row = ARTIFACT_COSTS[ARTIFACTS[pi].name];
+    const cost = row && row[q];
+    if (cost == null) lockedPriceMissing = true; else lockedPriceCostSum += cost;
+    if (priceBandIdx !== null) lockedPriceEdgeSum += PRICE_BAND_EDGES[q][priceBandIdx];
+  });
 
   const statMaxMap = {};
   for (const t of targetStats) {
@@ -4077,7 +4195,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       protection, targetStats: workerTargetStats, thresholds: workerThresholds,
       minStats: workerMinStats, ns: NS, total, noDebuffIdx: workerNoDebuffIdx,
       lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length,
-      poolPriceTier, lockedPriceTierSum, lockedPriceMissing, priceCategoryAllowed, ehGate
+      poolPriceCost, poolPriceEdge, lockedPriceCostSum, lockedPriceEdgeSum, lockedPriceMissing, ehGate
     },
     meta: {
       poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
@@ -4106,10 +4224,25 @@ self.onmessage = function(e){
   var protection = d.protection;
   var total = d.total;
   var noDebuffIdx = d.noDebuffIdx || [];
-  var poolPriceTier = d.poolPriceTier;
-  var priceCategoryAllowed = d.priceCategoryAllowed || null;
-  var priceTierSum = d.lockedPriceTierSum;
+  var poolPriceCost = d.poolPriceCost;
+  var poolPriceEdge = d.poolPriceEdge;          // null when unarmed
+  var priceGateOn = poolPriceEdge != null;
+  var priceCostSum = d.lockedPriceCostSum;
+  var priceEdgeSum = d.lockedPriceEdgeSum;
   var priceMissingCount = d.lockedPriceMissing ? 1 : 0;
+  // Suffix bounds for the price prune. Pool is sorted by soloScore, not cost, so both
+  // need explicit scans. Built only when armed - poolPriceEdge is null when unarmed.
+  var minCostFrom = null, maxEdgeFrom = null;
+  if(priceGateOn){
+    minCostFrom = new Float64Array(poolPriceCost.length+1);
+    maxEdgeFrom = new Float64Array(poolPriceCost.length+1);
+    minCostFrom[poolPriceCost.length] = Infinity; maxEdgeFrom[poolPriceCost.length] = 0;
+    for(var pi=poolPriceCost.length-1; pi>=0; pi--){
+      var pc = poolPriceCost[pi];
+      minCostFrom[pi] = Math.min(minCostFrom[pi+1], pc==null ? Infinity : pc);
+      maxEdgeFrom[pi] = Math.max(maxEdgeFrom[pi+1], poolPriceEdge[pi]);
+    }
+  }
   var ehGate = d.ehGate || null;
   // keep in sync with main thread's COVERAGE_EPS (blob scope can't share it)
   var COVERAGE_EPS = 0.006;
@@ -4485,10 +4618,9 @@ self.onmessage = function(e){
     for(var ndi=0;ndi<noDebuffIdx.length;ndi++){
       if(sum[noDebuffIdx[ndi].idx]*noDebuffIdx[ndi].dir + (noDebuffIdx[ndi].allow||0) < -1e-6) return;
     }
-    if(priceCategoryAllowed){
+    if(priceGateOn){
       if(priceMissingCount>0) return;
-      var cat=Math.round(priceTierSum/d.slots);
-      if(!priceCategoryAllowed[cat-1]) return;
+      if(priceCostSum>priceEdgeSum) return;
     }
     var thr=checkThresholds();
     var passes=thr.passes;
@@ -4541,7 +4673,9 @@ self.onmessage = function(e){
   }
   function recurse(start,remaining){
     if(remaining===0){considerLeaf();return;}
-    if(shouldPrune(start,remaining)){
+    var priceHopeless = priceGateOn &&
+      (priceCostSum + remaining*minCostFrom[start] > priceEdgeSum + remaining*maxEdgeFrom[start]);
+    if(priceHopeless || shouldPrune(start,remaining)){
       // Count from remaining capacity, not original caps - items at index >= start may
       // already be partly consumed by the current path, which would overshoot the total.
       var skipped=isBoundedPool?boundedCombinationCount(maxCounts.slice(start).map(function(m,j){return m-counts[start+j];}),remaining):combinationCount(n-start,remaining);
@@ -4557,12 +4691,14 @@ self.onmessage = function(e){
       var vec=VECS[i];
       counts[i]++;
       for(var k=0;k<activeIdx.length;k++) sum[k]+=vec[activeIdx[k]];
-      if(priceCategoryAllowed){
-        if(poolPriceTier[i]==null) priceMissingCount++; else priceTierSum+=poolPriceTier[i];
+      if(priceGateOn){
+        if(poolPriceCost[i]==null) priceMissingCount++; else priceCostSum+=poolPriceCost[i];
+        priceEdgeSum+=poolPriceEdge[i];
       }
       recurse(i,remaining-1);
-      if(priceCategoryAllowed){
-        if(poolPriceTier[i]==null) priceMissingCount--; else priceTierSum-=poolPriceTier[i];
+      if(priceGateOn){
+        if(poolPriceCost[i]==null) priceMissingCount--; else priceCostSum-=poolPriceCost[i];
+        priceEdgeSum-=poolPriceEdge[i];
       }
       for(var k=0;k<activeIdx.length;k++) sum[k]-=vec[activeIdx[k]];
       counts[i]--;
@@ -4580,12 +4716,14 @@ self.onmessage = function(e){
       var vec=VECS[i];
       counts[i]++;
       for(var k=0;k<activeIdx.length;k++) sum[k]+=vec[activeIdx[k]];
-      if(priceCategoryAllowed){
-        if(poolPriceTier[i]==null) priceMissingCount++; else priceTierSum+=poolPriceTier[i];
+      if(priceGateOn){
+        if(poolPriceCost[i]==null) priceMissingCount++; else priceCostSum+=poolPriceCost[i];
+        priceEdgeSum+=poolPriceEdge[i];
       }
       recurse(i,topRemaining-1);
-      if(priceCategoryAllowed){
-        if(poolPriceTier[i]==null) priceMissingCount--; else priceTierSum-=poolPriceTier[i];
+      if(priceGateOn){
+        if(poolPriceCost[i]==null) priceMissingCount--; else priceCostSum-=poolPriceCost[i];
+        priceEdgeSum-=poolPriceEdge[i];
       }
       for(var k=0;k<activeIdx.length;k++) sum[k]-=vec[activeIdx[k]];
       counts[i]--;
@@ -4805,6 +4943,11 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
     // Coverage uses the artefact/pinned total, not the display-merged container bonus. Only
     // reachable on coverage-fallback builds - `top` never holds a stat below this.
+    // Correct-and-odd (see DECISIONS.md): this badge reads raw `sum` while the pill colour below
+    // reads displayValue (armor + container folded in). So a fallback stat that no artefact
+    // provides but an overlaid armor lifts positive can print green AND carry this warning at
+    // once. Intended - coverage deliberately ignores overlay bonuses; the colour shows in-game
+    // truth. Pre-existing for the container bonus; armor just widens when it shows.
     const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
     const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
     html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}${noBenefit ? ' no-benefit' : ''}">${warnBadge}${star}${name}: ${valStr}</span>`;
@@ -4975,7 +5118,7 @@ const RESULTS_DISPLAY_CAP = 10;
 // Shared by renderResults and renderComparisonResults.
 function priceFilterGroupHtml(){
   let tierBtns = '';
-  for (let t=1;t<=5;t++){
+  for (let t=1;t<=4;t++){
     const disabled = t > lastSearchedMaxPriceTier;
     const active = visiblePriceTiers.has(t);
     tierBtns += `<button type="button" class="price-filter-btn${active?' active':''}" data-price="${t}"${disabled?' disabled':''}>${'$'.repeat(t)}</button>`;
@@ -4984,6 +5127,7 @@ function priceFilterGroupHtml(){
 }
 
 function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel){
+  currentPriceQuality = quality;
   lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel};
   // Rebuilt, not merged, so a stale column entry from a previous compare run can't be read
   // by a later normal-search chip.
@@ -5011,10 +5155,10 @@ function renderResults(results, extResults, targetStats, protection, minFallback
 
   // Applied last so the met/fallback split survives; one flat pass over displayResults
   // would collapse it.
-  const allPriceTiersVisible = visiblePriceTiers.size === 5;
+  const allPriceTiersVisible = visiblePriceTiers.size === 4;
   const passesPriceFilter = r => {
     if (allPriceTiersVisible) return true;
-    const cat = buildPriceCategory(r.chosen);
+    const cat = buildPriceCategory(r.chosen, quality);
     return cat != null && visiblePriceTiers.has(cat);
   };
   const preFilterCount = displayResults.length;
@@ -5141,8 +5285,8 @@ let showOwnedHighlight = false; // false in Mode B: every chip is already from t
 let gridView = false;           // true = 3-column grid layout for results
 let ownedHighlightOn = true;    // user toggle: green-highlight owned chips (gated by showOwnedHighlight)
 let topStatHighlightOn = true;  // user toggle: accent-highlight the top-2 result per target stat
-let visiblePriceTiers = new Set([1,2,3,4,5]); // shown price tiers; all on by default
-let lastSearchedMaxPriceTier = 5; // max tier the last search covered; disables higher filter buttons
+let visiblePriceTiers = new Set([1,2,3,4]); // shown price tiers; all on by default
+let lastSearchedMaxPriceTier = 4; // max tier the last search covered; disables higher filter buttons
 // EH threshold the last search ran with, or null. Same in-memory-only pattern as the line
 // above: it lets renderResults and minCriteriaLabel see the gate without a 12th positional arg.
 let lastSearchedEhMin = null;
@@ -5225,8 +5369,14 @@ let compareBuildsRowOrder = {};      // {containerName: [build,...]} in-memory d
 
 function formatResultForDiscord(result, rank, targetStats, containerName, containerBonus, protection){
   const {chosen, sum} = result;
-  // Line 1: container name (respects compare mode where each column has its own container)
-  const containerLine = containerName ? `[${containerName}]\n` : '';
+  // Line 1: container name (respects compare mode where each column has its own container),
+  // plus the armor when one is actually applied to the numbers below - fmtWithBonus folds the
+  // armor into the totals, so naming it keeps the copied text self-describing. Gated on
+  // includeArmorBuffs as well as selectedArmor, so the line only claims an armor that's really
+  // in the numbers. Reading the two globals directly matches fmtWithBonus -> displayValue.
+  const armorPart = (selectedArmor && includeArmorBuffs) ? `[${selectedArmor.name}]` : '';
+  const headParts = [containerName ? `[${containerName}]` : '', armorPart].filter(Boolean);
+  const containerLine = headParts.length ? `${headParts.join(' + ')}\n` : '';
   // Line 2: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
   const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
   const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
@@ -5240,7 +5390,10 @@ function formatResultForDiscord(result, rank, targetStats, containerName, contai
   const artParts = Array.from(artCounts, ([n, cnt]) => `${cnt}\u00d7 ${n}`);
   // Line 4: stat totals using fmtWithBonus so container/armor bonus toggles are respected
   const statParts = targetStats.map(t => `${t.name}: ${fmtWithBonus(t.name, sum[STAT_IDX[t.name]], containerBonus, protection)}`);
-  return `${containerLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}`;
+  const priceCat = buildPriceCategory(chosen, currentPriceQuality);
+  const priceLine = priceCat == null ? '' :
+    `\n\u{1F4B0} ${'$'.repeat(priceCat)} ${['Cheap','Average','Expensive','Beyond'][priceCat-1]}`;
+  return `${containerLine}${weightParts.join(', ')}\n${artParts.join(', ')}\n${statParts.join(' | ')}${priceLine}`;
 }
 document.getElementById('results').addEventListener('click', e=>{
   // save-build-btn also carries the copy-result-btn class for shared styling (see CSS) -
@@ -5371,11 +5524,9 @@ function readSharedSearchInputs(){
   lastSearchedEhMin = ehMin;
 
   const priceMaxTier = parseInt(document.getElementById('priceRangeSlider').value);
-  const priceCategoryAllowed = priceMaxTier === 5
-    ? null
-    : [1,2,3,4,5].map(cat => cat <= priceMaxTier);
+  const priceBandIdx = priceMaxTier === 4 ? null : priceMaxTier - 1;   // null = No limit
   lastSearchedMaxPriceTier = priceMaxTier;
-  if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4,5]);
+  if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4]);
 
   // Pinned artefacts: must appear in every result in both Mode A and Mode B.
   const pinnedIdx = Array.from(PINNED);
@@ -5400,7 +5551,7 @@ function readSharedSearchInputs(){
     }
   }
 
-  return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceCategoryAllowed, ehMin, ehArmorBR, includeContainerBuffs }};
+  return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceBandIdx, ehMin, ehArmorBR, includeContainerBuffs }};
 }
 
 // Maps a worker result's pool-local counts back to artefact indices, folding in the pinned
@@ -5776,10 +5927,11 @@ async function runComparisonSearch(){
 // Renders the 2-3 column comparison grid. No Extended-results toggle, but the "Add
 // containers bonus stats" toggle re-renders every column from cached columnResults.
 function renderComparisonResults(columnResults, targetStats, level, quality){
-  const allPriceTiersVisible = visiblePriceTiers.size === 5;
+  currentPriceQuality = quality;
+  const allPriceTiersVisible = visiblePriceTiers.size === 4;
   const passesPriceFilter = r => {
     if (allPriceTiersVisible) return true;
-    const cat = buildPriceCategory(r.chosen);
+    const cat = buildPriceCategory(r.chosen, quality);
     return cat != null && visiblePriceTiers.has(cat);
   };
   // The unfiltered `columnResults` param stays untouched so "All" can be restored later.
@@ -6006,6 +6158,7 @@ function renderBuildComparePanel(rb, i, statList, containerName){
 
 // Re-renders just one row's panel strip after a drag reorder, rather than the whole view.
 function rerenderBuildsRow(containerName){
+  currentPriceQuality = parseInt(document.getElementById('qualityInput').value) || 100;
   const rowEl = Array.from(document.querySelectorAll('.compare-builds-row')).find(r => r.dataset.container === containerName);
   if (!rowEl) return;
   const order = compareBuildsRowOrder[containerName];
@@ -6118,6 +6271,7 @@ function closeBuildsCompareView(){
 }
 
 function renderBuildsCompare(){
+  currentPriceQuality = parseInt(document.getElementById('qualityInput').value) || 100;
   compareBuildsActive = true;
   document.getElementById('consumableZone').innerHTML = '';
 
@@ -6157,6 +6311,25 @@ function renderBuildsCompare(){
   el.innerHTML = html;
   document.getElementById('closeBuildsCompareBtn').addEventListener('click', closeBuildsCompareView);
   wireBuildsCompareDragRow(el);
+}
+
+/* Re-renders whichever result view is on screen from cached args, without re-searching.
+   Display-only inputs (armor selection, the two bonus toggles) call this. Body is the exact
+   three-branch dispatch the buff-toggle handlers used to inline.
+   Must NOT run during page load: it reads lastRenderArgs / compareModeActive, which are `let`s
+   declared further down - the same TDZ trap that blanks the page in selectDefaultContainer().
+   Safe here because every caller is a user-triggered 'change', never init. */
+function rerenderDisplayOnly(){
+  if (compareBuildsActive){ renderBuildsCompare(); return; }
+  if (compareModeActive){
+    if (lastComparisonRenderArgs){
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+    }
+    return;
+  }
+  if (lastRenderArgs){
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
+  }
 }
 
 document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
