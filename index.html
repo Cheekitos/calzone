@@ -561,6 +561,25 @@
     width:11px;height:11px;
     box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
   }
+  /* Chromium matches :focus-visible on a range after a plain click, so the global outline
+     drew a selection box round the whole track. Focus moves onto the thumb instead.
+     Vendor thumb selectors must stay in separate rules - one unknown selector in a list
+     drops the whole list. */
+  .price-range-slider-row input[type=range]:focus{outline:none;}
+  .price-range-slider-row input[type=range]:focus-visible::-webkit-slider-thumb{
+    box-shadow:0 0 0 2.5px var(--accent), 0 0 0 5px var(--accent-soft), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .price-range-slider-row input[type=range]:focus-visible::-moz-range-thumb{
+    box-shadow:0 0 0 2.5px var(--accent), 0 0 0 5px var(--accent-soft), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  /* Same treatment for the max-copies slider, at its own 15px thumb ring. */
+  .popover-maxcopies input[type=range]:focus{outline:none;}
+  .popover-maxcopies input[type=range]:focus-visible::-webkit-slider-thumb{
+    box-shadow:0 0 0 3px var(--accent), 0 0 0 6px var(--accent-soft), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .popover-maxcopies input[type=range]:focus-visible::-moz-range-thumb{
+    box-shadow:0 0 0 3px var(--accent), 0 0 0 6px var(--accent-soft), 0 2px 8px rgba(0,0,0,0.6);
+  }
   /* Four discrete stops. Legend labels and ticks sit at the thumb centres
      (0 / 33.3 / 66.7 / 100%) so names read as track marks. */
   .price-range-control{margin-top:2px;}
