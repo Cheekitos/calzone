@@ -27,6 +27,10 @@
     --accent-soft: rgba(174,190,216,0.12);
     --accent-glow: rgba(174,190,216,0.28);
 
+    /* Fixed across themes, like --warn. Must not blend into the good/bad pill tints. */
+    --beats: #4FA8FF;
+    --beats-glow: rgba(79,168,255,0.35);
+
     --good: #46C97D;
     --good-bg: rgba(70,201,125,0.13);
     --bad: #F0565F;
@@ -109,6 +113,26 @@
   .check-list::-webkit-scrollbar-thumb:hover,.container-dd-panel::-webkit-scrollbar-thumb:hover{background:#33404F;background-clip:content-box;}
   .check-list::-webkit-scrollbar-track{background:transparent;}
 
+  /* ---------- video guide button ---------- */
+  /* Its own pill left of the theme pill, sized to match it exactly.
+     Theme pill width = 5 x 26px buttons + 4 x 4px gaps + 2 x 4px padding + 2 x 1px
+     border = 156px; height = 26 + 8 + 2 = 36px. Both are border-box. If the theme
+     pill ever gains or loses a swatch, redo this number. */
+  .guide-pill{
+    width:156px;height:36px;overflow:hidden;
+    display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:99px;
+    background:var(--panel);border:1px solid rgba(233,167,60,0.45);
+    text-decoration:none;color:#E9A73C;font-size:11.5px;white-space:nowrap;
+    text-overflow:ellipsis;
+    transition:border-color 0.15s ease,color 0.15s ease;
+  }
+  .guide-pill:hover{border-color:#E9A73C;color:#F3BE6B;}
+  .guide-btn{
+    width:19px;height:19px;flex-shrink:0;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:#E9A73C;color:#12181F;font-size:8px;line-height:1;
+  }
+
   /* ---------- masthead ---------- */
   header{margin-bottom:22px;}
   .masthead{display:flex;align-items:center;gap:14px;}
@@ -134,7 +158,7 @@
 
   /* ---------- theme switcher ---------- */
   .mast-row{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
-  .theme-switch{display:flex;align-items:center;}
+  .theme-switch{display:flex;align-items:center;gap:8px;}
   .theme-btns{
     display:flex;gap:4px;padding:4px;border-radius:99px;
     background:var(--panel);border:1px solid var(--border);
@@ -734,6 +758,31 @@
   .modal-btn.go.danger{border-color:var(--bad);color:var(--bad);}
   .modal-btn.go.danger:hover{background:var(--bad-bg);color:var(--bad);}
 
+  /* Video lightbox - reuses .modal-backdrop for the veil, its own wider box. */
+  .video-box{
+    width:100%;max-width:920px;transform:translateY(-6px) scale(0.985);
+    transition:transform 0.16s ease;position:relative;
+  }
+  .modal-backdrop.open .video-box{transform:none;}
+  .video-frame{
+    position:relative;width:100%;padding-top:56.25%;
+    background:#000;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:0 30px 60px -16px rgba(0,0,0,0.85);
+  }
+  .video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .video-close{
+    position:absolute;top:-13px;right:-13px;width:30px;height:30px;border-radius:50%;
+    background:var(--panel-3);border:1px solid var(--border);color:var(--text-dim);
+    font-size:15px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .video-close:hover{color:var(--text);border-color:var(--accent);}
+  .video-fallback{
+    display:block;margin-top:9px;text-align:center;
+    font-size:11.5px;color:var(--muted);text-decoration:none;
+  }
+  .video-fallback:hover{color:var(--accent);}
+
   .toast-wrap{
     position:fixed;z-index:2100;right:18px;bottom:18px;display:flex;flex-direction:column;
     gap:8px;align-items:flex-end;pointer-events:none;max-width:min(360px,calc(100vw - 36px));
@@ -879,6 +928,41 @@
     border:1px solid rgba(233,167,60,0.45);padding:10px 12px;border-radius:var(--r-md);margin-bottom:12px;
   }
   .results-grid-view .min-warning-banner{grid-column:1/-1;}
+  /* Shows on most searches, so muted rather than --warn: it is not an error. */
+  .filter-notice{
+    font-size:12px;color:var(--muted);background:var(--panel-2);
+    border:1px solid var(--border);padding:9px 12px;border-radius:var(--r-md);margin-top:18px;
+  }
+  .filter-notice b{color:var(--text);font-weight:600;}
+  /* Own panel behind a labelled rule; a margin and hairline read as "ranks 11+". */
+  .coverage-aside{
+    margin-top:34px;padding:0 14px 14px;border:1px solid var(--border);
+    border-radius:var(--r-md);background:var(--panel-2);
+  }
+  .coverage-aside-rule{
+    display:flex;align-items:center;gap:10px;
+    margin:0 -14px 12px;padding:0 14px;transform:translateY(-9px);
+  }
+  .coverage-aside-rule::before,.coverage-aside-rule::after{
+    content:"";flex:1;height:1px;background:var(--border);
+  }
+  .coverage-aside-rule span{
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    background:var(--panel-2);padding:0 8px;white-space:nowrap;
+  }
+  .coverage-aside-hdr{font-size:14px;margin:0 0 4px;color:var(--text);}
+  .coverage-aside-sub{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .coverage-aside .results-grid-view{margin-top:0;}
+  /* Never green: .good pills are already green-tinted, so a green ring reads as no
+     highlight. Fixed blue plus the glyph, so the mark survives themes and colour blindness. */
+  .target-pill.beats-main{
+    border-color:var(--beats);
+    box-shadow:0 0 0 1px var(--beats), 0 0 10px var(--beats-glow);
+    font-weight:600;
+  }
+  .target-pill .beats-badge{color:var(--beats);margin-right:4px;font-size:9px;vertical-align:1px;}
+  .coverage-aside-key{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
+  .coverage-aside-key b{color:var(--beats);font-size:9px;vertical-align:1px;margin-right:2px;}
   .flag-note{
     font-size:11.5px;color:var(--warn);background:var(--warn-bg);
     border:1px solid rgba(233,167,60,0.45);padding:10px 12px;border-radius:var(--r-md);margin-top:14px;
@@ -1132,6 +1216,10 @@
         <h1>STALZONE <span>ARTEFACT LOADOUT</span> CALCULATOR</h1>
       </div>
       <div class="theme-switch">
+        <a class="guide-pill" href="https://youtu.be/-xyIB2FJPHU" target="_blank" rel="noopener" title="Watch the video guide">
+          <span class="guide-btn" aria-hidden="true">&#9654;</span>
+          <span>Watch Tool Guide</span>
+        </a>
         <div class="theme-btns" id="themeBtns" role="group" aria-label="Colour theme">
           <button type="button" class="theme-btn" data-theme="violet" title="Violet" aria-label="Violet theme" aria-pressed="false"><span class="theme-swatch"></span></button>
           <button type="button" class="theme-btn" data-theme="ice" title="Ice blue" aria-label="Ice blue theme" aria-pressed="false"><span class="theme-swatch"></span></button>
@@ -3031,6 +3119,7 @@ const CONTAINERS = [
   { name:"Apiary Container",            tier:"legendary", slots:5, protection:89.5, effectiveness:120,  bonus:{} },
   { name:"Berloga-6U Container",        tier:"legendary", slots:6, protection:78.5, effectiveness:114,  bonus:{} },
   { name:"Chitin Backpack",             tier:"legendary", slots:6, protection:60,   effectiveness:115,  bonus:{"Carry weight":47} },
+  { name:"Bale Container",              tier:"exclusive", slots:3, protection:89.5, effectiveness:123,  bonus:{"Stamina":50, "Movement speed":5, "Running speed":5, "Carry weight":25, "Frost":1} },
   { name:"Freezer Container",           tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Temperature":-2.5, "Biological infection":0.5} },
   { name:"ZIVCAS ArcticSafe-6",         tier:"exclusive", slots:6, protection:75,   effectiveness:102.5, bonus:{"Psyonics":0.5, "Frost":-2.5} },
   { name:"ZIVCAS Sisyphus-6",           tier:"exclusive", slots:6, protection:60,   effectiveness:93,   bonus:{"Stamina":55, "Carry weight":40} },
@@ -4188,6 +4277,17 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     tier: t.tier,
     statMax: statMaxMap[t.name]
   }));
+  /* One printed step (cards show 2dp) per stat, summed per tier. Must be the FULL step:
+     at half, the grid is narrower and differently phased than the display, so builds
+     printing the same number still split. Empty tier keeps 1e-6 so it can't collapse
+     every build into one step. */
+  const DISPLAY_ULP = 0.01;
+  const tierEps = {h:0, m:0, l:0};
+  for (const t of workerTargetStats){
+    if (t.statMax > 1e-12) tierEps[t.tier === 'high' ? 'h' : t.tier === 'low' ? 'l' : 'm'] += DISPLAY_ULP / t.statMax;
+  }
+  ['h','m','l'].forEach(k => { if (tierEps[k] === 0) tierEps[k] = 1e-6; });
+
   const workerMinStats = targetStats
     .filter(t=>t.min !== null)
     .map(t=>{
@@ -4237,7 +4337,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
       protection, targetStats: workerTargetStats, thresholds: workerThresholds,
       minStats: workerMinStats, ns: NS, total, noDebuffIdx: workerNoDebuffIdx,
       lockedSum: Array.from(lockedSum), lockedSlots: pinnedIdx.length,
-      poolPriceCost, poolPriceEdge, lockedPriceCostSum, lockedPriceEdgeSum, lockedPriceMissing, ehGate
+      poolPriceCost, poolPriceEdge, lockedPriceCostSum, lockedPriceEdgeSum, lockedPriceMissing, ehGate,
+      tierEps
     },
     meta: {
       poolMeta, pinnedIdx, pinnedQuality, useLoadout, containerBonusMap, containerBaseVec,
@@ -4286,6 +4387,8 @@ self.onmessage = function(e){
     }
   }
   var ehGate = d.ehGate || null;
+  // Tier-score grid from buildContainerSearchPayload; 1e-6 = old exact-compare behaviour.
+  var tierEps = d.tierEps || {h:1e-6, m:1e-6, l:1e-6};
   // keep in sync with main thread's COVERAGE_EPS (blob scope can't share it)
   var COVERAGE_EPS = 0.006;
 
@@ -4369,11 +4472,19 @@ self.onmessage = function(e){
     }
     return c;
   }
+  /* Snap to the grid, compare exactly: builds printing the same number tie.
+     QUANTISE, DO NOT BAND. beats() sorts the buckets AND feeds shouldPrune's domination
+     test, so a non-transitive |a-b|<eps band leaves a non-minimal entry at a bucket tail
+     and the prune measures against the wrong worst. Math.round is transitive.
+     Final line stays a bare return false: a tiebreaker on entry.score broke
+     prune-equivalence, since shouldPrune's and considerLeaf's {cov,ts} carry no score. */
+  function qz(v,e){ return Math.round(v/e); }
   function beats(a,b){
     if(a.cov!==b.cov) return a.cov>b.cov;
-    if(Math.abs(a.ts.h-b.ts.h)>1e-6) return a.ts.h>b.ts.h;
-    if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
-    return a.ts.l>b.ts.l;
+    var ah=qz(a.ts.h,tierEps.h), bh=qz(b.ts.h,tierEps.h); if(ah!==bh) return ah>bh;
+    var am=qz(a.ts.m,tierEps.m), bm=qz(b.ts.m,tierEps.m); if(am!==bm) return am>bm;
+    var al=qz(a.ts.l,tierEps.l), bl=qz(b.ts.l,tierEps.l); if(al!==bl) return al>bl;
+    return false;
   }
   // unmet-minimum count + normalized deficit, for "closest to min" ranking
   function unmetMinInfo(){
@@ -4780,11 +4891,15 @@ self.onmessage = function(e){
 const COVERAGE_EPS = 0.006;
 // Mirrors WORKER_SRC's beats()/beatsFallback() (isolated blob scope) - keep in sync.
 // Used by runSplitSearch to merge worker buckets back into single-thread order.
+// Set by runSplitSearch before any merge; mergeBucket takes beats() by reference.
+let currentTierEps = {h:1e-6, m:1e-6, l:1e-6};
+function qzTier(v,e){ return Math.round(v/e); }
 function beats(a,b){
   if(a.cov!==b.cov) return a.cov>b.cov;
-  if(Math.abs(a.ts.h-b.ts.h)>1e-6) return a.ts.h>b.ts.h;
-  if(Math.abs(a.ts.m-b.ts.m)>1e-6) return a.ts.m>b.ts.m;
-  return a.ts.l>b.ts.l;
+  const ah=qzTier(a.ts.h,currentTierEps.h), bh=qzTier(b.ts.h,currentTierEps.h); if(ah!==bh) return ah>bh;
+  const am=qzTier(a.ts.m,currentTierEps.m), bm=qzTier(b.ts.m,currentTierEps.m); if(am!==bm) return am>bm;
+  const al=qzTier(a.ts.l,currentTierEps.l), bl=qzTier(b.ts.l,currentTierEps.l); if(al!==bl) return al>bl;
+  return false;
 }
 function beatsFallback(a,b){
   if(a.unmetCount!==b.unmetCount) return a.unmetCount<b.unmetCount;
@@ -4922,7 +5037,9 @@ function sortChosenForDisplay(chosen){
   });
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats, cardScope){
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats, cardScope, highlightClass){
+  // Class topSets paints. Default leaves every existing call site unchanged.
+  highlightClass = highlightClass || 'top-stat';
   rowSharedStats = rowSharedStats || new Set();
   const {chosen, sum} = result;
   const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
@@ -4989,7 +5106,10 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     // reads displayValue, so a stat can print green and still carry the warning.
     const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
     const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
-    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' top-stat' : ''}${noBenefit ? ' no-benefit' : ''}">${warnBadge}${star}${name}: ${valStr}</span>`;
+    // Glyph as well as colour: a ring alone on a tinted pill is easy to miss.
+    const beatsBadge = (isTopStat && highlightClass === 'beats-main')
+      ? '<span class="beats-badge" title="Beats every build in the list above on this stat">\u25b2</span>' : '';
+    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' ' + highlightClass : ''}${noBenefit ? ' no-benefit' : ''}">${beatsBadge}${warnBadge}${star}${name}: ${valStr}</span>`;
   });
   html += '</div>';
 
@@ -5088,7 +5208,10 @@ function renderConsumableZone(results, extResults, targetStats, protection, cont
 // Grid view: chip rows (.loadout-list) can be different heights across cards, pushing stat
 // pills out of alignment. Measures the tallest chip section per row-of-N and matches it.
 function equalizeGridCardChips(resultsEl){
-  const gridEl = resultsEl.querySelector('.results-grid-view');
+  // All grids, not just the first: the coverage aside renders its own.
+  resultsEl.querySelectorAll('.results-grid-view').forEach(equalizeOneGrid);
+}
+function equalizeOneGrid(gridEl){
   if (!gridEl) return;
   const cards = Array.from(gridEl.querySelectorAll('.result-card'));
   if (cards.length < 2) return;
@@ -5165,6 +5288,59 @@ function priceFilterGroupHtml(){
   return `<div class="price-filter-group">${tierBtns}</div>`;
 }
 
+/* Names the filters, never a rejected-build count: the filter test is in considerLeaf,
+   which pruned subtrees never reach, so any counter there undercounts. */
+function debuffNoticeHtml(){
+  if (!lastSearchedDebuffLabels.length) return '';
+  const n = lastSearchedDebuffLabels.length;
+  return `<div class="filter-notice">\u2699 <b>${n} debuff filter${n>1?'s':''} active:</b> ${lastSearchedDebuffLabels.join(', ')}. Builds with those debuffs were left out. Change them under Advanced settings.</div>`;
+}
+
+/* Same expression as the min-star and the search gate. EH gate deliberately excluded: it
+   always counts armor, while computeEffectiveHealth honours the display toggle. */
+function meetsAllStatMins(sum, targetStats, containerBonus){
+  return targetStats.every(t=>{
+    if (t.min === null || t.min === undefined) return true;
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    const bonus = STAT_META[t.name].threshold ? 0 : (includeContainerBuffs ? (containerBonus?.[t.name] || 0) : 0);
+    return (sum[STAT_IDX[t.name]] + bonus) * dir >= t.min - 1e-6;
+  });
+}
+
+/* topCoverageFallback, which renderResults otherwise drops whenever the main list is
+   non-empty. Cannot duplicate a main-list card: a build can't both have and lack coverage. */
+const COVERAGE_ASIDE_CAP = 3;
+// Below 4 stats the ranked list already covers every build worth seeing.
+const COVERAGE_ASIDE_MIN_STATS = 4;
+/* Stats where this build beats every build in the list above. Ignores the "Top stats"
+   toggle: that ranks within one list, this compares two. Reads displayValue(), so the mark
+   can't disagree with the printed number. */
+function computeBeatsMainSets(asideResults, mainResults, targetStats, containerBonus, protection){
+  const sets = {};
+  targetStats.forEach(t=>{
+    const dir = STAT_META[t.name].good ? 1 : -1;
+    const idx = STAT_IDX[t.name];
+    const best = mainResults.length
+      ? Math.max(...mainResults.map(r=>displayValue(t.name, r.sum[idx], containerBonus, protection)*dir))
+      : -Infinity;
+    const set = new Set();
+    asideResults.forEach((r,i)=>{
+      if (displayValue(t.name, r.sum[idx], containerBonus, protection)*dir > best + 1e-6) set.add(i);
+    });
+    sets[t.name] = set;
+  });
+  return sets;
+}
+function coverageAsideResults(coverageFallbackResults, targetStats, containerBonus, passesPriceFilter){
+  if (!coverageFallbackResults || !coverageFallbackResults.length) return [];
+  if (targetStats.length < COVERAGE_ASIDE_MIN_STATS) return [];
+  return coverageFallbackResults
+    .filter(r => r.cov === targetStats.length - 1)
+    .filter(r => meetsAllStatMins(r.sum, targetStats, containerBonus))
+    .filter(passesPriceFilter)             // its own pass; the bucket never flows through the main filter
+    .slice(0, COVERAGE_ASIDE_CAP);
+}
+
 function renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel){
   currentPriceQuality = quality;
   lastRenderArgs = {results, extResults, targetStats, protection, minFallbackResults, containerBonus, failedCoverageOnly, coverageFallbackResults, level, quality, containerSel};
@@ -5220,7 +5396,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
     const msg = failedCoverageOnly
       ? `No combination gives a beneficial value to every stat you selected at once. Try unchecking a stat, increasing slots, or including different artefacts.`
       : `No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.`;
-    el.innerHTML = `<h2>Result</h2><div class="msg-error">${msg}</div>`;
+    el.innerHTML = `<h2>Result</h2><div class="msg-error">${msg}</div>` + debuffNoticeHtml();
     if (showConsumableZone) {
       renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
     } else {
@@ -5287,8 +5463,45 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   } else {
     html += cardsHtml;
   }
+
+  /* Skipped when the coverage bucket is already the main list (it would print twice), and
+     when the price filter emptied the list, since "beats the list above" needs a list. */
+  if (!showCoverageFallback && displayResults.length){
+    const aside = coverageAsideResults(coverageFallbackResults, targetStats, containerBonus, passesPriceFilter);
+    if (aside.length){
+      const beatsSets = computeBeatsMainSets(aside, displayResults, targetStats, containerBonus, protection);
+      const anyBeat = targetStats.some(t=>beatsSets[t.name] && beatsSets[t.name].size);
+      // Same 3-wide grouping as the main list, so chips line up across the row.
+      const asideRowShared = [];
+      if (gridView && aside.length > 1){
+        for (let i = 0; i < aside.length; i += 3){
+          const rowResults = aside.slice(i, i + 3);
+          const shared = computeRowSharedStats(rowResults.map(r => ({sum: r.sum, containerBonus})));
+          rowResults.forEach((_, j) => { asideRowShared[i + j] = shared; });
+        }
+      }
+      const asideCards = aside.map((r,i)=>renderResultCard(
+        r, targetStats, protection, i+1, false, beatsSets, i, false, null, null,
+        containerBonus, asideRowShared[i], '', 'beats-main')).join('');
+      const keyHtml = anyBeat
+        ? `<div class="coverage-aside-key"><b>\u25b2</b> marks a stat where this build beats every build in the list above.</div>`
+        : '';
+      html += `<div class="coverage-aside">
+        <div class="coverage-aside-rule"><span>Different trade-off</span></div>
+        <h3 class="coverage-aside-hdr">Also worth a look: strong builds that miss one stat</h3>
+        <div class="coverage-aside-sub">Each gives nothing to one stat you selected (marked \u26a0), which is why it is not in the list above.</div>
+        ${keyHtml}
+        ${gridView && aside.length > 1 ? `<div class="results-grid-view">${asideCards}</div>` : asideCards}
+      </div>`;
+    }
+  }
+
+  // Last: it describes the whole result set, so it sits under what it explains.
+  html += debuffNoticeHtml();
+
   el.innerHTML = html;
-  if (gridView && displayResults.length > 1) equalizeGridCardChips(el);
+  // Not gated on displayResults: the aside can render a grid when the main list has one card.
+  if (gridView) equalizeGridCardChips(el);
 
   el.querySelectorAll('.view-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -5329,6 +5542,9 @@ let lastSearchedMaxPriceTier = 4; // max tier the last search covered; disables 
 // EH threshold the last search ran with, or null. Same in-memory-only pattern as the line
 // above: it lets renderResults and minCriteriaLabel see the gate without a 12th positional arg.
 let lastSearchedEhMin = null;
+/* Snapshotted at search time, like lastSearchedEhMin, so the notice describes the search
+   that produced the cards rather than the current toggles. */
+let lastSearchedDebuffLabels = [];
 // In-memory only, for result-card tooltips: last search's includeAdditional, plus a scaling
 // context per card scope ('' normal, 'c0'/'c1'/... per Compare column). renderPopoverMain
 // scales one artefact on the spot rather than reading VECS, which holds only the last
@@ -5562,9 +5778,12 @@ function readSharedSearchInputs(){
   const includeAdditional = document.getElementById('includeAdditionalChk').checked;
   lastSearchedIncludeAdditional = includeAdditional;
   // Stat index + direction for every currently-toggled-on "avoid debuff" button.
-  const noDebuffIdx = NO_DEBUFF_FILTERS
-    .filter(f=>document.getElementById(f.btn).classList.contains('active'))
+  const activeDebuffFilters = NO_DEBUFF_FILTERS
+    .filter(f=>document.getElementById(f.btn).classList.contains('active'));
+  const noDebuffIdx = activeDebuffFilters
     .map(f=>({idx: STAT_IDX[f.stat], dir: STAT_META[f.stat].good ? 1 : -1}));
+  // Same read as the payload, so notice and search can't diverge.
+  lastSearchedDebuffLabels = activeDebuffFilters.map(f=>f.label);
   const useLoadout = document.getElementById('useLoadoutBtn').classList.contains('active');
   showOwnedHighlight = !useLoadout;
 
@@ -5719,7 +5938,8 @@ document.getElementById('calcBtn').onclick = async ()=>{
       const results = data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      // cov: lets coverageAsideResults keep to builds missing exactly one stat.
+      const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
       renderResults(results, extResults, targetStats, protection, minFallbackResults, containerBonusMap, data.failedCoverageOnly, coverageFallbackResults, level, quality, backpackSelectEl.value);
   }
 };
@@ -5733,6 +5953,8 @@ let pendingWorkerResolve = null;
 function runSplitSearch(payload, meta, opts){
   opts = opts || {};
   const idx = opts.idx !== undefined ? opts.idx : '';
+  // The merge must use the grid the workers ranked on.
+  currentTierEps = payload.tierEps || {h:1e-6, m:1e-6, l:1e-6};
   return new Promise(resolve=>{
     pendingWorkerResolve = resolve;
 
@@ -6069,7 +6291,8 @@ function renderComparisonResults(columnResults, targetStats, level, quality){
   const resultsEl = document.getElementById('results');
   resultsEl.innerHTML =
     `<div class="results-header"><h2>Container comparison</h2><div class="results-toggles">${priceFilterHtml}${hlToggleHtml}</div></div>` +
-    `<div class="compare-grid" style="grid-template-rows:auto${maxRank > 0 ? ` repeat(${maxRank},auto)` : ''};">${columnsHtml}</div>`;
+    `<div class="compare-grid" style="grid-template-rows:auto${maxRank > 0 ? ` repeat(${maxRank},auto)` : ''};">${columnsHtml}</div>` +
+    debuffNoticeHtml();
   equalizeCompareCardChips(resultsEl);
 
   lastComparisonRenderArgs = { columnResults, filteredColumnResults, flatResults, targetStats, level, quality };
@@ -6392,6 +6615,50 @@ document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
   renderBuildsCompare();
   window.scrollTo({top: 0, behavior: 'smooth'});
 });
+
+/* Video guide lightbox. The pill keeps its real href so middle-click and
+   right-click still open YouTube; the click handler intercepts the plain case.
+   The iframe is created on open and removed on close, or the video keeps
+   playing behind the closed veil. */
+(function(){
+  var pill = document.querySelector('.guide-pill');
+  if (!pill) return;
+  var back = null;
+  function close(){
+    if (!back) return;
+    var b = back;
+    back = null;
+    document.removeEventListener('keydown', onKey, true);
+    b.classList.remove('open');
+    b.querySelector('iframe').src = 'about:blank';
+    setTimeout(function(){ b.remove(); }, 200);
+  }
+  function onKey(e){
+    if (e.key === 'Escape'){ e.stopPropagation(); close(); }
+  }
+  pill.addEventListener('click', function(e){
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (back) return;
+    back = document.createElement('div');
+    back.className = 'modal-backdrop';
+    back.innerHTML =
+      '<div class="video-box">' +
+        '<div class="video-frame">' +
+          '<iframe src="https://www.youtube.com/embed/-xyIB2FJPHU?autoplay=1&rel=0" ' +
+            'title="Video guide" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture" ' +
+            'allowfullscreen></iframe>' +
+        '</div>' +
+        '<button type="button" class="video-close" aria-label="Close video">&times;</button>' +
+        '<a class="video-fallback" href="https://youtu.be/-xyIB2FJPHU" target="_blank" rel="noopener">Player not loading? Open on YouTube</a>' +
+      '</div>';
+    document.body.appendChild(back);
+    requestAnimationFrame(function(){ back.classList.add('open'); });
+    back.querySelector('.video-close').addEventListener('click', close);
+    back.addEventListener('click', function(ev){ if (ev.target === back) close(); });
+    document.addEventListener('keydown', onKey, true);
+  });
+})();
 
 (function(){
   var link = document.getElementById('revealEmailLink');
