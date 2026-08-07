@@ -1532,9 +1532,7 @@ const STAT_META = {
 };
 
 const PERCENT_STATS = new Set([
-  "Bioinfection protection",
   "Bleeding protection",
-  "Burning",
   "Health regeneration",
   "Healing effectiveness",
   "Movement speed",
@@ -1629,6 +1627,7 @@ const ARTIFACTS = [
  {name:"Cone", tooltip:{main:{"Stamina":[12.92,15.2],"Temperature":[-4.08,-3.47],"Burning":[-0.2,-0.17]}, add:{"Stamina":[4.28,5.2],"Healing effectiveness":[4.2,5.1],"Burning":[-0.1,-0.082]}}},
  {name:"Crust", tooltip:{main:{"Health regeneration":[1.28,1.5],"Bullet resistance":[2.21,2.6],"Biological infection":[1.06,1.25],"Bleeding":[-0.8,-0.68]}, add:{"Bleeding":[-0.3,-0.255],"Bleeding protection":[2.14,2.6],"Health regeneration":[0.425,0.5]}}},
  {name:"Cryogen", tooltip:{main:{"Carry weight":[7.06,8.3],"Stamina regeneration":[1.62,1.9],"Temperature":[-3.04,-2.58]}, add:{"Stamina regeneration":[0.765,0.9],"Bullet resistance":[4.59,5.4],"Carry weight":[1.2,2]}}},
+ {name:"Crystal of Inside Out", tooltip:{main:{"Stamina":[11.05,13],"Carry weight":[10.54,12.4],"Radiation":[-1.28,-1.09],"Biological infection":[1.06,1.25]}, add:{"Stamina":[3.74,4.4],"Carry weight":[3.57,4.2],"Stamina regeneration":[2.465,2.9]}}},
  {name:"Cursed Rose", tooltip:{main:{"Bullet resistance":[9.86,11.6],"Explosion protection":[7.56,8.9],"Radiation":[1.06,1.25]}, add:{"Bullet resistance":[3.315,3.9],"Explosion protection":[2.55,3],"Stamina regeneration":[2.465,2.9]}}},
  {name:"Cycle", tooltip:{main:{"Stamina":[13.09,15.4],"Biological infection":[-4.08,-3.47],"Bleeding":[-0.7,-0.6]}, add:{"Stamina":[4.28,5.2],"Health regeneration":[0.99,1.2],"Bleeding":[-0.3,-0.25]}}},
  {name:"Dark Crystal", tooltip:{main:{"Vitality":[0.85,1],"Health regeneration":[1.36,1.6],"Stamina regeneration":[1.28,1.5],"Radiation":[-1.28,-1.09],"Psyonics":[0.53,0.62]}, add:{"Health regeneration":[0.49,0.6],"Vitality":[0.33,0.4],"Stamina regeneration":[0.66,0.8]}}},
@@ -1637,7 +1636,7 @@ const ARTIFACTS = [
  {name:"Dumbbell", tooltip:{main:{"Vitality":[0.51,0.6],"Running speed":[0.64,0.75],"Carry weight":[8.33,9.8],"Healing effectiveness":[8.33,9.8],"Laceration protection":[11.64,13.7],"Radiation":[2.12,2.5]}, add:{"Healing effectiveness":[2.805,3.3],"Laceration protection":[3.79,4.6],"Movement speed":[0.62,0.75]}}},
  {name:"Egg", tooltip:{main:{"Stamina":[16.49,19.4],"Carry weight":[15.81,18.6],"Radiation":[2.12,2.5]}, add:{"Stamina":[5.525,6.5],"Carry weight":[5.27,6.2],"Bleeding protection":[4.335,5.1]}}},
  {name:"Embryo", tooltip:{main:{"Running speed":[0.3,0.35],"Stamina regeneration":[1.28,1.5],"Radiation":[0.42,0.5],"Biological infection":[-2.16,-1.84],"Bleeding":[-0.7,-0.6],"Reaction to chemical burns":[0.6,0.7]}, add:{"Stamina regeneration":[0.425,0.5],"Bleeding":[-0.3,-0.24],"Movement speed":[0.28,0.35]}}},
- {name:"Eye of the Storm", tooltip:{main:{"Vitality":[-14.8,-12.58],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Carry weight":[8.33,9.8],"Thermal protection":[38.25,45],"Bioinfection protection":[38.25,45],"Temperature":[-2.16,-1.84],"Biological infection":[-2.16,-1.84]}, add:{"Thermal protection":[8.5,10],"Bioinfection protection":[4.25,10],"Movement speed":[0.2,0.25]}}},
+ {name:"Eye of the Storm", tooltip:{main:{"Vitality":[-14.8,-12.58],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Carry weight":[8.33,9.8],"Thermal protection":[38.25,45],"Bioinfection protection":[38.25,45],"Temperature":[-2.16,-1.84],"Biological infection":[-2.16,-1.84]}, add:{"Thermal protection":[16.47,20],"Bioinfection protection":[16.47,20],"Movement speed":[0.2,0.25]}}},
  {name:"Fahrenheit", tooltip:{main:{"Stamina":[8.84,10.4],"Bullet resistance":[7.9,9.3],"Temperature":[-1.28,-1.09],"Frost":[0.42,0.5],"Reaction to laceration":[0.85,1]}, add:{"Bullet resistance":[2.635,3.1],"Stamina":[2.88,3.5],"Health regeneration":[1.02,1.2]}}},
  {name:"Firebird", tooltip:{main:{"Health regeneration":[1.19,1.4],"Healing effectiveness":[7.4,8.7],"Bleeding protection":[1.28,1.5],"Temperature":[1.06,1.25]}, add:{"Bleeding":[-1,-0.85],"Health regeneration":[0.425,0.5],"Healing effectiveness":[2.465,2.9]}}},
  {name:"Flicker", tooltip:{main:{"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Health regeneration":[1.19,1.4],"Psyonics":[1.06,1.25],"Reaction to electricity":[1.19,1.4]}, add:{}}},
@@ -1693,7 +1692,7 @@ const ARTIFACTS = [
  {name:"Snake Eye", tooltip:{main:{"Vitality":[1.62,1.9],"Movement speed":[0.64,0.75],"Running speed":[0.85,1],"Healing effectiveness":[-4.5,-3.82],"Psyonics":[2.12,2.5]}, add:{"Stamina":[12.41,14.6],"Movement speed":[0.2,0.25],"Vitality":[0.595,0.7]}}},
  {name:"Snares", tooltip:{main:{"Movement speed":[0.6,0.7],"Running speed":[0.81,0.95],"Laceration protection":[14.79,17.4],"Biological infection":[0.53,0.62],"Psyonics":[-1.28,-1.09]}, add:{"Movement speed":[0.206,0.25],"Health regeneration":[1.15,1.4],"Laceration protection":[4.78,5.8]}}},
  {name:"Spectral Crystal", tooltip:{main:{"Vitality":[-8,-6.8],"Stamina regeneration":[1.44,1.7],"Psy-emission protection":[17,20],"Psyonics":[-2.16,-1.84],"Reaction to electricity":[0.76,0.9]}, add:{"Resistance to electricity":[6.01,7.3],"Psy-emission protection":[8.5,10],"Stamina regeneration":[0.51,0.6]}}},
- {name:"Spiral", tooltip:{main:{"Vitality":[-0.5,-0.42],"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Carry weight":[7.4,8.7],"Radiation":[1.06,1.25]}, add:{"Carry weight":[2.465,2.9],"Movement speed":[0.28,0.35],"Healing effectiveness":[6.12,7.2]}}},
+ {name:"Spiral", tooltip:{main:{"Vitality":[-0.5,-0.42],"Movement speed":[0.85,1],"Running speed":[1.15,1.35],"Carry weight":[7.4,8.7],"Radiation":[1.06,1.25]}, add:{"Carry weight":[2.465,2.9],"Movement speed":[0.28,0.35],"Healing effectiveness":[5.02,6.1]}}},
  {name:"Sponge", tooltip:{main:{"Carry weight":[2.38,2.8],"Laceration protection":[7.74,9.1],"Explosion protection":[8.16,9.6],"Radiation":[1.06,1.25],"Reaction to laceration":[0.76,0.9]}, add:{"Laceration protection":[2.635,3.1],"Explosion protection":[2.63,3.2],"Health regeneration":[0.9,1.1]}}},
  {name:"Static", tooltip:{main:{"Bullet resistance":[8.59,10.1],"Radiation":[2.12,2.5],"Recoil":[-3.7,-3.15]}, add:{"Stamina":[13.34,16.2],"Bullet resistance":[2.8,3.4],"Recoil":[-1.3,-1.07]}}},
  {name:"Steel Hedgehog", tooltip:{main:{"Stamina":[12.41,14.6],"Healing effectiveness":[2.55,3],"Bullet resistance":[11.05,13],"Psyonics":[2.12,2.5],"Reaction to laceration":[1.1,1.3]}, add:{"Bullet resistance":[3.74,4.4],"Laceration protection":[11.28,13.7],"Stamina":[4.03,4.9]}}},
@@ -1735,6 +1734,7 @@ const ARTIFACT_COSTS = {
   "Cone": {100: 100000, 115: 200000, 130: 500000, 145: 1000000, 160: 1000000, 175: 1000000},
   "Crust": {100: 10000, 115: 15000, 130: 20000, 145: 30000, 160: 30000, 175: 30000},
   "Cryogen": {100: 10000, 115: 15000, 130: 40000, 145: 120000, 160: 120000, 175: 120000},
+  "Crystal of Inside Out": {100: 35000, 115: 80000, 130: 200000, 145: 650000, 160: 650000, 175: 650000},
   "Cursed Rose": {100: 10000, 115: 20000, 130: 120000, 145: 1000000, 160: 1000000, 175: 1000000},
   "Cycle": {100: 150000, 115: 250000, 130: 2000000, 145: 8000000, 160: 8000000, 175: 8000000},
   "Dark Crystal": {100: 10000, 115: 15000, 130: 30000, 145: 300000, 160: 300000, 175: 300000},
