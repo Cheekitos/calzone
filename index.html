@@ -130,7 +130,15 @@
   .guide-btn{
     width:19px;height:19px;flex-shrink:0;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    background:#E9A73C;color:#12181F;font-size:8px;line-height:1;
+    background:#E9A73C;
+  }
+  /* Play triangle via borders: centres deterministically (text glyphs carry uneven side-bearing),
+     nudged right so its visual mass sits at the circle centre. */
+  .guide-btn::before{
+    content:'';border-style:solid;
+    border-width:4.5px 0 4.5px 7.5px;
+    border-color:transparent transparent transparent #12181F;
+    transform:translateX(1px);
   }
 
   /* ---------- masthead ---------- */
@@ -658,9 +666,18 @@
   /* ---------- artefact chips ---------- */
   .loadout-list{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px;}
   .loadout-chip{
+    position:relative;
     background:var(--panel-3);border:1px solid var(--border);border-radius:var(--r-sm);
     padding:6px 11px;font-size:12.5px;display:flex;align-items:center;gap:7px;
     transition:border-color 0.14s ease,background 0.14s ease;
+  }
+  /* Corner badge like target-pill's min-star, distinct colour so it isn't read as a min. */
+  .loadout-chip .copy-cap-badge{
+    position:absolute;top:-7px;right:-6px;
+    font-family:var(--mono);font-size:9px;line-height:1;font-weight:700;
+    color:var(--accent);background:var(--bg);
+    border:1px solid var(--accent-dim);border-radius:8px;padding:1px 4px;
+    pointer-events:none;white-space:nowrap;
   }
   .loadout-chip b{color:var(--accent);font-family:var(--mono);font-size:11.5px;}
   button.loadout-chip{cursor:pointer;font-family:var(--sans);color:var(--text);}
@@ -1096,9 +1113,11 @@
   }
   /* Grid columns too narrow for side-by-side gauges/stats - stack instead. */
   .results-grid-view .details-cols,
-  .compare-grid .details-cols{flex-direction:column;}
+  .compare-grid .details-cols,
+  .build-compare-strip .details-cols{flex-direction:column;}
   .results-grid-view .details-col + .details-col,
-  .compare-grid .details-col + .details-col{margin-top:12px;}
+  .compare-grid .details-col + .details-col,
+  .build-compare-strip .details-col + .details-col{margin-top:12px;}
   /* Inline `color:` carries the container's tier colour; currentColor ties the whole column to it. */
   .compare-col-header{
     font-family:var(--mono);font-size:12.5px;font-weight:700;
@@ -1162,6 +1181,13 @@
   /* ---------- compare my builds ---------- */
   .compare-builds-row + .compare-builds-row{margin-top:24px;}
   .build-compare-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;}
+  /* Stack stats one per row (name left, value right) so the same stat sits at the same level across panels. */
+  .build-compare-strip .target-line{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:4px;}
+  .build-compare-strip .target-line .target-pill{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .build-compare-strip .target-line .target-pill .tp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .build-compare-strip .target-line .target-pill .tp-val{flex:none;}
+  /* Keep equalizer padding below the chips, don't stretch the rows. */
+  .build-compare-strip .loadout-list{align-content:flex-start;}
   .build-compare-panel{margin-bottom:0;position:relative;transition:transform 0.15s ease,opacity 0.15s ease,box-shadow 0.15s ease;}
   .build-compare-close{
     position:absolute;top:7px;right:7px;width:20px;height:20px;line-height:18px;text-align:center;
@@ -1224,7 +1250,7 @@
       </div>
       <div class="theme-switch">
         <a class="guide-pill" href="https://youtu.be/-xyIB2FJPHU" target="_blank" rel="noopener" title="Watch the video guide">
-          <span class="guide-btn" aria-hidden="true">&#9654;</span>
+          <span class="guide-btn" aria-hidden="true"></span>
           <span>Watch Tool Guide</span>
         </a>
         <div class="theme-btns" id="themeBtns" role="group" aria-label="Colour theme">
@@ -1334,6 +1360,10 @@
         <label class="check-item" style="margin-bottom:4px;">
           <input type="checkbox" id="includeArmorBuffsChk">
           <span class="name">Add armor bonus stats in results</span>
+        </label>
+        <label class="check-item" style="margin-bottom:4px;">
+          <input type="checkbox" id="showTradeoffChk">
+          <span class="name">Interesting trade-off (experimental)</span>
         </label>
         <label class="check-item" style="margin-bottom:4px;">
           <input type="checkbox" id="showConsumableZoneChk">
@@ -1472,7 +1502,7 @@
         <div class="toggle-row">
           <button type="button" id="artAllBtn">select all</button>
           <button type="button" id="artNoneBtn">unselect all</button>
-          <button type="button" id="artUnpinBtn">unpin all</button>
+          <button type="button" id="artUnpinBtn">unpin &amp; unlimit all</button>
         </div>
         <div class="art-search-wrap">
           <input type="text" id="artSearchInput" placeholder="Search artefact" autocomplete="off" spellcheck="false">
@@ -2093,6 +2123,20 @@ document.getElementById('showConsumableZoneChk').addEventListener('change', e=>{
   }
 });
 
+document.getElementById('showTradeoffChk').addEventListener('change', e=>{
+  showTradeoff = e.target.checked;
+  if (compareBuildsActive){ renderBuildsCompare(); return; }
+  if (compareModeActive){
+    if (lastComparisonRenderArgs){
+      renderComparisonResults(lastComparisonRenderArgs.columnResults, lastComparisonRenderArgs.targetStats, lastComparisonRenderArgs.level, lastComparisonRenderArgs.quality);
+    }
+    return;
+  }
+  if (lastRenderArgs){
+    renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
+  }
+});
+
 // Sole programmatic path for the two buff toggles - don't add a second one. Dispatches
 // 'change' so the listeners above stay the only owners of the state var and the re-render.
 function setBuffToggle(id, on){
@@ -2131,27 +2175,13 @@ function saveExcludedNames(){
     .map(c => ARTIFACTS[parseInt(c.dataset.idx)].name);
   try { localStorage.setItem(LS_EXCLUDED, JSON.stringify(excluded)); } catch(e){}
 }
-function loadMaxCopies(){
-  try {
-    const raw = localStorage.getItem(LS_MAXCOPIES);
-    // A stored "null" is truthy but parses to null; unvalidated it throws at top level.
-    const v = raw ? JSON.parse(raw) : null;
-    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
-  } catch(e){ return {}; }
-}
+// Session-only: never persisted; this only clears any stale stored value.
 function saveMaxCopies(){
-  try { localStorage.setItem(LS_MAXCOPIES, JSON.stringify(MAX_COPIES)); } catch(e){}
+  try { localStorage.removeItem(LS_MAXCOPIES); } catch(e){}
 }
-function loadPinnedNames(){
-  try {
-    const raw = localStorage.getItem(LS_PINNED);
-    // Any truthy non-array clears the caller's guard, then throws on .forEach at top level.
-    const v = raw ? JSON.parse(raw) : null;
-    return Array.isArray(v) ? v : null;
-  } catch(e){ return null; }
-}
+// Session-only: never persisted; this only clears any stale stored value.
 function savePinnedNames(){
-  try { localStorage.setItem(LS_PINNED, JSON.stringify(Array.from(PINNED).map(i => ARTIFACTS[i].name))); } catch(e){}
+  try { localStorage.removeItem(LS_PINNED); } catch(e){}
 }
 // Stored name-keyed, held index-keyed - reordering ARTIFACTS must not reassign a user's units.
 function loadOwned(){
@@ -2226,15 +2256,14 @@ let buildsCloseForm = null;
 let buildsImportData = null;
 // Set by My Builds block below - lets a result card's save-to-build button reuse its path.
 let buildsSaveFromResult = null;
+// Session-only: start empty; drop any value an older build persisted.
 let PINNED = new Set(); // artifact indices that must appear in every result (Mode A only)
-{
-  const savedPinNames = loadPinnedNames();
-  if (savedPinNames){
-    const byName = new Map(ARTIFACTS.map((a,i) => [a.name, i]));
-    savedPinNames.forEach(n => { if (byName.has(n)) PINNED.add(byName.get(n)); }); // drops names no longer in ARTIFACTS
-  }
-}
-let MAX_COPIES = loadMaxCopies(); // {artifactName: cap 1-5}; absent = unlimited
+try { localStorage.removeItem(LS_PINNED); } catch(e){}
+let MAX_COPIES = {}; // {artifactName: cap 1-5}; absent = unlimited. Session-only, like PINNED above.
+try { localStorage.removeItem(LS_MAXCOPIES); } catch(e){}
+// MAX_COPIES snapshot frozen at search time, for the result-pill copy-limit badge.
+// Session-only; cleared on Reset.
+let LIMITED_IN_LAST_SEARCH = {};
 
 const artifactListEl = document.getElementById('artifactList');
 const savedExcluded = loadExcludedNames();
@@ -2806,6 +2835,9 @@ document.getElementById('artUnpinBtn').onclick = ()=>{
   savePinnedNames();
   updateAllLockStates();
   updateAllOwnedPinStates();
+  MAX_COPIES = {};
+  saveMaxCopies();
+  updateAllMaxCopiesBadges();
 };
 document.getElementById('clearLoadoutBtn').onclick = ()=>{
   OWNED = {};
@@ -3077,6 +3109,8 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   setBuffToggle('includeArmorBuffsChk', false);
   document.getElementById('showConsumableZoneChk').checked = false;
   showConsumableZone = false;
+  document.getElementById('showTradeoffChk').checked = false;
+  showTradeoff = false;
   document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.lvl==='0'));
   const lvlNote = document.getElementById('lvlNote');
   lvlNote.textContent = 'Additional stats excluded';
@@ -3105,6 +3139,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   MAX_COPIES = {};
   saveMaxCopies();
   updateAllMaxCopiesBadges();
+  LIMITED_IN_LAST_SEARCH = {}; // clear result-pill copy-limit flags too
   // useLoadoutBtn off - favorited artefacts stay; they're inventory, not a search param.
   document.getElementById('useLoadoutBtn').classList.remove('active');
   document.getElementById('loadoutSearchInput').value = '';
@@ -4936,6 +4971,39 @@ function beatsFallback(a,b){
   if(Math.abs(a.crit-b.crit)>1e-6) return a.crit>b.crit;
   return beats(a,b);
 }
+
+// Display-only re-rank of the beats-ordered top list: builds within TIER_TOLERANCE of the best
+// score on a tier tie there, next tier breaks it. NEVER call from beats()/worker/shouldPrune -
+// would corrupt the prune's domination test. Anchor-based (bounds give-up to tol), not
+// adjacent-gap (chains). Only over full-coverage lists (top/top_ext). See DECISIONS.md.
+const TIER_TOLERANCE = 0.015; // 1.5%
+function rerankByTierTolerance(list){
+  if(!list || list.length < 2) return list;
+  list.forEach((e,i)=>{ e.__si = i; }); // strict-order index: stable final tiebreak
+  const keyOf = { h:e=>e.ts.h, m:e=>e.ts.m, l:e=>e.ts.l };
+  function assign(subset, tier){
+    if(tier === 'done') return subset.slice().sort((a,b)=>a.__si-b.__si);
+    const key = keyOf[tier];
+    let scale = 1e-9;
+    for(const e of subset){ const v = Math.abs(key(e)); if(v>scale) scale = v; }
+    const sorted = subset.slice().sort((a,b)=> key(b)-key(a) || a.__si-b.__si);
+    const next = tier==='h' ? 'm' : tier==='m' ? 'l' : 'done';
+    const out = [];
+    let bucket = [sorted[0]], anchor = key(sorted[0]); // anchor = bucket's best, not prev
+    for(let j=1;j<sorted.length;j++){
+      if((anchor - key(sorted[j]))/scale > TIER_TOLERANCE){
+        for(const e of assign(bucket, next)) out.push(e);
+        bucket = []; anchor = key(sorted[j]);
+      }
+      bucket.push(sorted[j]);
+    }
+    for(const e of assign(bucket, next)) out.push(e);
+    return out;
+  }
+  const res = assign(list, 'h');
+  res.forEach(e=>{ delete e.__si; });
+  return res;
+}
 const THRESH_CAP     = 0.5;
 const THRESH_CAP_FROST = 1;
 const THRESH_EXT     = 0.55;
@@ -5067,89 +5135,11 @@ function sortChosenForDisplay(chosen){
   });
 }
 
-function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats, cardScope, highlightClass){
-  // Class topSets paints. Default leaves every existing call site unchanged.
-  highlightClass = highlightClass || 'top-stat';
-  rowSharedStats = rowSharedStats || new Set();
-  const {chosen, sum} = result;
-  const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
-  let html = `<div class="result-card" style="${borderStyle}">`;
-
-  // For consumable-zone cards, build small over-threshold badges for the header
-  let overBadges = '';
-  if (isExtended){
-    THRESHOLD_STATS.forEach(s=>{
-      const raw = sum[STAT_IDX[s]];
-      const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
-      const eff = thresholdEffValue(raw, bonus, s, protection);
-      if (eff > thresholdCap(s) + 1e-6){
-        overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;">${s} ${eff.toFixed(2)}</span>`;
-      }
-    });
-  }
-
-  const wouldBeNote = wouldBeRank != null
-    ? `<span style="font-size:10px;color:var(--muted);">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
-    : '';
-
-  const copyBtn = (!isExtended && resultIndex >= 0)
-    ? `<button type="button" class="copy-result-btn" data-result-idx="${resultIndex}" title="Copy to clipboard for Discord">📋 copy</button>`
-    : '';
-  const saveBuildBtn = (!isExtended && resultIndex >= 0)
-    ? `<button type="button" class="copy-result-btn save-build-btn" data-result-idx="${resultIndex}" title="Save to My Builds">💾 save</button>`
-    : '';
-  html += `<div class="rank-row">
-      <div class="rank-row-info"><span class="rank-badge">#${rank}</span>${priceBadgeHtml(chosen)}${overBadges}${wouldBeNote}</div>
-      <div class="rank-row-actions">${copyBtn}${saveBuildBtn}</div>
-    </div>`;
-
-  // Display-only; respects "Add containers bonus stats" so it matches stats shown elsewhere.
-  const ehVal = computeEffectiveHealth(sum, containerBonus);
-  const ehArmorNote = (selectedArmor && includeArmorBuffs) ? ` <span style="color:var(--muted);">w/ ${selectedArmor.name}</span>` : '';
-  html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
-
-  html += '<div class="loadout-list">';
-  // Constant for the whole card; the select can't change mid-render.
-  const globalQuality = parseInt(document.getElementById('qualityInput').value) || 100;
-  sortChosenForDisplay(chosen).forEach(c=>{
-    const effectiveQuality = c.quality != null ? c.quality : globalQuality;
-    const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
-    html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}" data-scope="${cardScope || ''}"${c.quality ? ` data-q="${c.quality}"` : ''}><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span></button>`;
-  });
-  html += '</div>';
-
-  html += '<div class="target-line">';
-  targetStats.forEach(t=>{
-    const name = t.name;
-    const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus, protection);
-    const dir = STAT_META[name].good ? 1 : -1;
-    /* Star must match the gate the search actually applied: container bonus counts for
-       ordinary stats when the tick is on, armor never does. Do NOT reroute through
-       displayValue - it folds in armor and would star a minimum the search never credited. */
-    const starBonus = STAT_META[name].threshold ? 0 : (includeContainerBuffs ? (containerBonus?.[name] || 0) : 0);
-    const meetsMin = (t.min !== null && t.min !== undefined) && ((sum[STAT_IDX[name]] + starBonus) * dir >= t.min - 1e-6);
-    const star = meetsMin ? '<span class="min-star">★</span>' : '';
-    const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
-    // Coverage uses the artefact/pinned total, not the display-merged container bonus. Only
-    // reachable on coverage-fallback builds - `top` never holds a stat below this.
-    // Intended mismatch (see DECISIONS.md): this badge reads raw `sum`, the pill colour below
-    // reads displayValue, so a stat can print green and still carry the warning.
-    const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
-    const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
-    // Glyph as well as colour: a ring alone on a tinted pill is easy to miss.
-    const beatsBadge = (isTopStat && highlightClass === 'beats-main')
-      ? '<span class="beats-badge" title="Beats every build in the list above on this stat">\u25b2</span>' : '';
-    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' ' + highlightClass : ''}${noBenefit ? ' no-benefit' : ''}">${beatsBadge}${warnBadge}${star}${name}: ${valStr}</span>`;
-  });
-  html += '</div>';
-
-  // Keyed on the build, not the rank, so filtering or reordering keeps each card's state.
-  // cardScope separates Compare Containers columns: two containers can share protection and
-  // bonus stats and return the same build, and without it opening one card expands the other.
-  const detailsKey = (isExtended ? 'x' : 'r') + '|' + (cardScope || '') + '|' +
-    chosen.map(c => c.idx + 'x' + c.count + (c.quality != null ? 'q' + c.quality : '')).sort().join(',');
-  const detailsOpen = openDetailsState.has(detailsKey) ? openDetailsState.get(detailsKey) : isTop;
-  html += '<details' + (detailsOpen ? ' open' : '') + ' data-dkey="' + detailsKey + '"><summary>Damage thresholds &amp; full stat breakdown</summary>';
+// Shared by renderResultCard and renderBuildComparePanel so both breakdowns are identical.
+// Caller supplies detailsKey/detailsOpen; targetStats may be [] and rowSharedStats empty
+// (Compare My Builds has no search targets).
+function statBreakdownDetailsHtml(sum, containerBonus, protection, targetStats, rowSharedStats, detailsKey, detailsOpen){
+  let html = '<details' + (detailsOpen ? ' open' : '') + ' data-dkey="' + detailsKey + '"><summary>Damage thresholds &amp; full stat breakdown</summary>';
 
   // Build gauge and stat cells as two independent column stacks (see below).
   const gaugeCells = [];
@@ -5210,8 +5200,99 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
   gridHtml += '<div class="details-col">' + statCells.join('') + '</div>';
   gridHtml += '</div></div></div>';
   html += gridHtml;
+  html += '</details>';
+  return html;
+}
 
-  html += '</details></div>';
+function renderResultCard(result, targetStats, protection, rank, isTop, topSets, resultIndex, isExtended, wouldBeRank, minStatus, containerBonus, rowSharedStats, cardScope, highlightClass){
+  // Class topSets paints. Default leaves every existing call site unchanged.
+  highlightClass = highlightClass || 'top-stat';
+  rowSharedStats = rowSharedStats || new Set();
+  const {chosen, sum} = result;
+  const borderStyle = isExtended ? 'border-color:var(--bad);' : '';
+  let html = `<div class="result-card" style="${borderStyle}">`;
+
+  // For consumable-zone cards, build small over-threshold badges for the header
+  let overBadges = '';
+  if (isExtended){
+    THRESHOLD_STATS.forEach(s=>{
+      const raw = sum[STAT_IDX[s]];
+      const bonus = containerBonus ? (containerBonus[s] || 0) : 0;
+      const eff = thresholdEffValue(raw, bonus, s, protection);
+      if (eff > thresholdCap(s) + 1e-6){
+        overBadges += `<span style="font-size:10px;font-family:var(--mono);background:var(--bad-bg);border:1px solid var(--bad);color:#f0bcb4;border-radius:3px;padding:1px 6px;">${s} ${eff.toFixed(2)}</span>`;
+      }
+    });
+  }
+
+  const wouldBeNote = wouldBeRank != null
+    ? `<span style="font-size:10px;color:var(--muted);">would be <b style="color:var(--text);">#${wouldBeRank}</b> in main list</span>`
+    : '';
+
+  const copyBtn = (!isExtended && resultIndex >= 0)
+    ? `<button type="button" class="copy-result-btn" data-result-idx="${resultIndex}" title="Copy to clipboard for Discord">📋 copy</button>`
+    : '';
+  const saveBuildBtn = (!isExtended && resultIndex >= 0)
+    ? `<button type="button" class="copy-result-btn save-build-btn" data-result-idx="${resultIndex}" title="Save to My Builds">💾 save</button>`
+    : '';
+  html += `<div class="rank-row">
+      <div class="rank-row-info"><span class="rank-badge">#${rank}</span>${priceBadgeHtml(chosen)}${overBadges}${wouldBeNote}</div>
+      <div class="rank-row-actions">${copyBtn}${saveBuildBtn}</div>
+    </div>`;
+
+  // Display-only; respects "Add containers bonus stats" so it matches stats shown elsewhere.
+  const ehVal = computeEffectiveHealth(sum, containerBonus);
+  const ehArmorNote = (selectedArmor && includeArmorBuffs) ? ` <span style="color:var(--muted);">w/ ${selectedArmor.name}</span>` : '';
+  html += `<div class="eh-line" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:-2px 0 8px;" title="(100 + Bullet resistance + armor) &times; (1 + Vitality/100)">Effective Health: <b style="color:var(--text);">${ehVal.toFixed(2)}</b>${ehArmorNote}</div>`;
+
+  html += '<div class="loadout-list">';
+  // Constant for the whole card; the select can't change mid-render.
+  const globalQuality = parseInt(document.getElementById('qualityInput').value) || 100;
+  sortChosenForDisplay(chosen).forEach(c=>{
+    const effectiveQuality = c.quality != null ? c.quality : globalQuality;
+    const ownedCls = showOwnedHighlight && ownedHighlightOn && isOwnedAtOrAboveQuality(c.idx, effectiveQuality) ? ' owned-match' : '';
+    // Cap the search applied (snapshot), not the live slider.
+    const copyCap = LIMITED_IN_LAST_SEARCH[ARTIFACTS[c.idx].name];
+    const copyCapBadge = copyCap
+      ? `<span class="copy-cap-badge" title="Limited to ${copyCap} cop${copyCap === 1 ? 'y' : 'ies'} in this search">\u00d7${copyCap}</span>`
+      : '';
+    html += `<button type="button" class="loadout-chip${ownedCls}" data-idx="${c.idx}" data-scope="${cardScope || ''}"${c.quality ? ` data-q="${c.quality}"` : ''}><b>${c.count}&times;</b> <span${c.quality ? ` style="color:${QUALITY_COLORS[c.quality]};"` : ''}>${ARTIFACTS[c.idx].name}</span>${copyCapBadge}</button>`;
+  });
+  html += '</div>';
+
+  html += '<div class="target-line">';
+  targetStats.forEach(t=>{
+    const name = t.name;
+    const valStr = fmtWithBonus(name, sum[STAT_IDX[name]], containerBonus, protection);
+    const dir = STAT_META[name].good ? 1 : -1;
+    /* Star must match the gate the search actually applied: container bonus counts for
+       ordinary stats when the tick is on, armor never does. Do NOT reroute through
+       displayValue - it folds in armor and would star a minimum the search never credited. */
+    const starBonus = STAT_META[name].threshold ? 0 : (includeContainerBuffs ? (containerBonus?.[name] || 0) : 0);
+    const meetsMin = (t.min !== null && t.min !== undefined) && ((sum[STAT_IDX[name]] + starBonus) * dir >= t.min - 1e-6);
+    const star = meetsMin ? '<span class="min-star">★</span>' : '';
+    const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
+    // Coverage uses the artefact/pinned total, not the display-merged container bonus. Only
+    // reachable on coverage-fallback builds - `top` never holds a stat below this.
+    // Intended mismatch (see DECISIONS.md): this badge reads raw `sum`, the pill colour below
+    // reads displayValue, so a stat can print green and still carry the warning.
+    const noBenefit = sum[STAT_IDX[name]] * dir <= COVERAGE_EPS;
+    const warnBadge = noBenefit ? '<span class="no-benefit-badge" title="No real benefit from this build">\u26a0</span>' : '';
+    // Glyph as well as colour: a ring alone on a tinted pill is easy to miss.
+    const beatsBadge = (isTopStat && highlightClass === 'beats-main')
+      ? '<span class="beats-badge" title="Beats every build in the list above on this stat">\u25b2</span>' : '';
+    html += `<span class="target-pill ${displayGoodValue(name, sum[STAT_IDX[name]], containerBonus, protection)?'good':'bad'}${isTopStat ? ' ' + highlightClass : ''}${noBenefit ? ' no-benefit' : ''}">${beatsBadge}${warnBadge}${star}${name}: ${valStr}</span>`;
+  });
+  html += '</div>';
+
+  // Keyed on the build, not the rank, so filtering or reordering keeps each card's state.
+  // cardScope separates Compare Containers columns: two containers can share protection and
+  // bonus stats and return the same build, and without it opening one card expands the other.
+  const detailsKey = (isExtended ? 'x' : 'r') + '|' + (cardScope || '') + '|' +
+    chosen.map(c => c.idx + 'x' + c.count + (c.quality != null ? 'q' + c.quality : '')).sort().join(',');
+  const detailsOpen = openDetailsState.has(detailsKey) ? openDetailsState.get(detailsKey) : isTop;
+  html += statBreakdownDetailsHtml(sum, containerBonus, protection, targetStats, rowSharedStats, detailsKey, detailsOpen);
+  html += '</div>';
 
   return html;
 }
@@ -5301,6 +5382,23 @@ function equalizeCompareCardChips(resultsEl){
   ranks.forEach((r, i) => {
     r.chipDivs.forEach(d => { d.style.minHeight = chipMax[i] + 'px'; });
     r.targetLines.forEach(d => { d.style.minHeight = targetMax[i] + 'px'; });
+  });
+}
+
+// Panels share one ordered stat list, so only an unequal block above the stats (chip list, or a
+// "skipped" note on some builds) misaligns them. Pad each chip list so every .target-line in a
+// strip starts at the same offset; equal grid-row height then lines the rows up across builds.
+function equalizeBuildComparePanels(scopeEl){
+  scopeEl.querySelectorAll('.build-compare-strip').forEach(strip=>{
+    const rows = Array.from(strip.querySelectorAll('.build-compare-panel'))
+      .map(p => ({ list: p.querySelector('.loadout-list'), target: p.querySelector('.target-line') }))
+      .filter(r => r.list && r.target);
+    if (rows.length < 2) return;
+    rows.forEach(r => { r.list.style.minHeight = ''; }); // reset so re-renders re-measure cleanly
+    const offsets = rows.map(r => r.target.offsetTop);          // panel is position:relative
+    const baseH = rows.map(r => r.list.getBoundingClientRect().height);
+    const maxOff = Math.max(...offsets);
+    rows.forEach((r, i) => { r.list.style.minHeight = (baseH[i] + (maxOff - offsets[i])) + 'px'; });
   });
 }
 
@@ -5496,7 +5594,7 @@ function renderResults(results, extResults, targetStats, protection, minFallback
 
   /* Skipped when the coverage bucket is already the main list (it would print twice), and
      when the price filter emptied the list, since "beats the list above" needs a list. */
-  if (!showCoverageFallback && displayResults.length){
+  if (showTradeoff && !showCoverageFallback && displayResults.length){
     const aside = coverageAsideResults(coverageFallbackResults, targetStats, containerBonus, passesPriceFilter);
     if (aside.length){
       const beatsSets = computeBeatsMainSets(aside, displayResults, targetStats, containerBonus, protection);
@@ -5517,9 +5615,9 @@ function renderResults(results, extResults, targetStats, protection, minFallback
         ? `<div class="coverage-aside-key"><b>\u25b2</b> marks a stat where this build beats every build in the list above.</div>`
         : '';
       html += `<div class="coverage-aside">
-        <div class="coverage-aside-rule"><span>Different trade-off</span></div>
-        <h3 class="coverage-aside-hdr">Also worth a look: strong builds that miss one stat</h3>
-        <div class="coverage-aside-sub">Each gives nothing to one stat you selected (marked \u26a0), which is why it is not in the list above.</div>
+        <div class="coverage-aside-rule"><span>Trade-off Options</span></div>
+        <h3 class="coverage-aside-hdr">Strong builds that miss one stat you picked</h3>
+        <div class="coverage-aside-sub">Each of these builds sacrifices one stat you picked for much better overall stats. Sacrificed stat is marked \u26a0.</div>
         ${keyHtml}
         ${gridView && aside.length > 1 ? `<div class="results-grid-view">${asideCards}</div>` : asideCards}
       </div>`;
@@ -5588,6 +5686,7 @@ let includeContainerBuffs = false;
 // affecting Effective Health. Off by default, auto-on when an armor is picked.
 let includeArmorBuffs = false;
 let showConsumableZone = false; // user toggle: shows/hides the already-computed consumable zone
+let showTradeoff = false; // advanced toggle: shows/hides the "Trade-off Options" coverage aside
 // Result-card disclosure state, keyed by data-dkey. Survives every display-only re-render;
 // cleared on a new search and by Reset All.
 const openDetailsState = new Map();
@@ -5792,6 +5891,8 @@ document.getElementById('results').addEventListener('click', async e=>{
    showOwnedHighlight/price-tier writes can't drift. Returns {error} or {sharedCtx}; side
    effects happen before validation. */
 function readSharedSearchInputs(){
+  // Freeze the copy-limit flags to this search (both search modes reach here once per run).
+  LIMITED_IN_LAST_SEARCH = {...MAX_COPIES};
   const level = Math.max(0, Math.min(15, parseInt(document.getElementById('levelInput').value) || 0));
   const quality = parseInt(document.getElementById('qualityInput').value) || 100;
 
@@ -5965,8 +6066,9 @@ document.getElementById('calcBtn').onclick = async ()=>{
 
       // Build the pinned-artefact base once and merge it into every worker result.
       const mergeChosen = makeMergeChosen(meta, useLoadout);
-      const results = data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
-      const extResults = (data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
+      // Near-tie re-rank (display only); see rerankByTierTolerance.
+      const results = rerankByTierTolerance(data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts})));
+      const extResults = rerankByTierTolerance((data.top_ext || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts})));
       const minFallbackResults = (data.top_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts}));
       // cov: lets coverageAsideResults keep to builds missing exactly one stat.
       const coverageFallbackResults = (data.top_coverage_fallback || []).map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts, cov: best.cov}));
@@ -6210,9 +6312,10 @@ async function runComparisonSearch(){
 
     const mergeChosen = makeMergeChosen(built.meta, useLoadout);
     // Compare mode shows the plain top-5 only, no Extended or fallback variants.
-    const top5 = (data.top || []).slice(0, 5).map(best => ({
+    // Re-rank the full list before the slice so the tolerance can promote into the visible 5.
+    const top5 = rerankByTierTolerance((data.top || []).map(best => ({
       chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts
-    }));
+    }))).slice(0, 5);
     columnResults.push({ containerCfg, results: top5, meta: built.meta });
   }
 
@@ -6424,7 +6527,11 @@ function computeRowStatList(rowResults){
     stats.push({name, winners});
   });
 
-  return {ehWinners, stats};
+  // Shared stats across the row (>=2 builds show them), so each panel's breakdown lists them
+  // in the same order and the columns line up - same helper the main results grid uses.
+  const sharedStats = computeRowSharedStats(rowResults.map(rb => ({sum: rb.result.sum, containerBonus: rb.result.containerBonus})));
+
+  return {ehWinners, stats, sharedStats};
 }
 
 function renderBuildComparePanel(rb, i, statList, containerName){
@@ -6453,14 +6560,21 @@ function renderBuildComparePanel(rb, i, statList, containerName){
   statList.stats.forEach(s=>{
     const val = sum[STAT_IDX[s.name]];
     if (Math.abs(val) < 1e-6){
-      html += `<span class="target-pill" style="color:var(--muted);">${s.name}: -</span>`;
+      html += `<span class="target-pill" style="color:var(--muted);"><span class="tp-name">${s.name}</span><span class="tp-val">-</span></span>`;
     } else {
       const win = s.winners.has(i);
       const good = displayGoodValue(s.name, val, containerBonus, protection);
-      html += `<span class="target-pill ${good?'good':'bad'}${win ? ' top-stat' : ''}">${s.name}: ${fmtWithBonus(s.name, val, containerBonus, protection)}</span>`;
+      html += `<span class="target-pill ${good?'good':'bad'}${win ? ' top-stat' : ''}"><span class="tp-name">${s.name}</span><span class="tp-val">${fmtWithBonus(s.name, val, containerBonus, protection)}</span></span>`;
     }
   });
-  html += '</div></div>';
+  html += '</div>';
+
+  // Same breakdown as the main list. Key on container+build name so open-state survives a reorder.
+  const detailsKey = 'b|' + containerName + '|' + build.name;
+  const detailsOpen = openDetailsState.has(detailsKey) ? openDetailsState.get(detailsKey) : false;
+  html += statBreakdownDetailsHtml(sum, containerBonus, protection, [], statList.sharedStats || new Set(), detailsKey, detailsOpen);
+
+  html += '</div>';
   return html;
 }
 
@@ -6476,6 +6590,7 @@ function rerenderBuildsRow(containerName){
   const strip = rowEl.querySelector('.build-compare-strip');
   strip.innerHTML = rowResults.map((rb,i) => renderBuildComparePanel(rb, i, statList, containerName)).join('');
   wireBuildsCompareDragRow(rowEl);
+  equalizeBuildComparePanels(rowEl);
 }
 
 let buildsDragSource = null; // {containerName, buildName}
@@ -6619,6 +6734,7 @@ function renderBuildsCompare(){
   el.innerHTML = html;
   document.getElementById('closeBuildsCompareBtn').addEventListener('click', closeBuildsCompareView);
   wireBuildsCompareDragRow(el);
+  equalizeBuildComparePanels(el);
 }
 
 /* Re-renders whichever result view is on screen from cached args, without re-searching.
