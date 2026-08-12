@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Artefact Loadout Calculator</title>
+<title>Artifact Loadout Calculator</title>
 <style>
   :root{
     /* housing */
@@ -114,10 +114,8 @@
   .check-list::-webkit-scrollbar-track{background:transparent;}
 
   /* ---------- video guide button ---------- */
-  /* Its own pill left of the theme pill, sized to match it exactly.
-     Theme pill width = 5 x 26px buttons + 4 x 4px gaps + 2 x 4px padding + 2 x 1px
-     border = 156px; height = 26 + 8 + 2 = 36px. Both are border-box. If the theme
-     pill ever gains or loses a swatch, redo this number. */
+  /* Matches the theme pill (border-box): 5x26 + 4x4 gap + 2x4 pad + 2x1 border = 156px wide,
+     26+8+2 = 36px tall. Recompute if the theme pill gains or loses a swatch. */
   .guide-pill{
     width:156px;height:36px;overflow:hidden;
     display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:99px;
@@ -433,6 +431,13 @@
     background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;
     text-decoration:underline;padding:0;letter-spacing:0.03em;
   }
+  /* Available-artifacts row has three buttons; stretch them across the full panel
+     width (like the search bar) on one line. 11px is the largest that fits. */
+  #availableArtifactsPanel .toggle-row{justify-content:stretch;flex-wrap:nowrap;gap:5px;}
+  #availableArtifactsPanel .toggle-row button{
+    flex:1 1 auto;white-space:nowrap;text-align:center;
+    font-size:10px;padding:6px 3px;letter-spacing:0.03em;
+  }
 
   /* ---------- buttons ---------- */
   button.primary{
@@ -593,10 +598,9 @@
     width:11px;height:11px;
     box-shadow:0 0 0 2.5px var(--accent), 0 2px 8px rgba(0,0,0,0.6);
   }
-  /* Chromium matches :focus-visible on a range after a plain click, so the global outline
-     drew a selection box round the whole track. Focus moves onto the thumb instead.
-     Vendor thumb selectors must stay in separate rules - one unknown selector in a list
-     drops the whole list. */
+  /* Chromium fires :focus-visible on a range after a plain click, boxing the whole track;
+     ring the thumb instead. Vendor thumb selectors stay in separate rules - one unknown
+     selector drops the whole list. */
   .price-range-slider-row input[type=range]:focus{outline:none;}
   .price-range-slider-row input[type=range]:focus-visible::-webkit-slider-thumb{
     box-shadow:0 0 0 2.5px var(--accent), 0 0 0 5px var(--accent-soft), 0 2px 8px rgba(0,0,0,0.6);
@@ -663,7 +667,7 @@
     padding:11px 13px;border-radius:var(--r-md);font-size:12.5px;margin-bottom:14px;
   }
 
-  /* ---------- artefact chips ---------- */
+  /* ---------- artifact chips ---------- */
   .loadout-list{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px;}
   .loadout-chip{
     position:relative;
@@ -726,9 +730,9 @@
     box-shadow:inset 0 0 0 2px var(--panel-3);
   }
 
-  /* Input is a SIBLING of the button, not a child - nesting it in <button> is invalid and
-     swallows the click. Overlays the button's reserved 70px right padding; later in DOM
-     order and positioned, so it paints above and takes the click. */
+  /* Input is a SIBLING, not a child - nesting in <button> is invalid and swallows the click.
+     Overlays the button's reserved 70px right padding; later in DOM order + positioned,
+     so it paints above and takes the click. */
   .eh-gate-row{position:relative;}
   .eh-gate-row .loadout-toggle-btn{padding-right:70px;}
   .eh-gate-row input.stat-min-input{
@@ -921,7 +925,7 @@
   }
   .price-sign{color:var(--muted);opacity:0.45;}
   .price-sign.filled{color:var(--warn);opacity:1;}
-  /* Price-tier badge in the artefact popover header. */
+  /* Price-tier badge in the artifact popover header. */
   .cost-badge{
     font-size:10px;font-family:var(--mono);
     border:1px solid color-mix(in srgb, var(--muted) 45%, var(--border));border-radius:var(--r-sm);padding:1px 6px;
@@ -992,7 +996,6 @@
     border:1px solid rgba(233,167,60,0.45);padding:10px 12px;border-radius:var(--r-md);margin-top:14px;
   }
 
-  /* Disclosure */
   .result-card details{margin-top:11px;}
   .result-card summary{
     cursor:pointer;font-size:10px;color:var(--muted);letter-spacing:0.14em;
@@ -1010,8 +1013,8 @@
   .result-card summary:hover{color:var(--accent-hi);}
   .result-card details[open] summary{margin-bottom:10px;}
   .result-card details[open] summary::before{transform:rotate(90deg);}
-  /* Row track animates 0fr <-> 1fr; .details-anim-inner's overflow:hidden is what clips it.
-     Without that the track collapses but the content still overflows. */
+  /* Track animates 0fr <-> 1fr; .details-anim-inner's overflow:hidden does the clipping -
+     without it the track collapses but content still overflows. */
   .result-card .details-anim{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.26s ease;}
   .result-card details[open] .details-anim{grid-template-rows:1fr;}
   .result-card .details-anim-inner{overflow:hidden;min-width:0;min-height:0;}
@@ -1095,9 +1098,9 @@
   }
 
   /* ---------- compare containers ---------- */
-  /* Stays 3-up: the rank row compacts rather than the grid stepping down. grid-template-rows
-     is set inline per render (auto header + one row per rank) and the columns subgrid onto it,
-     so expanding a card moves every column below it as one block. */
+  /* Stays 3-up; the rank row compacts instead. grid-template-rows is set inline per render
+     (auto header + one row per rank) and columns subgrid onto it, so expanding a card
+     shifts every column below as one block. */
   .compare-grid{display:grid;grid-template-columns:repeat(3,1fr);column-gap:16px;row-gap:10px;}
   .compare-column{display:grid;grid-template-rows:subgrid;grid-row:1/-1;row-gap:10px;min-width:0;align-items:start;}
   /* One column: shared tracks would stack all three columns on top of each other. */
@@ -1227,8 +1230,8 @@
 </style>
 
 <script>
-/* Theme, part 1 of 2 (part 2 sits before </body>) - keep the two in sync. Standalone and
-   try/catch guarded: it runs pre-paint, so a throw here aborts the whole page. */
+/* Theme part 1 of 2 (part 2 before </body>) - keep in sync. Try/catch guarded: runs
+   pre-paint, so a throw here aborts the page. */
 (function(){
   try{
     var t = localStorage.getItem('artiCalc_theme');
@@ -1246,10 +1249,10 @@
     <div class="mast-row">
       <div class="masthead">
         <div class="mast-mark" aria-hidden="true"></div>
-        <h1>STALZONE <span>ARTEFACT LOADOUT</span> CALCULATOR</h1>
+        <h1>STALZONE <span>ARTIFACT LOADOUT</span> CALCULATOR</h1>
       </div>
       <div class="theme-switch">
-        <a class="guide-pill" href="https://youtu.be/-xyIB2FJPHU" target="_blank" rel="noopener" title="Watch the video guide">
+        <a class="guide-pill" href="https://youtu.be/bMld7m87mH4" target="_blank" rel="noopener" title="Watch the video guide">
           <span class="guide-btn" aria-hidden="true"></span>
           <span>Watch Tool Guide</span>
         </a>
@@ -1313,7 +1316,7 @@
           </label>
           <!-- Remove this div to revert to granular input -->
           <div class="field" style="flex:1;">
-            <span class="lbl">Artefact Level</span>
+            <span class="lbl">Artifact Level</span>
             <div class="lvl-toggle">
               <button type="button" class="lvl-btn active" data-lvl="0">LVL 0</button>
               <button type="button" class="lvl-btn" data-lvl="15">LVL 15</button>
@@ -1381,8 +1384,8 @@
           <button type="button" id="statClearBtn">clear</button>
         </div>
         <div class="check-list" id="statList"></div>
-        <!-- Anything added below is OUTSIDE #statList: the stat/tier/min queries sweep that
-             list, and a control inside it would be read as a target stat. -->
+        <!-- Keep below OUTSIDE #statList: stat/tier/min queries sweep that list and would
+             read any control inside it as a target stat. -->
         <div class="advanced-wrap">
           <div class="advanced-inner">
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -1405,7 +1408,7 @@
             <input type="file" id="importLoadoutFile" accept="application/json" style="display:none;">
           </span>
         </div>
-        <p class="panel-hint">Add here the artefacts you already own in game, and search using only those.</p>
+        <p class="panel-hint">Add here the artifacts you already own in game, and search using only those.</p>
         <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
           <button type="button" id="useLoadoutBtn" class="loadout-toggle-btn">Only use my loadout for next search</button>
         </div>
@@ -1417,9 +1420,9 @@
           </span>
         </div>
         <div class="check-list" id="ownedList" style="max-height:160px;"></div>
-        <div class="check-group-hdr" style="padding-top:12px;">Add Artefact</div>
+        <div class="check-group-hdr" style="padding-top:12px;">Add Artifact</div>
         <div style="position:relative;margin-bottom:8px;">
-          <input type="text" id="loadoutSearchInput" placeholder="Type artefact name…" autocomplete="off">
+          <input type="text" id="loadoutSearchInput" placeholder="Type artifact name…" autocomplete="off">
           <div id="loadoutSearchDd" class="loadout-search-dd"></div>
         </div>
         <div id="loadoutAddRow" class="row-inline" style="display:none;">
@@ -1465,13 +1468,13 @@
           </div>
 
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-            <span class="lbl">Artefacts</span>
+            <span class="lbl">Artifacts</span>
             <span style="color:var(--muted);font-size:11.5px;" id="buildSlotCountLabel">0/0</span>
           </div>
           <div class="check-list" id="buildSlotsList" style="max-height:160px;"></div>
 
           <div id="buildAddWrap" style="position:relative;margin-top:8px;margin-bottom:8px;">
-            <input type="text" id="buildSearchInput" placeholder="Type artefact name…" autocomplete="off">
+            <input type="text" id="buildSearchInput" placeholder="Type artifact name…" autocomplete="off">
             <div id="buildSearchDd" class="loadout-search-dd"></div>
           </div>
           <div id="buildAddRow" class="row-inline" style="display:none;">
@@ -1496,16 +1499,16 @@
 
       </div>
 
-      <div class="panel" id="availableArtefactsPanel">
-        <h2>Available artefacts</h2>
-        <p class="panel-hint">Untick anything the search shouldn't use. The lock <b>pins</b> an artefact into every build; the heart <b>adds</b> it to your loadout.</p>
+      <div class="panel" id="availableArtifactsPanel">
+        <h2>Available artifacts</h2>
+        <p class="panel-hint">Untick anything the search shouldn't use. The lock <b>pins</b> an artifact into every build; the heart <b>adds</b> it to your loadout.</p>
         <div class="toggle-row">
           <button type="button" id="artAllBtn">select all</button>
           <button type="button" id="artNoneBtn">unselect all</button>
           <button type="button" id="artUnpinBtn">unpin &amp; unlimit all</button>
         </div>
         <div class="art-search-wrap">
-          <input type="text" id="artSearchInput" placeholder="Search artefact" autocomplete="off" spellcheck="false">
+          <input type="text" id="artSearchInput" placeholder="Search artifact" autocomplete="off" spellcheck="false">
         </div>
         <div class="check-list" id="artifactList"></div>
       </div>
@@ -1523,9 +1526,9 @@
 </div>
 
 <script>
-// For saved-or-imported build data (names, container strings, artefact-slot names, resolve
-// errors) - the one channel an outside file controls. Escape & first. Apply ONCE, at print
-// time from raw stored data: never at import, never twice ("A & B" would print "A &amp; B").
+// For saved/imported build data - the one channel an outside file controls. Escape & first.
+// Apply ONCE, at print time from raw stored data: never at import, never twice ("A & B"
+// would print "A &amp; B").
 function escapeHtml(s){
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1610,10 +1613,9 @@ function colorQualitySelect(sel){
 
 const GROUP1_DEBUFF = new Set(["Temperature","Frost","Biological infection","Radiation","Psyonics"]);
 const GROUP2_DEBUFF = new Set(["Vitality","Bullet resistance","Healing effectiveness"]);
-// Confirmed in-game: these scale ONLY in their beneficial direction and stay flat in the
-// debuff direction. Not folded into GROUP1/GROUP2 - GROUP1_DEBUFF also drives the "not
-// included in results" marker, so reusing it would silently move that marker. isFormulaB
-// is the only reader.
+// Confirmed in-game: scale ONLY in the beneficial direction, flat in the debuff direction.
+// Kept out of GROUP1/GROUP2 - GROUP1_DEBUFF also drives the "not included in results" marker,
+// so reusing it would silently move that marker. isFormulaB is the only reader.
 const FLAT_WHEN_NEG = new Set(["Movement speed","Running speed","Reaction to burns"]); // good stats: no scale below 0
 const FLAT_WHEN_POS = new Set(["Recoil"]);                                             // bad stat: no scale above 0
 
@@ -1856,9 +1858,8 @@ const ARTIFACT_COSTS = {
   "Wolf Tears": {100: 10000, 115: 12000, 130: 15000, 145: 25000, 160: 25000, 175: 25000},
 };
 
-// Calibrated from sampled winning-build costs: quartiles (p25/p50/p75) of the
-// per-slot rouble cost of builds the optimiser actually returns, over 10
-// representative searches x 10 builds at each quality, rounded. 160/175 mirror 145.
+// Quartiles (p25/p50/p75) of per-slot rouble cost across builds the optimiser actually
+// returns: 10 representative searches x 10 builds per quality, rounded. 160/175 mirror 145.
 const PRICE_BAND_EDGES = {
   100: [35_000, 90_000, 130_000],
   115: [60_000, 200_000, 600_000],
@@ -1919,7 +1920,7 @@ function priceBadgeHtml(chosen){
   return `<span class="price-badge" title="${label} (${cat}/4)">${signs}</span>`;
 }
 
-// Per-artefact $-$$$$ tier, same categorisation as the result cards; never an exact price.
+// Per-artifact $-$$$$ tier, same categorisation as the result cards; never an exact price.
 function artifactBandAt(idx, quality){ return buildPriceCategory([{idx, count:1}], quality); }
 function artifactCostBadgeHtml(idx, scaleCtx){
   if (!ARTIFACT_COSTS[ARTIFACTS[idx].name]) return '';
@@ -2101,8 +2102,7 @@ document.getElementById('includeContainerBuffsChk').addEventListener('change', e
   }
 });
 
-// Same display-only treatment as includeContainerBuffsChk above. Unlike the container handler
-// it has no note to refresh, so it delegates straight to the shared display-only re-render.
+// Display-only like includeContainerBuffsChk, but with no note to refresh.
 document.getElementById('includeArmorBuffsChk').addEventListener('change', e=>{
   includeArmorBuffs = e.target.checked;
   rerenderDisplayOnly();
@@ -2292,12 +2292,12 @@ function clearArtSearchHit(){
   const prev = artifactListEl.querySelector('.check-item.search-hit');
   if (prev) prev.classList.remove('search-hit');
 }
-function findArtefactInList(){
+function findArtifactInList(){
   clearArtSearchHit();
   const q = artSearchInputEl.value.trim().toLowerCase();
   if (!q) return;
   // Matches in current DOM order, not ARTIFACTS order, so the hit is the first one the
-  // user would actually scroll to even while used artefacts are hoisted to the top.
+  // user would actually scroll to even while used artifacts are hoisted to the top.
   const item = Array.from(artifactListEl.querySelectorAll('.check-item'))
     .find(el => el.querySelector('.name').textContent.toLowerCase().includes(q));
   if (!item) return;
@@ -2309,7 +2309,7 @@ function findArtefactInList(){
   const itemRect = item.getBoundingClientRect();
   artifactListEl.scrollTop += (itemRect.top - listRect.top) - (listRect.height - itemRect.height) / 2;
 }
-artSearchInputEl.addEventListener('input', findArtefactInList);
+artSearchInputEl.addEventListener('input', findArtifactInList);
 artSearchInputEl.addEventListener('keydown', e=>{
   if (e.key !== 'Escape') return;
   artSearchInputEl.value = '';
@@ -2353,7 +2353,7 @@ artifactListEl.addEventListener('click', e=>{
   }
 });
 
-// Hovering an artefact name opens the same popover as a loadout chip, auto-closing after a
+// Hovering an artifact name opens the same popover as a loadout chip, auto-closing after a
 // delay once the mouse leaves both; popoverOpenedViaHover gates the auto-close.
 let hoverCloseTimer = null;
 function cancelHoverClose(){
@@ -2389,7 +2389,7 @@ artifactListEl.addEventListener('mouseout', e=>{
 // chipPopoverEl is a later `const` - touching it here is a TDZ throw. Its own
 // mouseover/mouseout listeners are registered further down.
 
-// Pins artefacts used in the last results to the top of "Available artefacts", highlighted.
+// Pins artifacts used in the last results to the top of "Available artifacts", highlighted.
 function usedArtifactIndices(results){
   const set = new Set();
   (results || []).forEach(r => r.chosen.forEach(c => set.add(c.idx)));
@@ -2421,7 +2421,7 @@ function highlightUsedArtifacts(indices){
   });
 }
 
-/* ---------- My Loadout: owned-artefacts list + chip popover ---------- */
+/* ---------- My Loadout: owned-artifacts list + chip popover ---------- */
 const ownedListEl = document.getElementById('ownedList');
 const expandLoadoutBtnEl = document.getElementById('expandLoadoutBtn');
 let ownedListExpanded = false;
@@ -2439,7 +2439,7 @@ expandLoadoutBtnEl.addEventListener('click', ()=>{
 function renderOwnedList(){
   const indices = Object.keys(OWNED).map(Number).filter(i => OWNED[i] && OWNED[i].length > 0);
   if (indices.length === 0){
-    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts in your Loadout yet</div>';
+    ownedListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artifacts in your Loadout yet</div>';
     applyOwnedListHeight();
     return;
   }
@@ -2498,7 +2498,7 @@ let popoverOpenIdx = null;
 let popoverAnchorEl = null;
 let popoverOpenQi = null; // index into OWNED[idx] for unit-specific operations
 let popoverOpenedViaHover = false; // hover-opened popovers only; gates auto-close on mouseout
-let popoverHideExclude = false; // Available Artefacts hover: the checkbox is right there
+let popoverHideExclude = false; // Available Artifacts hover: the checkbox is right there
 let popoverBesidePanel = false; // re-renders must reuse positionPopoverBesidePanel or it jumps
 
 function closeChipPopover(){
@@ -2526,9 +2526,9 @@ function positionPopover(anchorEl){
 }
 // Pins the popup outside the panel's right edge, tracking row y: row-anchoring (as in
 // positionPopover) overlapped neighbouring rows.
-const availableArtefactsPanelEl = document.getElementById('availableArtefactsPanel');
+const availableArtifactsPanelEl = document.getElementById('availableArtifactsPanel');
 function positionPopoverBesidePanel(anchorEl){
-  const panelRect = availableArtefactsPanelEl.getBoundingClientRect();
+  const panelRect = availableArtifactsPanelEl.getBoundingClientRect();
   const anchorRect = anchorEl.getBoundingClientRect();
   const popRect = chipPopoverEl.getBoundingClientRect();
   const popW = Math.max(popRect.width, 230);
@@ -2587,12 +2587,12 @@ function renderPopoverMain(idx, hideExclude, scaleCtx){
         <span class="lbl">Max copies in search</span>
         <span class="popover-maxcopies-val" id="maxCopiesVal">${cap ? cap : '\u221e'}</span>
       </div>
-      <input type="range" min="1" max="6" step="1" id="maxCopiesSlider" value="${cap || 6}" title="Limits how many copies of this artefact the default search can use per build">
+      <input type="range" min="1" max="6" step="1" id="maxCopiesSlider" value="${cap || 6}" title="Limits how many copies of this artifact the default search can use per build">
     </div>
     <button type="button" class="popover-btn" data-act="favorite">${isOwned ? 'Edit Loadout' : 'Add to Loadout'}</button>
     ${isOwned ? '<button type="button" class="popover-btn danger" data-act="unfavorite">Remove from Loadout</button>' : ''}
     <button type="button" class="popover-btn" data-act="toggle-pin">${isPinned ? '🔒 Unpin from results' : '🔓 Pin to results'}</button>
-    ${hideExclude ? '' : '<button type="button" class="popover-btn" data-act="exclude">Exclude Artefact</button>'}
+    ${hideExclude ? '' : '<button type="button" class="popover-btn" data-act="exclude">Exclude Artifact</button>'}
   `;
   const slider = document.getElementById('maxCopiesSlider');
   const valEl = document.getElementById('maxCopiesVal');
@@ -2965,7 +2965,7 @@ document.getElementById('exportLoadoutBtn').onclick = ()=>{
   a.click();
   URL.revokeObjectURL(url);
   const nArt = indices.length, nB = data.builds.length;
-  showToast('Exported ' + nArt + ' artefact' + (nArt===1?'':'s') + ' and ' + nB + ' build' + (nB===1?'':'s') + ' to artifact-loadout.json.');
+  showToast('Exported ' + nArt + ' artifact' + (nArt===1?'':'s') + ' and ' + nB + ' build' + (nB===1?'':'s') + ' to artifact-loadout.json.');
 };
 document.getElementById('importLoadoutBtn').onclick = ()=>{
   document.getElementById('importLoadoutFile').click();
@@ -2985,7 +2985,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
     const hasArtifacts = data && Array.isArray(data.artifacts);
     const hasBuilds = data && Array.isArray(data.builds);
     if (!hasArtifacts && !hasBuilds){
-      showModal({kind:'error', title:'Import failed', message:'That file isn\u2019t a recognized loadout export - it has no artefacts or builds in it.', cancel:null});
+      showModal({kind:'error', title:'Import failed', message:'That file isn\u2019t a recognized loadout export - it has no artifacts or builds in it.', cancel:null});
       return;
     }
     const willReplaceOwned = hasArtifacts && Object.keys(OWNED).length > 0;
@@ -3013,7 +3013,7 @@ document.getElementById('importLoadoutFile').addEventListener('change', e=>{
       saveOwned();
       renderOwnedList();
       updateAllHeartStates();
-      msg += 'Loadout imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (unrecognized artefact or quality).' : '');
+      msg += 'Loadout imported.' + (skipped ? ' ' + skipped + ' entr' + (skipped===1?'y':'ies') + ' skipped (unrecognized artifact or quality).' : '');
     }
     if (hasBuilds && buildsImportData){
       const skipped = buildsImportData(data.builds);
@@ -3140,7 +3140,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   saveMaxCopies();
   updateAllMaxCopiesBadges();
   LIMITED_IN_LAST_SEARCH = {}; // clear result-pill copy-limit flags too
-  // useLoadoutBtn off - favorited artefacts stay; they're inventory, not a search param.
+  // useLoadoutBtn off - favorited artifacts stay; they're inventory, not a search param.
   document.getElementById('useLoadoutBtn').classList.remove('active');
   document.getElementById('loadoutSearchInput').value = '';
   document.getElementById('loadoutAddRow').style.display = 'none';
@@ -3511,13 +3511,13 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
   }
   renderBuildsList();
 
-  /* ---- Artefact list: own ids, separate from My Loadout's. Quality is fixed at add
+  /* ---- Artifact list: own ids, separate from My Loadout's. Quality is fixed at add
      time (re-add to change it); level is build-wide. ---- */
   function renderFormSlotsList(){
     const cap = currentCap();
     buildSlotCountLabel.textContent = formSlots.length + '/' + cap;
     if (formSlots.length === 0){
-      buildSlotsListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artefacts added yet.</div>';
+      buildSlotsListEl.innerHTML = '<div class="empty-state" style="padding:12px 4px;font-size:11.5px;">No artifacts added yet.</div>';
     } else {
       buildSlotsListEl.innerHTML = formSlots.map((s,i)=>`<div class="check-item" data-i="${i}">
         <span class="quality-pill ${QUALITY_CLASS[s.quality]}">${escapeHtml(s.artifact)}</span>
@@ -3532,7 +3532,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
       buildCapNote.textContent = 'Select a container first.';
       buildCapNote.style.display = '';
     } else if (atCap){
-      buildCapNote.textContent = 'Container full (' + cap + '/' + cap + ' slots) - remove an artefact to add another.';
+      buildCapNote.textContent = 'Container full (' + cap + '/' + cap + ' slots) - remove an artifact to add another.';
       buildCapNote.style.display = '';
     } else {
       buildCapNote.style.display = 'none';
@@ -3607,7 +3607,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     if (formSlots.length > cap){
       const dropped = formSlots.length - cap;
       formSlots = formSlots.slice(0, cap);
-      buildTruncNote.textContent = dropped + ' artefact' + (dropped===1?'':'s') + ' removed - new container only holds ' + cap + '.';
+      buildTruncNote.textContent = dropped + ' artifact' + (dropped===1?'':'s') + ' removed - new container only holds ' + cap + '.';
       buildTruncNote.style.display = '';
     } else {
       buildTruncNote.style.display = 'none';
@@ -3645,7 +3645,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     hideBuildDd();
     buildAddRow.style.display = 'none';
     buildSelectedIdx = null;
-    buildContainerSelect.dispatchEvent(new Event('change')); // syncs custom dropdown label/color + re-renders the artefact list
+    buildContainerSelect.dispatchEvent(new Event('change')); // syncs custom dropdown label/color + re-renders the artifact list
     buildFormEl.style.display = '';
   }
   function closeBuildForm(){
@@ -3661,7 +3661,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     if (BUILDS.some(b => b.name === name && b !== editingBuildRef)){ showBuildError('A build with that name already exists.'); return; }
     const containerVal = buildContainerSelect.value;
     if (containerVal === 'none'){ showBuildError('Select a container.'); return; }
-    if (formSlots.length === 0){ showBuildError('Add at least one artefact before saving.'); return; }
+    if (formSlots.length === 0){ showBuildError('Add at least one artifact before saving.'); return; }
     const containerObj = CONTAINERS[parseInt(containerVal)];
     const newData = {
       name,
@@ -3688,7 +3688,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     buildPopoverEl.classList.remove('open');
     buildPopoverOpenRef = null;
   }
-  // Same approach as positionPopoverBesidePanel (Available artefacts).
+  // Same approach as positionPopoverBesidePanel (Available artifacts).
   function positionBuildPopover(anchorEl){
     const panelRect = myLoadoutPanelEl.getBoundingClientRect();
     const anchorRect = anchorEl.getBoundingClientRect();
@@ -3725,7 +3725,7 @@ compareSelectEls.forEach(sel=>enhanceContainerSelect(sel));
     const cap = containerObj ? containerObj.slots : build.slots.length;
     const artListHtml = build.slots.length
       ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;max-width:260px;">${build.slots.map(s=>`<span class="quality-pill ${QUALITY_CLASS[s.quality]}" style="font-size:11px;">${escapeHtml(s.artifact)}</span>`).join('')}</div>`
-      : `<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">No artefacts.</div>`;
+      : `<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">No artifacts.</div>`;
     buildPopoverEl.innerHTML = `
       <div style="font-size:12px;color:#fff;font-weight:700;margin-bottom:4px;">${escapeHtml(build.name)}</div>
       <div style="font-size:12px;color:${color};margin-bottom:8px;">${escapeHtml(build.container)} - ${build.slots.length}/${cap} slots \u00b7 LVL ${build.level}</div>
@@ -3941,10 +3941,38 @@ const ARMOR_BR_OVERRIDE = {
   "MIS-X ATLAS": 261.48,
   "SBA TANK": 383.79,
   "Templar Armored Suit": 346.03,
+  // In-game verified (base 100 HP removed); see EHP notes.
+  "Vanguard Armored Suit": 337.01,
+  "Ronin Armored Suit": 337.01,
+  "Rigel Exoarmor": 335.58,
+  "CD-4 Armored Suit": 330.33,
+  "Antares Exoarmor": 329.13,
+  "Hector Exoarmor": 312.26,
+  "Beast Slayer Exoarmor": 312.26,
+  "Scythian-5 Armored Suit": 303.03,
+  "Peresvet Jumpsuit": 301.80,
+  "Marten Exoarmor": 284.98,
+  "Albatross Interceptor Armored Exoskeleton": 284.98,
+  "Orion Jumpsuit": 279.74,
+  "JD ZIVCAS 2A Exoarmor": 275.75,
+  "Ganymede Jumpsuit": 269.38,
+  "Missionary Exoarmor": 267.91,
+  "Hounds Exoarmor": 255.00,
+  "Legionnaire Heavy Armored Suit": 292.70,
+  "Blizzard Walker Heavy Armored Suit": 282.27,
+  "Yorsh Protective Armored Suit": 277.02,
+  "Aborigine Exoskeleton": 273.21,
+  "Scythian-4 Armored Suit": 273.21,
+  "Samson Exoarmor": 273.21,
+  "Trump Exoarmor": 273.21,
+  "RAPS Spanner": 267.91,
+  "Jaeger Exoarmor": 261.48,
+  "RAPS AH-5 Pilgrim": 248.47,
 };
 function armorEffectiveBR(armor){
   if (Object.prototype.hasOwnProperty.call(ARMOR_BR_OVERRIDE, armor.name)) return ARMOR_BR_OVERRIDE[armor.name];
-  return Math.min(2 * armor.br, 1.3 * armor.br + 30);
+  // In-game-confirmed relation across 49 verified armors (BR 103-282, error <1%).
+  return 1.3 * armor.br + 30;
 }
 
 const ARMOR_TIER_META = {
@@ -4096,19 +4124,17 @@ armorSelectEl.addEventListener('change', ()=>{
     selectedArmor = null;
     armorSelectEl.style.color = '';
     updateArmorBonusNote();
-    // No armor, nothing for the row to show - switch it back off. If the tick was already off
-    // (user unticked it earlier), setBuffToggle dispatches nothing, so re-render by hand to
-    // drop the previous armor from the cards.
+    // Nothing left to show. If the tick was already off, setBuffToggle dispatches nothing,
+    // so re-render by hand to drop the previous armor from the cards.
     if (!setBuffToggle('includeArmorBuffsChk', false)) rerenderDisplayOnly();
     return;
   }
   selectedArmor = ARMORS[parseInt(armorSelectEl.value)];
   armorSelectEl.style.color = ARMOR_TIER_META[selectedArmor.tier].color;
   updateArmorBonusNote();
-  // With an armor picked the results are more relevant with its bonus shown, so switch it on.
-  // When the toggle was already on (swapping armor A -> B) it dispatches nothing and the cards
-  // would keep printing armor A - re-render by hand in exactly that case. selectedArmor is set
-  // above, so both the toggle-driven and manual renders see the new armor.
+  // Auto-show the bonus. On a swap (armor A -> B) the toggle is already on and dispatches
+  // nothing, so cards would keep printing armor A - re-render by hand in exactly that case.
+  // selectedArmor is set above, so both paths see the new armor.
   if (!setBuffToggle('includeArmorBuffsChk', true)) rerenderDisplayOnly();
 });
 
@@ -4116,10 +4142,10 @@ armorSelectEl.addEventListener('change', ()=>{
 function computeEffectiveHealth(sum, containerBonus){
   const brBonus = containerBonus ? (containerBonus['Bullet resistance'] || 0) : 0;
   const vitBonus = containerBonus ? (containerBonus['Vitality'] || 0) : 0;
-  const artefactBR = sum[STAT_IDX['Bullet resistance']] + (includeContainerBuffs ? brBonus : 0);
+  const artifactBR = sum[STAT_IDX['Bullet resistance']] + (includeContainerBuffs ? brBonus : 0);
   const vitality = sum[STAT_IDX['Vitality']] + (includeContainerBuffs ? vitBonus : 0);
   const armorBR = (selectedArmor && includeArmorBuffs) ? armorEffectiveBR(selectedArmor) : 0;
-  return (100 + artefactBR + armorBR) * (1 + vitality / 100);
+  return (100 + artifactBR + armorBR) * (1 + vitality / 100);
 }
 
 /* ---------- Combination count: C(n+k-1, k) multiset formula ---------- */
@@ -4186,8 +4212,8 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
 
   if (pinnedIdx.length >= slots){
     const msg = containerCfg.name
-      ? `${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
-      : `${pinnedIdx.length} artefact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} available. Unpin some or increase the slot count.`;
+      ? `${pinnedIdx.length} artifact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
+      : `${pinnedIdx.length} artifact${pinnedIdx.length===1?'':'s'} pinned but only ${slots} slot${slots===1?'':'s'} available. Unpin some or increase the slot count.`;
     return { error: msg };
   }
 
@@ -4215,14 +4241,14 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     if (totalUnits < slots){
       const msg = containerCfg.name
         ? `Only ${totalUnits} unit${totalUnits===1?'':'s'} in your Loadout - not enough to fill ${slots} slot${slots===1?'':'s'} in ${containerCfg.name}.`
-        : `You only have ${totalUnits} artefact${totalUnits===1?'':'s'} in your Loadout, not enough to fill ${slots} slot${slots===1?'':'s'}. Add more to your Loadout or lower the slot count.`;
+        : `You only have ${totalUnits} artifact${totalUnits===1?'':'s'} in your Loadout, not enough to fill ${slots} slot${slots===1?'':'s'}. Add more to your Loadout or lower the slot count.`;
       return { error: msg };
     }
-    // Consume one pool unit per pinned artefact, pre-adding its stats to lockedSum.
+    // Consume one pool unit per pinned artifact, pre-adding its stats to lockedSum.
     if (pinnedIdx.length > 0) {
       for (const pi of pinnedIdx) {
         if (!OWNED[pi] || OWNED[pi].length === 0) {
-          return { error: `Pinned artefact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Add it to your Loadout first, or unpin it.` };
+          return { error: `Pinned artifact \u201c${ARTIFACTS[pi].name}\u201d is not in your Loadout. Add it to your Loadout first, or unpin it.` };
         }
       }
       for (const pi of pinnedIdx) {
@@ -4367,7 +4393,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
     });
   /* EH is derived (BR x Vitality), so it can't be a minStats entry keyed on a sum index; the
      worker recomputes it per leaf. containerBaseVec seeds threshold stats only, so
-     sum[brIdx]/sum[vitIdx] are artefact-only and the container's flat bonus belongs in
+     sum[brIdx]/sum[vitIdx] are artifact-only and the container's flat bonus belongs in
      base/vitBonus - the same split computeEffectiveHealth uses. */
   const ehGate = sharedCtx.ehMin == null ? null : {
     min: sharedCtx.ehMin,
@@ -4386,7 +4412,7 @@ function buildContainerSearchPayload(containerCfg, sharedCtx){
 
   /* With the display tick on, the container's own bonus counts toward each avoid-debuff
      filter, direction-adjusted like the filter is (Recoil points the opposite way). None of
-     the six is a threshold stat, so `sum` is artefact-only for them and nothing double-counts.
+     the six is a threshold stat, so `sum` is artifact-only for them and nothing double-counts.
      Armor stays out. New objects, NOT a mutation: sharedCtx.noDebuffIdx is shared across
      Compare Containers columns, so writing allow in place leaks one column's bonus into the
      next. */
@@ -5020,7 +5046,7 @@ function thresholdEffValue(raw, bonus, statName, protection){
 
 
 /* ---------- Render results ---------- */
-// Returns true if OWNED contains at least one unit of this artefact at >= the given quality.
+// Returns true if OWNED contains at least one unit of this artifact at >= the given quality.
 function isOwnedAtOrAboveQuality(artifactIdx, quality){
   const units = OWNED[artifactIdx];
   if (!units || units.length === 0) return false;
@@ -5050,7 +5076,7 @@ function fmtWithBonus(name, totalVal, containerBonus, protection){
 function isGoodValue(name, val){
   return STAT_META[name].good ? val >= 0 : val <= 0;
 }
-// Colors off the same merged total fmtWithBonus prints, not the raw artefact-only sum -
+// Colors off the same merged total fmtWithBonus prints, not the raw artifact-only sum -
 // otherwise a stat that's a buff only via container/armor bonus would miscolor.
 function displayGoodValue(name, sumVal, containerBonus, protection){
   return isGoodValue(name, displayValue(name, sumVal, containerBonus, protection));
@@ -5126,7 +5152,7 @@ function computeRowSharedStats(rowEntries){
   return shared;
 }
 
-// Pinned artefacts first (alphabetical among themselves), then the rest alphabetically.
+// Pinned artifacts first (alphabetical among themselves), then the rest alphabetically.
 function sortChosenForDisplay(chosen){
   return chosen.slice().sort((a, b)=>{
     const aPinned = PINNED.has(a.idx), bPinned = PINNED.has(b.idx);
@@ -5272,7 +5298,7 @@ function renderResultCard(result, targetStats, protection, rank, isTop, topSets,
     const meetsMin = (t.min !== null && t.min !== undefined) && ((sum[STAT_IDX[name]] + starBonus) * dir >= t.min - 1e-6);
     const star = meetsMin ? '<span class="min-star">★</span>' : '';
     const isTopStat = !!(topSets && topSets[name] && topSets[name].has(resultIndex));
-    // Coverage uses the artefact/pinned total, not the display-merged container bonus. Only
+    // Coverage uses the artifact/pinned total, not the display-merged container bonus. Only
     // reachable on coverage-fallback builds - `top` never holds a stat below this.
     // Intended mismatch (see DECISIONS.md): this badge reads raw `sum`, the pill colour below
     // reads displayValue, so a stat can print green and still carry the warning.
@@ -5522,8 +5548,8 @@ function renderResults(results, extResults, targetStats, protection, minFallback
   const el = document.getElementById('results');
   if (!displayResults || (displayResults.length === 0 && !priceFilterEmptied)){
     const msg = failedCoverageOnly
-      ? `No combination gives a beneficial value to every stat you selected at once. Try unchecking a stat, increasing slots, or including different artefacts.`
-      : `No combination of the selected artefacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artefacts.`;
+      ? `No combination gives a beneficial value to every stat you selected at once. Try unchecking a stat, increasing slots, or including different artifacts.`
+      : `No combination of the selected artifacts respects the damage threshold (Radiation / Temperature / Frost / Biological infection / Psyonics). Try increasing backpack protection, reducing slots, or including different artifacts.`;
     el.innerHTML = `<h2>Result</h2><div class="msg-error">${msg}</div>` + debuffNoticeHtml();
     if (showConsumableZone) {
       renderConsumableZone(results, extResults, targetStats, protection, containerBonus);
@@ -5675,7 +5701,7 @@ let lastSearchedEhMin = null;
 let lastSearchedDebuffLabels = [];
 // In-memory only, for result-card tooltips: last search's includeAdditional, plus a scaling
 // context per card scope ('' normal, 'c0'/'c1'/... per Compare column). renderPopoverMain
-// scales one artefact on the spot rather than reading VECS, which holds only the last
+// scales one artifact on the spot rather than reading VECS, which holds only the last
 // container searched.
 let lastSearchedIncludeAdditional = false;
 let CHIP_SCALE_CTX = {};
@@ -5757,14 +5783,13 @@ function formatResultForDiscord(result, rank, targetStats, containerName, contai
   // Mode B entries carry their own, Mode A entries take the search's global box.
   const qualities = new Set(chosen.map(c => c.quality ?? quality));
   const mixedQuality = qualities.size > 1;
-  // Line 1: container name (respects compare mode where each column has its own container),
-  // then the level/quality the artefact numbers below were computed at. The armor is NOT named
-  // here - it is named on the Effective Health line instead, which prints under exactly the same
-  // gate (selectedArmor && includeArmorBuffs), so text shaped by an armor still always names it.
+  // Line 1: container name (per-column in compare mode) + the level/quality the numbers below
+  // were computed at. Armor is deliberately named on the Effective Health line instead, which
+  // prints under the same gate (selectedArmor && includeArmorBuffs).
   const qualityPart = mixedQuality
     ? 'mixed quality'
     : (() => { const q = qualities.values().next().value; return `Quality ${q}% ${QUALITY_LABELS[q] || ''}`.trim(); })();
-  const headParts = [containerName ? `[${containerName}]` : '', `[Artefacts LvL ${level} - ${qualityPart}]`].filter(Boolean);
+  const headParts = [containerName ? `[${containerName}]` : '', `[Artifacts LvL ${level} - ${qualityPart}]`].filter(Boolean);
   const containerLine = `${headParts.join(' ')}\n`;
   // Line 2: price band. Unpriceable builds omit the line rather than print a placeholder.
   const priceCat = buildPriceCategory(chosen, quality);
@@ -5777,7 +5802,7 @@ function formatResultForDiscord(result, rank, targetStats, containerName, contai
   // Line 4: stat targets with tier shown as filled-star depth (high=★★★, med=☆★★, low=☆☆★)
   const TIER_STARS = {high:'★★★', med:'☆★★', low:'☆☆★'};
   const weightParts = targetStats.map(t => `${t.name} ${TIER_STARS[t.tier] || '☆★★'}`);
-  // Line 5: artefact list, combined by name. Loadout mode can hold one artefact at two
+  // Line 5: artifact list, combined by name. Loadout mode can hold one artifact at two
   // qualities, so when they differ the key and the label carry the quality too - otherwise the
   // two entries collapse into an unreadable "2x X" under a header that can't name one quality.
   const artCounts = new Map();
@@ -5823,10 +5848,9 @@ document.getElementById('results').addEventListener('click', e=>{
     containerBonus = source.containerBonus;
     protection = source.protection;
   }
-  // level/quality come off the search that produced these cards, not the live input boxes, so
-  // the header names what the printed numbers were actually computed at. Both render args
-  // carry them; quality also grades the price line, replacing currentPriceQuality here (same
-  // value on both paths - each render entry point sets it from this very field).
+  // level/quality come off the search that produced these cards, not the live inputs, so the
+  // header names what the printed numbers were computed at. quality also grades the price
+  // line, replacing currentPriceQuality (same value on both paths).
   const text = formatResultForDiscord(result, idx + 1, source.targetStats, containerName, containerBonus, protection, source.level, source.quality);
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent = '\u2713 copied';
@@ -5835,7 +5859,7 @@ document.getElementById('results').addEventListener('click', e=>{
   }).catch(()=>{});
 });
 
-// Prompts for a name, then pushes container/level/artefact+quality into BUILDS via
+// Prompts for a name, then pushes container/level/artifact+quality into BUILDS via
 // buildsSaveFromResult, the same path the My Builds form uses. Compare-mode results share
 // level/quality across columns but resolve their own container name.
 document.getElementById('results').addEventListener('click', async e=>{
@@ -5933,33 +5957,33 @@ function readSharedSearchInputs(){
   lastSearchedMaxPriceTier = priceMaxTier;
   if (![...visiblePriceTiers].some(t => t <= lastSearchedMaxPriceTier)) visiblePriceTiers = new Set([1,2,3,4]);
 
-  // Pinned artefacts: must appear in every result in both Mode A and Mode B.
+  // Pinned artifacts: must appear in every result in both Mode A and Mode B.
   const pinnedIdx = Array.from(PINNED);
   if (!useLoadout) {
-    // Mode A: ensure pinned artefacts are in the search pool even if unticked.
+    // Mode A: ensure pinned artifacts are in the search pool even if unticked.
     pinnedIdx.forEach(pi => { if (!includedIdx.includes(pi)) includedIdx.push(pi); });
   }
 
   // These three don't depend on which container is being searched, unlike the
   // pin/loadout-capacity checks inside buildContainerSearchPayload.
   if (targetStats.length === 0) return {error: 'Select at least one stat to search.'};
-  if (!useLoadout && includedIdx.length === 0) return {error: 'Include at least one artefact.'};
-  // Artefacts alone reach ~150 EH, so with no armor every build fails and the list is all
+  if (!useLoadout && includedIdx.length === 0) return {error: 'Include at least one artifact.'};
+  // Artifacts alone reach ~150 EH, so with no armor every build fails and the list is all
   // fallbacks.
   if (ehMin !== null && !selectedArmor){
-    return {error: 'Select an armor to search with a minimum Effective Health - that range is not reachable from artefacts alone.'};
+    return {error: 'Select an armor to search with a minimum Effective Health - that range is not reachable from artifacts alone.'};
   }
   if (useLoadout){
     const totalOwnedUnits = Object.values(OWNED).reduce((s,arr)=>s+(arr?arr.length:0), 0);
     if (totalOwnedUnits === 0){
-      return {error: 'Add at least one artefact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".'};
+      return {error: 'Add at least one artifact to your Loadout first (click a chip on a result card \u2192 Add to Loadout), or untick "Use My Loadout".'};
     }
   }
 
   return {sharedCtx: { targetStats, includedIdx, includeAdditional, level, quality, noDebuffIdx, useLoadout, pinnedIdx, priceBandIdx, ehMin, ehArmorBR, includeContainerBuffs }};
 }
 
-// Maps a worker result's pool-local counts back to artefact indices, folding in the pinned
+// Maps a worker result's pool-local counts back to artifact indices, folding in the pinned
 // copies that never entered the pool. Built once per container, used for every bucket.
 function makeMergeChosen(meta, useLoadout){
   const pinnedMerge = [];
@@ -5970,7 +5994,7 @@ function makeMergeChosen(meta, useLoadout){
     const chosen = [];
     best.counts.forEach((c, localI)=>{ if (c>0) chosen.push({idx: meta.poolMeta[localI].artifactIdx, count: c, quality: meta.poolMeta[localI].quality}); });
     pinnedMerge.forEach(p => {
-      // Quality as well as artefact: a merged entry becomes one chip, and save expands each
+      // Quality as well as artifact: a merged entry becomes one chip, and save expands each
       // chip at that chip's quality, so merging a Rare into a Common wrote the Rare down as
       // a Common. Normal search sets quality null on both sides, so null===null still merges.
       const ex = chosen.find(c => c.idx === p.idx && c.quality === p.quality);
@@ -6064,7 +6088,7 @@ document.getElementById('calcBtn').onclick = async ()=>{
       btn.classList.remove('stop-mode');
       btn.textContent = 'Find best combination';
 
-      // Build the pinned-artefact base once and merge it into every worker result.
+      // Build the pinned-artifact base once and merge it into every worker result.
       const mergeChosen = makeMergeChosen(meta, useLoadout);
       // Near-tie re-rank (display only); see rerankByTierTolerance.
       const results = rerankByTierTolerance(data.top.map(best=>({chosen: mergeChosen(best), sum: new Float64Array(best.sum), score: best.score, ts: best.ts})));
@@ -6154,10 +6178,10 @@ function runSplitSearch(payload, meta, opts){
     }
 
     // __srcIdx = the top-level pool index a leaf was first picked from. Bin-packing gives each
-    // top-level index to exactly one worker, so cross-worker leaves always differ here and this
-    // tie-break alone reproduces single-thread order. Same-worker ties were already ordered by
-    // that worker, and a stable sort over worker-by-worker concatenation carries that through -
-    // don't reorder each worker's array before merging.
+    // top-level index to one worker, so cross-worker leaves always differ here and this
+    // tie-break alone reproduces single-thread order. Same-worker ties are already ordered, and
+    // a stable sort over worker-by-worker concatenation carries that through - don't reorder
+    // each worker's array before merging.
     function mergeCompare(beatsFn, a, b){
       if (beatsFn(a, b)) return -1;
       if (beatsFn(b, a)) return 1;
@@ -6321,7 +6345,7 @@ async function runComparisonSearch(){
 
   // Each buildContainerSearchPayload() above rebuilt VECS, so the loop leaves it scaled to
   // the last container compared. Restore the main select's settings for later VECS readers
-  // (the artefact tooltip fallback). Defence-in-depth: card chips carry their own scaleCtx.
+  // (the artifact tooltip fallback). Defence-in-depth: card chips carry their own scaleCtx.
   const mainContainer = CONTAINERS[parseInt(backpackSelectEl.value)];
   if (mainContainer) rebuildVecs(sharedCtx.includeAdditional, mainContainer.effectiveness, level, quality);
 
@@ -6471,7 +6495,7 @@ function computeBuildResult(build){
   let skippedSlots = 0;
   build.slots.forEach(slot=>{
     const idx = ARTIFACTS.findIndex(a => a.name === slot.artifact);
-    if (idx === -1){ skippedSlots++; return; } // since-removed artefact: skip just this slot
+    if (idx === -1){ skippedSlots++; return; } // since-removed artifact: skip just this slot
     const vec = scaleArtifactVec(idx, slot.quality, includeAdditional, containerObj.effectiveness, build.level);
     for (let k=0;k<NS;k++) sum[k] += vec[k];
     const existing = chosen.find(c => c.idx === idx && c.quality === slot.quality);
@@ -6553,7 +6577,7 @@ function renderBuildComparePanel(rb, i, statList, containerName){
   });
   html += '</div>';
   if (result.skippedSlots){
-    html += `<div class="note" style="color:var(--warn);font-size:11px;margin:-2px 0 8px;">${result.skippedSlots} artefact${result.skippedSlots===1?'':'s'} no longer exists - skipped.</div>`;
+    html += `<div class="note" style="color:var(--warn);font-size:11px;margin:-2px 0 8px;">${result.skippedSlots} artifact${result.skippedSlots===1?'':'s'} no longer exists - skipped.</div>`;
   }
 
   html += '<div class="target-line">';
@@ -6791,12 +6815,12 @@ document.getElementById('compareBuildsBtn').addEventListener('click', ()=>{
     back.innerHTML =
       '<div class="video-box">' +
         '<div class="video-frame">' +
-          '<iframe src="https://www.youtube.com/embed/-xyIB2FJPHU?autoplay=1&rel=0" ' +
+          '<iframe src="https://www.youtube.com/embed/bMld7m87mH4?autoplay=1&rel=0" ' +
             'title="Video guide" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture" ' +
             'allowfullscreen></iframe>' +
         '</div>' +
         '<button type="button" class="video-close" aria-label="Close video">&times;</button>' +
-        '<a class="video-fallback" href="https://youtu.be/-xyIB2FJPHU" target="_blank" rel="noopener">Player not loading? Open on YouTube</a>' +
+        '<a class="video-fallback" href="https://youtu.be/bMld7m87mH4" target="_blank" rel="noopener">Player not loading? Open on YouTube</a>' +
       '</div>';
     document.body.appendChild(back);
     requestAnimationFrame(function(){ back.classList.add('open'); });
