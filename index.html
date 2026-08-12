@@ -297,6 +297,18 @@
     box-shadow:0 0 0 3px var(--accent-soft);
   }
   input[type=text]::placeholder{color:var(--muted);font-size:12.5px;}
+
+  /* Chevron cue on the two artifact search boxes. Drawn on the wrapper, not the
+     input, so it stays put while text scrolls; pointer-events off so a click on
+     it still lands in the field. Inputs get matching left padding below. */
+  .search-arrow{position:relative;}
+  .search-arrow::before{
+    content:'>';position:absolute;left:11px;top:50%;transform:translateY(-50%);
+    font-family:var(--mono);font-size:13px;font-weight:700;line-height:1;color:var(--accent);
+    pointer-events:none;transition:color 0.15s ease;
+  }
+  .search-arrow:focus-within::before{color:var(--accent-hi);}
+  .search-arrow > input[type=text]{padding-left:26px;}
   /* Sits alone, so it needs a typeable cue; :focus has its own ring. */
   #loadoutSearchInput:hover:not(:focus){
     border-color:var(--accent-dim);background:var(--panel-3);
@@ -400,6 +412,7 @@
   }
   .art-search-wrap{margin-bottom:9px;}
   .art-search-wrap input{padding:7px 10px;font-size:12.5px;}
+  .art-search-wrap.search-arrow > input[type=text]{padding-left:26px;}
   .artifact-used-hdr{
     font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);
     font-family:var(--mono);
@@ -1435,7 +1448,7 @@
         </div>
         <div class="check-list" id="ownedList" style="max-height:160px;"></div>
         <div class="check-group-hdr" style="padding-top:12px;">Add Artifact</div>
-        <div style="position:relative;margin-bottom:8px;">
+        <div class="search-arrow" style="margin-bottom:8px;">
           <input type="text" id="loadoutSearchInput" placeholder="Type artifact name…" autocomplete="off">
           <div id="loadoutSearchDd" class="loadout-search-dd"></div>
         </div>
@@ -1487,18 +1500,18 @@
           </div>
           <div class="check-list" id="buildSlotsList" style="max-height:160px;"></div>
 
-          <div id="buildAddWrap" style="position:relative;margin-top:8px;margin-bottom:8px;">
+          <div id="buildAddWrap" class="search-arrow" style="margin-top:8px;margin-bottom:8px;">
             <input type="text" id="buildSearchInput" placeholder="Type artifact name…" autocomplete="off">
             <div id="buildSearchDd" class="loadout-search-dd"></div>
           </div>
           <div id="buildAddRow" class="row-inline" style="display:none;">
             <select id="buildQualitySelect" style="flex:1;">
-              <option value="100">Common - 100%</option>
-              <option value="115">Uncommon - 115%</option>
-              <option value="130">Special - 130%</option>
-              <option value="145">Rare - 145%</option>
-              <option value="160">Exclusive - 160%</option>
-              <option value="175">Legendary - 175%</option>
+              <option value="100" style="color:var(--q-common);">Common - 100%</option>
+              <option value="115" style="color:var(--q-uncommon);">Uncommon - 115%</option>
+              <option value="130" style="color:var(--q-special);">Special - 130%</option>
+              <option value="145" style="color:var(--q-rare);">Rare - 145%</option>
+              <option value="160" style="color:var(--q-exclusive);">Exclusive - 160%</option>
+              <option value="175" style="color:var(--q-legendary);">Legendary - 175%</option>
             </select>
             <button type="button" id="buildAddArtBtn" class="primary" style="width:auto;margin:0;padding:8px 16px;flex-shrink:0;">Add</button>
           </div>
@@ -1521,7 +1534,7 @@
           <button type="button" id="artNoneBtn">unselect all</button>
           <button type="button" id="artUnpinBtn">unpin &amp; unlimit all</button>
         </div>
-        <div class="art-search-wrap">
+        <div class="art-search-wrap search-arrow">
           <input type="text" id="artSearchInput" placeholder="Search artifact" autocomplete="off" spellcheck="false">
         </div>
         <div class="check-list" id="artifactList"></div>
@@ -1532,7 +1545,7 @@
     <div>
       <div class="panel" id="results">
         <h2>Result</h2>
-        <div class="empty-state">Choose stats to optimize and hit "Find best combination".</div>
+        <div class="empty-state">Choose your container, level and quality of artifacts, what stats to optimize for and hit "Find best combination".</div>
       </div>
       <div id="consumableZone"></div>
     </div>
@@ -1630,7 +1643,7 @@ const QUALITY_CLASS  = {100:"q-100",115:"q-115",130:"q-130",145:"q-145",160:"q-1
 function colorQualitySelect(sel){
   sel.style.color = QUALITY_COLORS[parseInt(sel.value)] || '';
 }
-['qualityInput','loadoutQualitySelect'].forEach(id=>{
+['qualityInput','loadoutQualitySelect','buildQualitySelect'].forEach(id=>{
   const sel = document.getElementById(id);
   colorQualitySelect(sel);
   sel.addEventListener('change', ()=>colorQualitySelect(sel));
@@ -3174,7 +3187,7 @@ document.getElementById('resetAllBtn').onclick = ()=>{
   btn.disabled = false;
   btn.classList.remove('stop-mode');
   btn.textContent = 'Find best combination';
-  document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit \u201cFind best combination\u201d.</div>';
+  document.getElementById('results').innerHTML = '<h2>Result</h2><div class="empty-state">Choose your container, level and quality of artifacts, what stats to optimize for and hit \u201cFind best combination\u201d.</div>';
   document.getElementById('consumableZone').innerHTML = '';
 };
 
@@ -6738,7 +6751,7 @@ function closeBuildsCompareView(){
   } else if (lastRenderArgs){
     renderResults(lastRenderArgs.results, lastRenderArgs.extResults, lastRenderArgs.targetStats, lastRenderArgs.protection, lastRenderArgs.minFallbackResults, lastRenderArgs.containerBonus, lastRenderArgs.failedCoverageOnly, lastRenderArgs.coverageFallbackResults, lastRenderArgs.level, lastRenderArgs.quality, lastRenderArgs.containerSel);
   } else {
-    el.innerHTML = '<h2>Result</h2><div class="empty-state">Choose stats to optimize and hit "Find best combination".</div>';
+    el.innerHTML = '<h2>Result</h2><div class="empty-state">Choose your container, level and quality of artifacts, what stats to optimize for and hit "Find best combination".</div>';
   }
 }
 
